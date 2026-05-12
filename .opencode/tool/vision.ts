@@ -1,10 +1,11 @@
 /// <reference path="../env.d.ts" />
 import { tool } from "@opencode-ai/plugin"
+import { loadConfig } from "./lib/config"
 
 const MAX_SIZE = 20 * 1024 * 1024 // 20MB
 
-async function encodeImage(path: string): Promise<{ mime: string; base64: string }> {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "png"
+async function encodeImage(filePath: string): Promise<{ mime: string; base64: string }> {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "png"
   const mimeMap: Record<string, string> = {
     png: "image/png",
     jpg: "image/jpeg",
@@ -13,7 +14,7 @@ async function encodeImage(path: string): Promise<{ mime: string; base64: string
     webp: "image/webp",
     bmp: "image/bmp",
   }
-  const file = Bun.file(path)
+  const file = Bun.file(filePath)
   if ((await file.arrayBuffer()).byteLength > MAX_SIZE) {
     throw new Error(`Image too large (max ${MAX_SIZE / 1024 / 1024}MB)`)
   }
@@ -22,37 +23,32 @@ async function encodeImage(path: string): Promise<{ mime: string; base64: string
 
 export default tool({
   description:
-    "Analyze image content using vision AI. When a text-only model needs to understand images, it calls this tool which forwards to a vision-capable model (GPT-4V/Claude/Gemini). Supports: describing images, reading text from screenshots, locating UI elements.",
+    "Analyze image content using vision AI. Uses the active vision instance configured via /instance-vision.",
   args: {
     image_path: tool.schema.string().describe("Absolute path to the image file"),
     question: tool.schema.string().describe("What to ask about this image"),
   },
-  async execute(args) {
+  async execute(args, context) {
     const { mime, base64 } = await encodeImage(args.image_path)
 
-    const apiKey =
-      process.env.VISION_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || ""
-    const apiBase =
-      process.env.VISION_API_BASE ||
-      process.env.OPENAI_BASE_URL ||
-      (process.env.ANTHROPIC_API_KEY ? "https://api.anthropic.com" : "https://api.openai.com")
+    const config = await loadConfig(context.directory)
+    const inst = config.instances.find((i) => i.id === config.vision_active)
+    if (!inst) {
+      throw new Error("No active vision instance. Run /instance-vision in the TUI to select one.")
+    }
 
-    if (!apiKey) throw new Error("Set VISION_API_KEY or OPENAI_API_KEY or ANTHROPIC_API_KEY")
-
-    const model = process.env.VISION_MODEL || (apiBase.includes("anthropic") ? "claude-sonnet-4-20250514" : "gpt-4o")
-
-    const isAnthropic = apiBase.includes("anthropic")
+    const isAnthropic = inst.base_url.includes("anthropic")
 
     if (isAnthropic) {
-      const res = await fetch(`${apiBase}/v1/messages`, {
+      const res = await fetch(`${inst.base_url}/v1/messages`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-api-key": apiKey,
+          "x-api-key": inst.key,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model,
+          model: inst.model,
           max_tokens: 1024,
           messages: [
             {
@@ -70,14 +66,14 @@ export default tool({
       return data.content?.[0]?.text ?? ""
     }
 
-    const res = await fetch(`${apiBase}/v1/chat/completions`, {
+    const res = await fetch(`${inst.base_url}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
+        authorization: `Bearer ${inst.key}`,
       },
       body: JSON.stringify({
-        model,
+        model: inst.model,
         max_tokens: 1024,
         messages: [
           {

@@ -41,6 +41,9 @@ import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "@tui/component/dialog-agent"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
 import { DialogConsoleOrg } from "@tui/component/dialog-console-org"
+import { DialogInstanceAdd } from "@tui/component/dialog-instance-add"
+import { DialogInstanceSelect } from "@tui/component/dialog-instance-select"
+import { DialogInstanceVision } from "@tui/component/dialog-instance-vision"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
@@ -571,6 +574,34 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
           dialog.replace(() => <DialogProviderList />)
         },
         category: "Provider",
+      },
+      {
+        name: "instance.add",
+        title: "添加 AI 实例",
+        category: "Provider",
+        slashName: "instance-add",
+        run: () => {
+          dialog.replace(() => <DialogInstanceAdd />)
+        },
+      },
+      {
+        name: "instance.list",
+        title: "选择对话模型",
+        category: "Provider",
+        slashName: "instance-select",
+        slashAliases: ["instances"],
+        run: () => {
+          dialog.replace(() => <DialogInstanceSelect />)
+        },
+      },
+      {
+        name: "instance.vision",
+        title: "选择视觉模型",
+        category: "Provider",
+        slashName: "instance-vision",
+        run: () => {
+          dialog.replace(() => <DialogInstanceVision />)
+        },
       },
       ...(sync.data.console_state.switchableOrgCount > 1
         ? [
