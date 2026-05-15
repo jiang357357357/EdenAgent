@@ -1,5 +1,6 @@
 import { BusEvent } from "@/bus/bus-event"
 import { SessionID, MessageID, PartID } from "./schema"
+import { createLogger } from "@opencode-ai/logs"
 import z from "zod"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
@@ -18,7 +19,7 @@ import { MessageTable, PartTable, SessionTable } from "./session.sql"
 import * as ProviderError from "@/provider/error"
 import { iife } from "@/util/iife"
 import { errorMessage } from "@/util/error"
-import { isMedia } from "@/util/media"
+import { isImageAttachment, isMedia } from "@/util/media"
 import type { SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
@@ -37,6 +38,8 @@ interface FetchDecompressionError extends Error {
 
 export const SYNTHETIC_ATTACHMENT_PROMPT = "Attached media from tool result:"
 export { isMedia }
+
+const msgLog = createLogger("Session", "message")
 
 export const OutputLengthError = namedSchemaError("MessageOutputLengthError", {})
 export const AbortedError = namedSchemaError("MessageAbortedError", { message: Schema.String })
@@ -775,7 +778,23 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
           })
         // text/plain and directory files are converted into text parts, ignore them
         if (part.type === "file" && part.mime !== "text/plain" && part.mime !== "application/x-directory") {
-          if (options?.stripMedia && isMedia(part.mime)) {
+          // 图片：当模型不支持 image 输入时，替换为文本提示，引导 LLM 主动调用 vision 工具
+          if (isImageAttachment(part.mime) && !model.capabilities.input.image) {
+            const filepath = part.url.startsWith("file://") ? part.url.replace("file://", "").replace(/^\/*/, "") : part.url
+            msgLog.info("image→text hint: %s (%s) → %s", part.filename ?? "image", part.mime, filepath)
+            userMessage.parts.push({
+              type: "text",
+              text: [
+                "用户发送了一张图片。",
+                `文件名: ${part.filename ?? "image"}`,
+                `类型: ${part.mime}`,
+                "",
+                "请使用 vision 工具查看和分析这张图片：",
+                `  image_path: ${filepath}`,
+                "  question: (你自己决定要问什么，根据上下文和用户意图来写)",
+              ].join("\n"),
+            })
+          } else if (options?.stripMedia && isMedia(part.mime)) {
             userMessage.parts.push({
               type: "text",
               text: `[Attached ${part.mime}: ${part.filename ?? "file"}]`,

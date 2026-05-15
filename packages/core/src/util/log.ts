@@ -3,6 +3,7 @@ export * as Log from "./log"
 import path from "path"
 import fs from "fs/promises"
 import { createWriteStream } from "fs"
+import { configureLogger, createLogger, type Logger as ColorLogger } from "@opencode-ai/logs"
 import * as Global from "../global"
 import z from "zod"
 import { Glob } from "./glob"
@@ -41,6 +42,28 @@ export type Logger = {
 }
 
 const loggers = new Map<string, Logger>()
+const colorLoggers = new Map<string, ColorLogger>()
+
+function serviceLogger(service: string) {
+  const cached = colorLoggers.get(service)
+  if (cached) return cached
+  const logger = createLogger("opencode", service)
+  colorLoggers.set(service, logger)
+  return logger
+}
+
+function formatExtra(extra?: Record<string, any>) {
+  if (!extra) return undefined
+  const result = Object.fromEntries(
+    Object.entries(extra)
+      .filter(([key, value]) => key !== "service" && value !== undefined && value !== null)
+      .map(([key, value]) => {
+        if (value instanceof Error) return [key, value.message]
+        return [key, value]
+      }),
+  )
+  return Object.keys(result).length ? result : undefined
+}
 
 export const Default = create({ service: "default" })
 
@@ -54,14 +77,17 @@ let logpath = ""
 export function file() {
   return logpath
 }
-let write = (msg: any) => {
+let write = (msg: string) => {
   process.stderr.write(msg)
-  return msg.length
 }
 
 export async function init(options: Options) {
   if (options.level) level = options.level
   void cleanup(Global.Path.log)
+  configureLogger({
+    level,
+    writer: (message) => write(message),
+  })
   if (options.print) return
   logpath = path.join(
     Global.Path.log,
@@ -69,11 +95,11 @@ export async function init(options: Options) {
   )
   await fs.truncate(logpath).catch(() => {})
   const stream = createWriteStream(logpath, { flags: "a" })
-  write = async (msg: any) => {
-    return new Promise((resolve, reject) => {
+  write = async (msg: string) => {
+    await new Promise<void>((resolve, reject) => {
       stream.write(msg, (err) => {
         if (err) reject(err)
-        else resolve(msg.length)
+        else resolve()
       })
     })
   }
@@ -95,14 +121,6 @@ async function cleanup(dir: string) {
   await Promise.all(doomed.map((file) => fs.unlink(path.join(dir, file)).catch(() => {})))
 }
 
-function formatError(error: Error, depth = 0): string {
-  const result = error.message
-  return error.cause instanceof Error && depth < 10
-    ? result + " Caused by: " + formatError(error.cause, depth + 1)
-    : result
-}
-
-let last = Date.now()
 export function create(tags?: Record<string, any>) {
   tags = tags || {}
 
@@ -114,43 +132,31 @@ export function create(tags?: Record<string, any>) {
     }
   }
 
-  function build(message: any, extra?: Record<string, any>) {
-    const prefix = Object.entries({
-      ...tags,
-      ...extra,
-    })
-      .filter(([_, value]) => value !== undefined && value !== null)
-      .map(([key, value]) => {
-        const prefix = `${key}=`
-        if (value instanceof Error) return prefix + formatError(value)
-        if (typeof value === "object") return prefix + JSON.stringify(value)
-        return prefix + value
-      })
-      .join(" ")
-    const next = new Date()
-    const diff = next.getTime() - last
-    last = next.getTime()
-    return [next.toISOString().split(".")[0], "+" + diff + "ms", prefix, message].filter(Boolean).join(" ") + "\n"
+  const logger = service && typeof service === "string" ? serviceLogger(service) : createLogger("opencode")
+  const details = (extra?: Record<string, any>) => formatExtra({ ...tags, ...extra })
+  const args = (message?: any, extra?: Record<string, any>) => {
+    const metadata = details(extra)
+    return metadata === undefined ? [message] : [message, metadata]
   }
   const result: Logger = {
     debug(message?: any, extra?: Record<string, any>) {
       if (shouldLog("DEBUG")) {
-        write("DEBUG " + build(message, extra))
+        logger.debug(...args(message, extra))
       }
     },
     info(message?: any, extra?: Record<string, any>) {
       if (shouldLog("INFO")) {
-        write("INFO  " + build(message, extra))
+        logger.info(...args(message, extra))
       }
     },
     error(message?: any, extra?: Record<string, any>) {
       if (shouldLog("ERROR")) {
-        write("ERROR " + build(message, extra))
+        logger.error(...args(message, extra))
       }
     },
     warn(message?: any, extra?: Record<string, any>) {
       if (shouldLog("WARN")) {
-        write("WARN  " + build(message, extra))
+        logger.warn(...args(message, extra))
       }
     },
     tag(key: string, value: string) {

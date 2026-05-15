@@ -1,5 +1,5 @@
 ---
-description: Configure vision model for image analysis
+description: 配置视觉模型用于图片分析
 ---
 
 Help the user configure a vision-capable AI instance for image analysis.

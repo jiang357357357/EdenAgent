@@ -1,3 +1,4 @@
+// Stub: TUI 已迁移到 Web 前端，保留服务端事件类型以维持 API 兼容
 import { BusEvent } from "@/bus/bus-event"
 import { SessionID } from "@/session/schema"
 import { PositiveInt } from "@opencode-ai/core/schema"

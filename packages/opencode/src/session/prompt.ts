@@ -1,5 +1,6 @@
 import path from "path"
 import os from "os"
+import { createLogger } from "@opencode-ai/logs"
 import * as EffectZod from "@opencode-ai/core/effect-zod"
 import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
@@ -65,6 +66,8 @@ import { SessionTable } from "./session.sql"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
+
+const sessionLog = createLogger("Session", "prompt")
 
 const decodeMessageInfo = Schema.decodeUnknownExit(MessageV2.Info)
 const decodeMessagePart = Schema.decodeUnknownExit(MessageV2.Part)
@@ -1232,6 +1235,41 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     text: decodeDataUrl(part.url),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
+                ]
+              }
+              // 图片 data: URL → 保存为临时文件，让 LLM 通过 vision 工具主动分析
+              if (part.mime.startsWith("image/")) {
+                const tempDir = path.join(os.tmpdir(), "opencode")
+                const filename = `${crypto.randomUUID().slice(0, 8)}.${part.mime.split("/")[1] ?? "png"}`
+                const filepath = path.join(tempDir, filename)
+                const match = part.url.match(/^data:[^;]+;base64,(.+)$/)
+                if (match) {
+                  try {
+                    yield* Effect.promise(() =>
+                      Bun.write(filepath, Buffer.from(match[1], "base64")),
+                    )
+                    sessionLog.info("图片已保存为临时文件: %s (%s, %d bytes)", filename, part.mime, match[1].length)
+                  } catch {
+                    sessionLog.warn("图片临时文件保存失败: %s", filename)
+                    // fall through if temp file write fails
+                    break
+                  }
+                }
+                sessionLog.info("图片解析完成 → LLM vision 工具路径: %s", filepath)
+                const fileURL = pathToFileURL(filepath).href
+                return [
+                  {
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text",
+                    synthetic: true,
+                    text: [
+                      `用户发送了一张图片: ${part.filename ?? filename} (${part.mime})`,
+                      `图片已保存为: ${filepath}`,
+                      `你可以使用 vision 工具来查看和分析这张图片。`,
+                    ].join("\n"),
+                  },
+                  { ...part, url: fileURL, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
               break

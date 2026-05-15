@@ -1,6 +1,17 @@
 node_modules/
 dist/
+target/
 .env
 *.log
 .DS_Store
 Thumbs.db
+
+# Image assets
+packages/web/public/characters/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico

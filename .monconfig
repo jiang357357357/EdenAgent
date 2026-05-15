@@ -1,0 +1,22 @@
+# ============================================================
+# opencode .monconfig
+# AI personal assistant development environment
+# ============================================================
+
+[service]
+NAME=opencode
+VERSION=0.1.0
+
+[server]
+HOST=127.0.0.1
+PORT=40082
+WEB_PORT=40081
+BASE_URL=http://127.0.0.1:40082
+WEB_URL=http://127.0.0.1:40081
+
+[desktop]
+TITLE=opencode — AI 个人助手
+QUIT_FLAG=.artifacts/desktop-quit.flag
+
+[log]
+LEVEL=DEBUG

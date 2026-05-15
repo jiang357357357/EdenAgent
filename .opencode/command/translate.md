@@ -1,5 +1,5 @@
 ---
-description: translate English to other languages
+description: 翻译英文到其他语言
 model: opencode/claude-opus-4-7
 ---
 

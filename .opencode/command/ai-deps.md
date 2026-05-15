@@ -1,5 +1,5 @@
 ---
-description: "Bump AI sdk dependencies minor / patch versions only"
+description: 升级 AI SDK 依赖的次要/补丁版本
 ---
 
 Please read @package.json and @packages/opencode/package.json.

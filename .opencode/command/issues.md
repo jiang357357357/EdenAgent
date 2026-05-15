@@ -1,5 +1,5 @@
 ---
-description: "find issue(s) on github"
+description: 查找 GitHub 上的 Issue
 model: opencode/claude-haiku-4-5
 ---
 

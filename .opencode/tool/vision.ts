@@ -23,10 +23,10 @@ async function encodeImage(filePath: string): Promise<{ mime: string; base64: st
 
 export default tool({
   description:
-    "Analyze image content using vision AI. Uses the active vision instance configured via /instance-vision.",
+    "分析图片内容。使用 /instance-vision 配置的活跃视觉模型。当对话模型不支持图片输入时，系统会自动调用此工具预处理图片。",
   args: {
     image_path: tool.schema.string().describe("Absolute path to the image file"),
-    question: tool.schema.string().describe("What to ask about this image"),
+    question: tool.schema.string().describe("要问这张图片什么问题。可以根据上下文和用户意图自由发挥，也可以用中文描述需求。"),
   },
   async execute(args, context) {
     const { mime, base64 } = await encodeImage(args.image_path)
@@ -39,8 +39,11 @@ export default tool({
 
     const isAnthropic = inst.base_url.includes("anthropic")
 
+    const apiBase = inst.base_url.replace(/\/+$/, "")
+
     if (isAnthropic) {
-      const res = await fetch(`${inst.base_url}/v1/messages`, {
+      const endpoint = apiBase.endsWith("/messages") ? apiBase : `${apiBase}/v1/messages`
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -66,7 +69,8 @@ export default tool({
       return data.content?.[0]?.text ?? ""
     }
 
-    const res = await fetch(`${inst.base_url}/v1/chat/completions`, {
+    const endpoint = apiBase.endsWith("/chat/completions") ? apiBase : `${apiBase}/v1/chat/completions`
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",

@@ -418,9 +418,12 @@ function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMes
       if (model.capabilities.input[modality]) return part
 
       const name = filename ? `"${filename}"` : modality
+      const hint = modality === "image"
+        ? `[图片: ${name}] 视觉分析预处理未生效，请检查 /instance-vision 配置。`
+        : `[不支持的内容: ${name}（当前模型不支持 ${modality} 输入）]`
       return {
         type: "text" as const,
-        text: `ERROR: Cannot read ${name} (this model does not support ${modality} input). Inform the user.`,
+        text: hint,
       }
     })
 

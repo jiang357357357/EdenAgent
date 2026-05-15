@@ -34,6 +34,7 @@
     "@opentelemetry/context-async-hooks": "2.6.1",
     "@opentelemetry/exporter-trace-otlp-http": "0.214.0",
     "@opentelemetry/sdk-trace-base": "2.6.1",
+    "@opencode-ai/logs": "workspace:*",
     "effect": "catalog:",
     "cross-spawn": "catalog:",
     "glob": "13.0.5",

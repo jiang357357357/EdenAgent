@@ -1,5 +1,5 @@
 ---
-description: Remove AI code slop
+description: 清理 AI 生成的冗余代码
 ---
 
 Check the diff against dev, and remove all AI generated slop introduced in this branch.
