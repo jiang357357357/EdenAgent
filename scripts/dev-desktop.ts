@@ -53,7 +53,7 @@ function requestDesktopQuitSync() {
 $root = '${escapedRoot}'
 $targets = Get-CimInstance Win32_Process | Where-Object {
   ($_.ExecutablePath -like "$root*") -and
-  ($_.Name -eq "opencode-desktop.exe" -or $_.CommandLine -like "*target\\\\debug\\\\opencode-desktop.exe*")
+  ($_.Name -eq "opencode-desktop.exe" -or $_.CommandLine -like "*target*debug*opencode-desktop.exe*")
 } | Select-Object -ExpandProperty ProcessId -Unique
 
 foreach ($id in $targets) {
@@ -76,12 +76,12 @@ $root = '${escapedRoot}'
 $current = $PID
 $targets = Get-CimInstance Win32_Process | Where-Object {
   $_.ProcessId -ne $current -and (
-    ($_.ExecutablePath -like "$root*") -or
+    ($_.Name -eq "opencode-desktop.exe" -and $_.ExecutablePath -like "$root*") -or
     ($_.CommandLine -like "*--cwd packages/desktop dev*") -or
-    ($_.CommandLine -like "*--cwd packages\\\\desktop dev*") -or
-    ($_.CommandLine -like "*packages\\\\desktop\\\\src-tauri*") -or
+    ($_.CommandLine -like "*--cwd packages*desktop dev*") -or
+    ($_.CommandLine -like "*packages*desktop*src-tauri*") -or
     ($_.CommandLine -like "*packages/desktop/src-tauri*") -or
-    ($_.CommandLine -like "*target\\\\debug\\\\opencode-desktop.exe*") -or
+    ($_.CommandLine -like "*target*debug*opencode-desktop.exe*") -or
     ($_.CommandLine -like "*target/debug/opencode-desktop.exe*") -or
     ($_.Name -eq "cargo.exe" -and $_.CommandLine -like "*run --no-default-features --color always --*")
   )
@@ -98,8 +98,44 @@ foreach ($id in $targets) {
   })
 }
 
+function waitForDesktopBinaryUnlock() {
+  if (process.platform !== "win32") return
+
+  const exe = path.join(root, "packages", "desktop", "src-tauri", "target", "debug", "opencode-desktop.exe")
+  for (let i = 0; i < 12; i++) {
+    killDesktopProjectProcesses()
+    const result = Bun.spawnSync(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `
+$path = '${exe.replaceAll("'", "''")}'
+if (!(Test-Path -LiteralPath $path)) { exit 0 }
+try {
+  $stream = [System.IO.File]::Open($path, 'Open', 'ReadWrite', 'None')
+  $stream.Close()
+  exit 0
+} catch {
+  exit 1
+}
+`], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    if (result.exitCode === 0) return
+    sleepSync(500)
+  }
+}
+
 let cleaned = false
 let desktopProc: ReturnType<typeof spawn> | undefined
+
+async function relay(readable: ReadableStream<Uint8Array> | null, target: NodeJS.WriteStream) {
+  if (!readable) return
+
+  const reader = readable.getReader()
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    target.write(value)
+  }
+}
 
 function cleanupSync() {
   if (cleaned) return
@@ -125,16 +161,20 @@ process.on("exit", () => {
 })
 
 await waitForVite()
+waitForDesktopBinaryUnlock()
 
 desktopProc = spawn({
   cmd: ["bun", "run", "--cwd", "packages/desktop", "dev"],
-  stdout: "inherit",
-  stderr: "inherit",
+  stdout: "pipe",
+  stderr: "pipe",
   env: {
     ...process.env,
     OPENCODE_DESKTOP_QUIT_FLAG: quitFlag,
   },
 })
+
+void relay(desktopProc.stdout, process.stdout)
+void relay(desktopProc.stderr, process.stderr)
 
 await desktopProc.exited
 cleanupSync()

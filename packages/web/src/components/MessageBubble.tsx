@@ -2,14 +2,16 @@ import { MessageData } from '../types';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { cn } from '../lib/utils';
+import { resolveOpencodeUrl } from '../lib/opencode';
 import ReactMarkdown from 'react-markdown';
 import { User, Sparkles } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: MessageData;
+  onPreviewImage?: (src: string, alt?: string) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onPreviewImage }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -43,8 +45,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {message.images.map((img, idx) => (
               <img 
                 key={idx}
-                src={img} 
+                src={resolveOpencodeUrl(img)}
                 alt="Uploaded" 
+                onClick={() => onPreviewImage?.(resolveOpencodeUrl(img), 'Uploaded')}
                 className={cn(
                   "rounded-xl object-cover max-w-xs shadow-sm border border-border cursor-pointer hover:opacity-90 transition-opacity",
                   isUser ? "h-32 w-auto" : "w-64 h-auto"

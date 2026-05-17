@@ -1,30 +1,96 @@
+import { spawn } from "bun"
+
 const root = process.cwd()
 const { loadMonConfig } = await import("./monconfig")
 const config = loadMonConfig(root)
 const serverPort = config.number("server", "PORT", 40082)
 const webPort = config.number("server", "WEB_PORT", 40081)
 
-function psQuote(input: string) {
-  return `'${input.replaceAll("'", "''")}'`
+type Child = ReturnType<typeof spawn>
+
+const children: Child[] = []
+let shuttingDown = false
+
+const ansi = {
+  reset: "\x1b[0m",
+  dev: "\x1b[90m",
+  server: "\x1b[36m",
+  web: "\x1b[35m",
+  desktop: "\x1b[32m",
 }
 
-function openTerminal(title: string, command: string) {
-  if (process.platform === "win32") {
-    const psCommand = [
-      `$Host.UI.RawUI.WindowTitle = ${psQuote(title)}`,
-      `Set-Location -LiteralPath ${psQuote(root)}`,
-      command,
-    ].join("; ")
+function labelText(label: string) {
+  const color =
+    label === "server" ? ansi.server :
+    label === "web" ? ansi.web :
+    label === "desktop" ? ansi.desktop :
+    ansi.dev
+  return `${color}[${label}]${ansi.reset}`
+}
 
-    Bun.spawnSync(["cmd", "/c", "start", title, "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", psCommand])
-    return
+function devLog(message: string) {
+  console.log(`${labelText("dev")} ${message}`)
+}
+
+function writeLine(label: string, line: string, stream: "stdout" | "stderr") {
+  if (!line) return
+  const target = stream === "stderr" ? process.stderr : process.stdout
+  target.write(`${labelText(label)} ${line}\n`)
+}
+
+async function prefixOutput(label: string, readable: ReadableStream<Uint8Array> | null, stream: "stdout" | "stderr") {
+  if (!readable) return
+
+  const decoder = new TextDecoder()
+  const reader = readable.getReader()
+  let pending = ""
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+
+    pending += decoder.decode(value, { stream: true })
+    const lines = pending.split(/\r?\n/)
+    pending = lines.pop() ?? ""
+    for (const line of lines) writeLine(label, line, stream)
   }
 
-  Bun.spawn({
-    cmd: ["sh", "-lc", `cd ${JSON.stringify(root)} && ${command}`],
-    stdout: "ignore",
-    stderr: "ignore",
+  pending += decoder.decode()
+  if (pending) writeLine(label, pending, stream)
+}
+
+function killProcessTree(proc: Child | undefined) {
+  if (!proc?.pid) return
+  if (process.platform === "win32") {
+    Bun.spawnSync(["taskkill", "/PID", String(proc.pid), "/T", "/F"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    return
+  }
+  proc.kill()
+}
+
+function start(label: string, cmd: string[]) {
+  const child = spawn({
+    cmd,
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
   })
+  children.push(child)
+
+  void prefixOutput(label, child.stdout, "stdout")
+  void prefixOutput(label, child.stderr, "stderr")
+  void child.exited.then((code) => {
+    if (!shuttingDown && code !== 0) {
+      process.stderr.write(`${labelText("dev")} ${label} exited with code ${code}\n`)
+      shutdown(code)
+    }
+  })
+
+  return child
 }
 
 async function waitFor(url: string, label: string) {
@@ -38,15 +104,27 @@ async function waitFor(url: string, label: string) {
   throw new Error(`${label} 未在 30s 内就绪：${url}`)
 }
 
-console.log("启动 server 终端...")
-openTerminal("opencode server", "bun run dev:server")
-await waitFor(`http://localhost:${serverPort}/session`, "server")
+function shutdown(code = 0) {
+  if (shuttingDown) return
+  shuttingDown = true
+  for (const child of [...children].reverse()) killProcessTree(child)
+  process.exit(code)
+}
 
-console.log("启动 web 终端...")
-openTerminal("opencode web", "bun run dev:web")
+process.on("SIGINT", () => shutdown(0))
+process.on("SIGTERM", () => shutdown(0))
+
+devLog(`启动 server，端口 ${serverPort}`)
+start("server", ["bun", "run", "dev:server"])
+await waitFor(`http://localhost:${serverPort}/api/session`, "server")
+
+devLog(`启动 web，端口 ${webPort}`)
+start("web", ["bun", "run", "dev:web"])
 await waitFor(`http://localhost:${webPort}`, "web")
 
-console.log("启动 desktop 终端...")
-openTerminal("opencode desktop", "bun run scripts/dev-desktop.ts")
+devLog("启动 desktop")
+const desktop = start("desktop", ["bun", "run", "scripts/dev-desktop.ts"])
 
-console.log("已打开 3 个独立终端：server / web / desktop")
+devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
+await desktop.exited
+shutdown(0)

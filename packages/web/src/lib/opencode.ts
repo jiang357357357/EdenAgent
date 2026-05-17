@@ -28,6 +28,7 @@ type ApiPart =
       id: string;
       type: 'text';
       text: string;
+      synthetic?: boolean;
     }
   | {
       id: string;
@@ -39,6 +40,7 @@ type ApiPart =
       type: 'file';
       mime: string;
       url: string;
+      filename?: string;
     }
   | {
       id: string;
@@ -107,6 +109,30 @@ function stringify(value: unknown) {
   }
 }
 
+export function resolveOpencodeUrl(url: string) {
+  if (!url) return url;
+  if (/^(data:|blob:|https?:\/\/)/i.test(url)) return url;
+  if (url.startsWith('file://')) {
+    if (!('__TAURI_INTERNALS__' in window)) return url;
+
+    try {
+      const fileUrl = new URL(url);
+      const pathname = decodeURIComponent(fileUrl.pathname);
+      const filePath = pathname.replace(/^\/([A-Za-z]:\/)/, '$1').replace(/\//g, '\\');
+      return (window as unknown as {
+        __TAURI_INTERNALS__?: {
+          convertFileSrc?: (filePath: string, protocol?: string) => string;
+        };
+      }).__TAURI_INTERNALS__?.convertFileSrc?.(filePath) ?? url;
+    } catch {
+      return url;
+    }
+  }
+  if (url.startsWith('/api/')) return url;
+  if (url.startsWith('/')) return `${baseUrl}${url}`;
+  return url;
+}
+
 function mapTool(part: Extract<ApiPart, { type: 'tool' }>): ToolCall {
   const state = part.state;
   const status = state.status === 'completed' ? 'success' : state.status === 'error' ? 'error' : 'running';
@@ -136,7 +162,7 @@ export function mapSession(info: ApiSession, messages: MessageData[] = []): Sess
 
 export function mapMessage(input: ApiMessage): MessageData {
   const text = input.parts
-    .filter((part): part is Extract<ApiPart, { type: 'text' }> => part.type === 'text')
+    .filter((part): part is Extract<ApiPart, { type: 'text' }> => part.type === 'text' && !part.synthetic)
     .map((part) => part.text)
     .join('\n')
     .trim();

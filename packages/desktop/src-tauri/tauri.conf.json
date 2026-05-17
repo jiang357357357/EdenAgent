@@ -17,12 +17,17 @@
         "height": 620,
         "resizable": true,
         "fullscreen": false,
+        "transparent": true,
         "center": true,
         "minWidth": 480,
         "minHeight": 380
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$TEMP/opencode/**"]
+      },
       "csp": null
     }
   }

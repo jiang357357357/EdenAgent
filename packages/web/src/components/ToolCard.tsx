@@ -37,7 +37,7 @@ export function ToolCard({ tool }: ToolCardProps) {
           {getIcon()}
         </span>
         <div className="flex-grow flex items-center gap-2 text-text font-serif">
-          {tool.name}
+          工具: {tool.name}
           <span className="text-text-muted font-sans font-normal truncate max-w-[200px] text-xs">
             {tool.input.length > 30 ? tool.input.substring(0, 30) + '...' : tool.input}
           </span>
@@ -59,7 +59,7 @@ export function ToolCard({ tool }: ToolCardProps) {
           >
             <div className="p-3 bg-bg border-t border-border grid gap-3">
               <div>
-                <div className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-1">Input</div>
+                <div className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-1">输入</div>
                 <pre className="text-xs text-text font-mono whitespace-pre-wrap overflow-x-auto bg-card border border-border p-2 rounded-lg">
                   {tool.input}
                 </pre>
@@ -67,7 +67,7 @@ export function ToolCard({ tool }: ToolCardProps) {
               
               {tool.output && (
                 <div>
-                  <div className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-1">Output</div>
+                  <div className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.2em] mb-1">输出</div>
                   <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-card border border-border p-2 rounded-lg text-text-lighter">
                     {tool.output}
                   </pre>
@@ -76,7 +76,7 @@ export function ToolCard({ tool }: ToolCardProps) {
               
               {tool.error && (
                 <div>
-                  <div className="text-[10px] font-semibold text-red-500/70 uppercase tracking-[0.2em] mb-1">Error</div>
+                  <div className="text-[10px] font-semibold text-red-500/70 uppercase tracking-[0.2em] mb-1">错误</div>
                   <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-red-950/20 border border-red-900/30 text-red-400 p-2 rounded-lg">
                     {tool.error}
                   </pre>

@@ -22,6 +22,12 @@
     font-family: var(--font-sans);
   }
 
+  html.character-transparent,
+  html.character-transparent body,
+  html.character-transparent #root {
+    background: transparent;
+  }
+
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

@@ -6,7 +6,8 @@ export const color = {
   reset: RESET,
   black: (t: string) => fmt(t, "30"),
   gray: (t: string) => fmt(t, "90"),
-  dimGray: (t: string) => fmt(t, "2;90"),
+  dimGray: (t: string) => fmt(t, "90"),
+  slate: (t: string) => fmt(t, "37"),
   green: (t: string) => fmt(t, "32"),
   yellow: (t: string) => fmt(t, "33"),
   red: (t: string) => fmt(t, "31"),
@@ -39,5 +40,5 @@ export function levelName(level: string): string {
 }
 
 export function dimPath(text: string): string {
-  return color.dimGray(text)
+  return color.slate(text)
 }

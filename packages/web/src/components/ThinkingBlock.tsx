@@ -17,7 +17,7 @@ export function ThinkingBlock({ content }: ThinkingBlockProps) {
         className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] font-sans text-text-muted hover:text-text transition-colors py-1 select-none"
       >
         <Sparkles className="w-3.5 h-3.5 text-accent" />
-        <span>REASONING</span>
+        <span>思考</span>
         {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
 

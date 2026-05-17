@@ -3,15 +3,17 @@
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 use std::{env, path::Path};
 
 use tauri::{
+    Emitter,
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    Manager, WindowEvent, Wry,
+    window::Color,
 };
 
 const APP_WINDOW_TITLE: &str = "opencode — AI 个人助手";
@@ -19,6 +21,8 @@ const APP_WINDOW_TITLE: &str = "opencode — AI 个人助手";
 #[derive(Clone)]
 struct AppState {
     quitting: Arc<AtomicBool>,
+    character_mode: Arc<AtomicBool>,
+    toggle_view_mode: Arc<Mutex<Option<MenuItem<Wry>>>>,
 }
 
 fn has_quit_flag() -> bool {
@@ -119,6 +123,7 @@ mod single_instance {
 struct WindowSizeRequest {
     width: Option<f64>,
     height: Option<f64>,
+    aspect_ratio: Option<f64>,
     width_ratio: Option<f64>,
     height_ratio: Option<f64>,
     min_width: Option<f64>,
@@ -144,6 +149,29 @@ fn show_main_window(app: &tauri::AppHandle) {
 fn hide_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
+    }
+}
+
+fn set_view_mode(app: &tauri::AppHandle, mode: &str) {
+    show_main_window(app);
+    let _ = app.emit("opencode-view-mode", mode);
+}
+
+fn update_view_mode_menu(app: &tauri::AppHandle, mode: &str) {
+    let item = app
+        .state::<AppState>()
+        .toggle_view_mode
+        .lock()
+        .ok()
+        .and_then(|item| item.clone());
+
+    if let Some(item) = item {
+        let text = if mode == "character" {
+            "切换到三栏模式"
+        } else {
+            "切换到角色模式"
+        };
+        let _ = item.set_text(text);
     }
 }
 
@@ -176,9 +204,15 @@ fn fallback_tray_icon() -> Image<'static> {
 fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "隐藏到托盘", true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
+    let toggle_view_mode = MenuItem::with_id(app, "toggle_view_mode", "切换到角色模式", true, None::<&str>)?;
+    let separator_view = PredefinedMenuItem::separator(app)?;
+    let separator_quit = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &hide, &separator, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &hide, &separator_view, &toggle_view_mode, &separator_quit, &quit])?;
+    if let Ok(mut item) = app.state::<AppState>().toggle_view_mode.lock() {
+        *item = Some(toggle_view_mode.clone());
+    }
+
     TrayIconBuilder::with_id("main-tray")
         .icon(fallback_tray_icon())
         .tooltip(APP_WINDOW_TITLE)
@@ -187,6 +221,16 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),
             "hide" => hide_main_window(app),
+            "toggle_view_mode" => {
+                let mode = if app.state::<AppState>().character_mode.load(Ordering::SeqCst) {
+                    "chatWithCharacter"
+                } else {
+                    "character"
+                };
+                set_view_mode(app, mode);
+                app.state::<AppState>().character_mode.store(mode == "character", Ordering::SeqCst);
+                update_view_mode_menu(app, mode);
+            }
             "quit" => {
                 app.state::<AppState>().quitting.store(true, Ordering::SeqCst);
                 app.exit(0);
@@ -218,7 +262,7 @@ fn set_window_size(window: tauri::WebviewWindow, request: WindowSizeRequest) -> 
         .or_else(|| window.primary_monitor().ok().flatten())
         .map(|monitor| monitor.size().to_logical::<f64>(monitor.scale_factor()));
 
-    let width = match (request.width, request.width_ratio, monitor_size.as_ref()) {
+    let mut width = match (request.width, request.width_ratio, monitor_size.as_ref()) {
         (Some(width), _, _) => width,
         (_, Some(ratio), Some(size)) => size.width * ratio,
         _ => 900.0,
@@ -229,8 +273,29 @@ fn set_window_size(window: tauri::WebviewWindow, request: WindowSizeRequest) -> 
         _ => 620.0,
     };
 
-    let width = clamp(width, request.min_width, request.max_width);
     let height = clamp(height, request.min_height, request.max_height);
+    if let Some(aspect_ratio) = request.aspect_ratio {
+        width = height * aspect_ratio;
+    }
+    let width = clamp(width, request.min_width, request.max_width);
+
+    if request.min_width.is_some() || request.min_height.is_some() {
+        window
+            .set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
+                width: request.min_width.unwrap_or(1.0),
+                height: request.min_height.unwrap_or(1.0),
+            })))
+            .map_err(|error| error.to_string())?;
+    }
+
+    if request.max_width.is_some() || request.max_height.is_some() {
+        window
+            .set_max_size(Some(tauri::Size::Logical(tauri::LogicalSize {
+                width: request.max_width.unwrap_or(f64::INFINITY),
+                height: request.max_height.unwrap_or(f64::INFINITY),
+            })))
+            .map_err(|error| error.to_string())?;
+    }
 
     window
         .set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
@@ -243,6 +308,41 @@ fn set_window_size(window: tauri::WebviewWindow, request: WindowSizeRequest) -> 
     Ok(())
 }
 
+#[tauri::command]
+fn set_window_appearance(window: tauri::WebviewWindow, mode: String) -> Result<(), String> {
+    let character = mode == "character";
+    let background = if character {
+        Some(Color(0, 0, 0, 0))
+    } else {
+        Some(Color(245, 245, 244, 255))
+    };
+
+    window
+        .set_decorations(!character)
+        .map_err(|error| error.to_string())?;
+    window
+        .set_shadow(!character)
+        .map_err(|error| error.to_string())?;
+    window
+        .set_background_color(background)
+        .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn set_view_mode_state(app: tauri::AppHandle, mode: String) {
+    app.state::<AppState>()
+        .character_mode
+        .store(mode == "character", Ordering::SeqCst);
+    update_view_mode_menu(&app, &mode);
+}
+
+#[tauri::command]
+fn start_window_drag(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.start_dragging().map_err(|error| error.to_string())
+}
+
 fn main() {
     console_control::ignore_interrupts();
 
@@ -253,9 +353,16 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState {
             quitting: Arc::new(AtomicBool::new(false)),
+            character_mode: Arc::new(AtomicBool::new(false)),
+            toggle_view_mode: Arc::new(Mutex::new(None)),
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![set_window_size])
+        .invoke_handler(tauri::generate_handler![
+            set_window_size,
+            set_window_appearance,
+            set_view_mode_state,
+            start_window_drag
+        ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let is_quitting = window

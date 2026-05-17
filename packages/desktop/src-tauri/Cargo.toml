@@ -6,7 +6,7 @@ rust-version = "1.84"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-opener = "2"
 
 [build-dependencies]
