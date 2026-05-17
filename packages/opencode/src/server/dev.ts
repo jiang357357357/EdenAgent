@@ -80,6 +80,14 @@ async function main() {
         async fetch(req) {
           const url = new URL(req.url)
 
+          // Legacy SSE endpoint used by local dev tooling.
+          // This must be checked before the generic /api/* proxy branch,
+          // otherwise `/api/events` gets rewritten to `/events` and falls
+          // through to the backend UI catch-all.
+          if (url.pathname === "/api/events") {
+            return handleSSE(req)
+          }
+
           // Proxy API calls to the Effect HTTP server (strip /api prefix for v1 routes)
           if (url.pathname.startsWith("/api/")) {
             try {
@@ -98,11 +106,6 @@ async function main() {
                 { status: 503, headers: { "content-type": "application/json" } },
               )
             }
-          }
-
-          // SSE endpoint
-          if (url.pathname === "/api/events") {
-            return handleSSE(req)
           }
 
           // In dev, proxy to Vite

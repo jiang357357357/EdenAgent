@@ -22,6 +22,7 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
+import { resolveMonHubMcpUrl } from "./monhub"
 import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
@@ -310,7 +311,8 @@ export const layer = Layer.effect(
     ) {
       const oauthDisabled = mcp.oauth === false
       const oauthConfig = typeof mcp.oauth === "object" ? mcp.oauth : undefined
-      const url = remoteURL(key, mcp.url)
+      const resolvedURL = yield* resolveRemoteURL(key, mcp)
+      const url = remoteURL(key, resolvedURL)
       if (!url) {
         return {
           client: undefined as MCPClient | undefined,
@@ -322,7 +324,7 @@ export const layer = Layer.effect(
       if (!oauthDisabled) {
         authProvider = new McpOAuthProvider(
           key,
-          mcp.url,
+          resolvedURL,
           {
             clientId: oauthConfig?.clientId,
             clientSecret: oauthConfig?.clientSecret,
@@ -399,7 +401,7 @@ export const layer = Layer.effect(
             log.debug("transport connection failed", {
               key,
               transport: name,
-              url: mcp.url,
+              url: resolvedURL,
               error: lastError.message,
             })
             lastStatus = { status: "failed" as const, error: lastError.message }
@@ -418,6 +420,33 @@ export const layer = Layer.effect(
         client: undefined as MCPClient | undefined,
         status: (lastStatus ?? { status: "failed", error: "Unknown error" }) as Status,
       }
+    })
+
+    const resolveRemoteURL = Effect.fn("MCP.resolveRemoteURL")(function* (
+      key: string,
+      mcp: ConfigMCP.Info & { type: "remote" },
+    ) {
+      if (mcp.discovery?.type === "monhub") {
+        return yield* Effect.tryPromise({
+          try: () => resolveMonHubMcpUrl(key, mcp.discovery!),
+          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+        }).pipe(
+          Effect.tap((url) => Effect.sync(() => log.info("resolved remote mcp through MonHub", { key, url }))),
+          Effect.catch((error) => {
+            if (mcp.url) {
+              log.warn("failed to resolve remote mcp through MonHub, falling back to configured url", {
+                key,
+                error: error.message,
+              })
+              return Effect.succeed(mcp.url)
+            }
+            return Effect.fail(error)
+          }),
+        )
+      }
+
+      if (mcp.url) return mcp.url
+      return yield* Effect.fail(new Error(`Missing MCP URL for "${key}"`))
     })
 
     const connectLocal = Effect.fn("MCP.connectLocal")(function* (

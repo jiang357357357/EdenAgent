@@ -9,7 +9,7 @@ interface ToolCardProps {
 }
 
 export function ToolCard({ tool }: ToolCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(tool.status === 'running' || tool.status === 'error');
 
   const getIcon = () => {
     switch (tool.name.toLowerCase()) {
@@ -25,6 +25,12 @@ export function ToolCard({ tool }: ToolCardProps) {
     if (tool.status === 'error') return 'text-red-500';
     if (tool.status === 'running') return 'text-accent animate-pulse';
     return 'text-accent';
+  };
+
+  const getStatusLabel = () => {
+    if (tool.status === 'error') return 'error';
+    if (tool.status === 'running') return 'running';
+    return 'done';
   };
 
   return (
@@ -43,6 +49,18 @@ export function ToolCard({ tool }: ToolCardProps) {
           </span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 text-xs text-text-muted font-sans uppercase tracking-widest">
+          <span
+            className={cn(
+              'rounded-full border px-2 py-0.5 text-[10px] tracking-[0.15em]',
+              tool.status === 'error'
+                ? 'border-red-500/30 text-red-400'
+                : tool.status === 'running'
+                  ? 'border-accent/30 text-accent'
+                  : 'border-border text-text-muted',
+            )}
+          >
+            {getStatusLabel()}
+          </span>
           {tool.duration && <span>{tool.duration}ms</span>}
           {tool.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -64,6 +82,12 @@ export function ToolCard({ tool }: ToolCardProps) {
                   {tool.input}
                 </pre>
               </div>
+
+              {tool.status === 'running' && !tool.output && !tool.error && (
+                <div className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-text-muted">
+                  正在执行中...
+                </div>
+              )}
               
               {tool.output && (
                 <div>

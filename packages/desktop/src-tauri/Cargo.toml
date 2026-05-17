@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.84"
 
+[package.metadata.tauri]
+identifier = "com.opencode.app"
+bundle = { icon = ["icons/icon.ico"] }
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }

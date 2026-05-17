@@ -9,6 +9,9 @@
     "beforeDevCommand": "",
     "beforeBuildCommand": "bun run --cwd ../web build"
   },
+  "bundle": {
+    "icon": ["icons/icon.ico"]
+  },
   "app": {
     "windows": [
       {

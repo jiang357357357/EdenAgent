@@ -37,9 +37,37 @@ export const OAuth = Schema.Struct({
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type OAuth = Schema.Schema.Type<typeof OAuth>
 
+export const MonHubDiscovery = Schema.Struct({
+  type: Schema.Literal("monhub").annotate({ description: "Resolve the MCP URL from MonHub service discovery" }),
+  serviceName: Schema.optional(Schema.String).annotate({
+    description: "MonHub service_name to resolve. Defaults to the MCP config key.",
+  }),
+  serviceType: Schema.optional(Schema.String).annotate({
+    description: "MonHub service_type to query. Defaults to mcp_server.",
+  }),
+  capabilities: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+    description: "Required MonHub capabilities.",
+  }),
+  udpPort: Schema.optional(PositiveInt).annotate({
+    description: "MonHub UDP discovery/query port. Defaults to 40053.",
+  }),
+  broadcastAddress: Schema.optional(Schema.String).annotate({
+    description: "UDP broadcast address. Defaults to 255.255.255.255.",
+  }),
+  timeout: Schema.optional(PositiveInt).annotate({
+    description: "Discovery timeout in ms. Defaults to 3000.",
+  }),
+})
+  .annotate({ identifier: "McpMonHubDiscoveryConfig" })
+  .pipe(withStatics((s) => ({ zod: zod(s) })))
+export type MonHubDiscovery = Schema.Schema.Type<typeof MonHubDiscovery>
+
 export const Remote = Schema.Struct({
   type: Schema.Literal("remote").annotate({ description: "Type of MCP server connection" }),
-  url: Schema.String.annotate({ description: "URL of the remote MCP server" }),
+  url: Schema.String.annotate({ description: "Fallback URL of the remote MCP server" }),
+  discovery: Schema.optional(MonHubDiscovery).annotate({
+    description: "Optional service discovery configuration for resolving the remote MCP URL.",
+  }),
   enabled: Schema.optional(Schema.Boolean).annotate({
     description: "Enable or disable the MCP server on startup",
   }),

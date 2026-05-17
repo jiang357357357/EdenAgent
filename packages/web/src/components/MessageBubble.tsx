@@ -1,10 +1,11 @@
 import { MessageData } from '../types';
 import { ToolCard } from './ToolCard';
 import { ThinkingBlock } from './ThinkingBlock';
+import { MetaPartCard } from './MetaPartCard';
 import { cn } from '../lib/utils';
 import { resolveOpencodeUrl } from '../lib/opencode';
 import ReactMarkdown from 'react-markdown';
-import { User, Sparkles } from 'lucide-react';
+import { User } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: MessageData;
@@ -59,12 +60,16 @@ export function MessageBubble({ message, onPreviewImage }: MessageBubbleProps) {
 
         {/* Assistant Thinking */}
         {!isUser && message.thinking && (
-          <ThinkingBlock content={message.thinking} />
+          <ThinkingBlock content={message.thinking} state={message.thinkingState} />
         )}
 
         {/* Assistant Tool Calls */}
         {!isUser && message.toolCalls && message.toolCalls.map((tool) => (
           <ToolCard key={tool.id} tool={tool} />
+        ))}
+
+        {!isUser && message.metaParts && message.metaParts.map((part) => (
+          <MetaPartCard key={part.id} part={part} />
         ))}
 
         {/* Main Content Bubble */}
@@ -79,8 +84,14 @@ export function MessageBubble({ message, onPreviewImage }: MessageBubbleProps) {
             ) : (
                <div className="markdown-body">
                  <ReactMarkdown>{message.content}</ReactMarkdown>
-               </div>
-            )}
+             </div>
+           )}
+          </div>
+        )}
+
+        {!isUser && !message.content && message.isStreaming && (!message.toolCalls || message.toolCalls.length === 0) && (
+          <div className="px-1 text-sm text-text-muted">
+            正在组织回复...
           </div>
         )}
       </div>
