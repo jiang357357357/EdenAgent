@@ -38,7 +38,7 @@ describe("session.listGlobal", () => {
       fn: async () => svc.create({ title: "second-session" }),
     })
 
-    const sessions = [...svc.listGlobal({ limit: 200 })]
+    const sessions = await Effect.runPromise(svc.listGlobal({ limit: 200 }))
     const ids = sessions.map((session) => session.id)
 
     expect(ids).toContain(firstSession.id)
@@ -69,12 +69,12 @@ describe("session.listGlobal", () => {
       fn: async () => svc.setArchived({ sessionID: archived.id, time: Date.now() }),
     })
 
-    const sessions = [...svc.listGlobal({ limit: 200 })]
+    const sessions = await Effect.runPromise(svc.listGlobal({ limit: 200 }))
     const ids = sessions.map((session) => session.id)
 
     expect(ids).not.toContain(archived.id)
 
-    const allSessions = [...svc.listGlobal({ limit: 200, archived: true })]
+    const allSessions = await Effect.runPromise(svc.listGlobal({ limit: 200, archived: true }))
     const allIds = allSessions.map((session) => session.id)
 
     expect(allIds).toContain(archived.id)
@@ -93,11 +93,11 @@ describe("session.listGlobal", () => {
       fn: async () => svc.create({ title: "page-two" }),
     })
 
-    const page = [...svc.listGlobal({ directory: tmp.path, limit: 1 })]
+    const page = await Effect.runPromise(svc.listGlobal({ directory: tmp.path, limit: 1 }))
     expect(page.length).toBe(1)
     expect(page[0].id).toBe(second.id)
 
-    const next = [...svc.listGlobal({ directory: tmp.path, limit: 10, cursor: page[0].time.updated })]
+    const next = await Effect.runPromise(svc.listGlobal({ directory: tmp.path, limit: 10, cursor: page[0].time.updated }))
     const ids = next.map((session) => session.id)
 
     expect(ids).toContain(first.id)

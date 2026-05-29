@@ -1,0 +1,1 @@
+export { CharacterPage } from './CharacterPage';

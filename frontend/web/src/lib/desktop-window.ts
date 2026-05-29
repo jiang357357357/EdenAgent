@@ -1,11 +1,11 @@
 const WINDOW_SIZES = {
   chatWithCharacter: {
     widthRatio: 0.56,
-    heightRatio: 0.68,
+    heightRatio: 0.55,
     minWidth: 820,
     minHeight: 540,
     maxWidth: 1040,
-    maxHeight: 760,
+    maxHeight: 640,
   },
   character: {
     aspectRatio: 9 / 16,

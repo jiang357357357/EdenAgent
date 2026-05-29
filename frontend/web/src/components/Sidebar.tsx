@@ -1,6 +1,7 @@
-import { Plus, MessageSquare, Menu, Moon, Sun, Settings } from 'lucide-react';
+import { Plus, Menu, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Session } from '../types';
+import type { AuthUser } from '../lib/auth';
 
 interface SidebarProps {
   sessions: Session[];
@@ -11,6 +12,8 @@ interface SidebarProps {
   setIsOpen: (open: boolean) => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  currentUser?: AuthUser | null;
+  onLogout: () => void;
 }
 
 export function Sidebar({ 
@@ -21,7 +24,9 @@ export function Sidebar({
   isOpen, 
   setIsOpen,
   theme,
-  toggleTheme
+  toggleTheme,
+  currentUser,
+  onLogout,
 }: SidebarProps) {
   
   // Group sessions by date
@@ -91,7 +96,21 @@ export function Sidebar({
            </div>
         </div>
 
-        {/* Footer / Settings */}
+        <div className="border-t border-border px-[2vw] py-[2vh]">
+          <div className="mb-3 min-w-0">
+            <div className="truncate text-sm text-text">{currentUser?.username ?? '未登录'}</div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">
+              {currentUser?.is_superuser ? 'Core Admin' : currentUser?.is_staff ? 'Core Staff' : 'Core User'}
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-2.5 text-xs uppercase tracking-[0.15em] text-text-muted transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            <LogOut className="h-4 w-4" />
+            退出登录
+          </button>
+        </div>
 
       </aside>
     </>

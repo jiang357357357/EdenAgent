@@ -1,147 +1,143 @@
-import { NotFoundError } from "@/storage/storage"
-import { eq } from "drizzle-orm"
-import { and } from "drizzle-orm"
+import { WorkspaceTable } from "@/control-plane/workspace.sql"
 import { SyncEvent } from "@/sync"
 import * as Session from "./session"
-import { MessageV2 } from "./message-v2"
-import { SessionTable, MessageTable, PartTable } from "./session.sql"
-import { WorkspaceTable } from "@/control-plane/workspace.sql"
-import { Log } from "@opencode-ai/core/util/log"
-import nextProjectors from "./projectors-next"
+import { getMoncoreConfig } from "@/integrations/moncore/config"
+import {
+  createSessionMap,
+  updateSessionMap,
+  deleteSessionMap,
+  createMessageMap,
+  updateMessageMap,
+  deleteMessageMap,
+  getSessionMap,
+  listMessageMaps,
+} from "@/integrations/moncore"
+import { GlobalBus } from "@/bus/global"
 
-const log = Log.create({ service: "session.projector" })
+export function initMoncoreSync() {
+  GlobalBus.on("event", (event) => {
+    const { payload } = event
+    const config = getMoncoreConfig()
+    if (!config.enabled) return
 
-function foreign(err: unknown) {
-  if (typeof err !== "object" || err === null) return false
-  if ("code" in err && err.code === "SQLITE_CONSTRAINT_FOREIGNKEY") return true
-  return "message" in err && typeof err.message === "string" && err.message.includes("FOREIGN KEY constraint failed")
+    try {
+      handleBusEvent(payload)
+    } catch (err) {
+      console.error("[MonCoreSync] error handling event", err)
+    }
+  })
 }
 
-export type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> | null } : T
+function handleBusEvent(payload: { type: string; properties: Record<string, unknown> }) {
+  const { type, properties } = payload
 
-function grab<T extends object, K1 extends keyof T, X>(
-  obj: T,
-  field1: K1,
-  cb?: (val: NonNullable<T[K1]>) => X,
-): X | undefined {
-  if (obj == undefined || !(field1 in obj)) return undefined
+  switch (type) {
+    case "session.created": {
+      const sessionID = String(properties.sessionID)
+      const info = properties.info as Record<string, unknown> | undefined
+      if (!info) return
+      createSessionMap({
+        source: "opencode",
+        external_session_id: sessionID,
+        title: String(info.title ?? ""),
+        session_payload: info as Record<string, unknown>,
+        status: "active",
+      }).catch((err) => console.error("[MonCoreSync] create session failed", err))
+      break
+    }
 
-  const val = obj[field1]
-  if (val && typeof val === "object" && cb) {
-    return cb(val)
+    case "session.updated": {
+      const sessionID = String(properties.sessionID)
+      const info = properties.info as Record<string, unknown> | undefined
+      if (!info) return
+      getSessionMap(sessionID).then((existing) => {
+        return updateSessionMap(existing.id, {
+          title: String(info.title ?? ""),
+          session_payload: info as Record<string, unknown>,
+        })
+      }).catch((err) => console.error("[MonCoreSync] update session failed", err))
+      break
+    }
+
+    case "session.deleted": {
+      const sessionID = String(properties.sessionID)
+      getSessionMap(sessionID).then((existing) => {
+        return deleteSessionMap(existing.id)
+      }).catch(() => {})
+      break
+    }
+
+    case "message.updated": {
+      const sessionID = String(properties.sessionID)
+      const info = properties.info as Record<string, unknown> | undefined
+      if (!info) return
+      createMessageMap(sessionID, {
+        external_message_id: String(info.id),
+        kind: String(info.role ?? "assistant"),
+        message_payload: { info, parts: [] } as Record<string, unknown>,
+        external_parent_message_id: info.parentID ? String(info.parentID) : undefined,
+        sync_status: "synced",
+      }).catch((err) => console.error("[MonCoreSync] create message failed", err))
+      break
+    }
+
+    case "message.removed": {
+      const sessionID = String(properties.sessionID)
+      const messageID = String(properties.messageID)
+      listMessageMaps(sessionID).then((messages) => {
+        const found = messages.find((m) => m.external_message_id === messageID)
+        if (found) return deleteMessageMap(sessionID, found.id)
+      }).catch(() => {})
+      break
+    }
+
+    case "message.part.updated": {
+      const sessionID = String(properties.sessionID)
+      const part = properties.part as Record<string, unknown> | undefined
+      if (!part) return
+      const messageID = String(part.messageID)
+      listMessageMaps(sessionID).then((messages) => {
+        const found = messages.find((m) => m.external_message_id === messageID)
+        if (!found) return null
+        const payload = (found.message_payload ?? {}) as Record<string, unknown>
+        const parts = (payload.parts ?? []) as Array<Record<string, unknown>>
+        const existingIdx = parts.findIndex((p) => p.id === part.id)
+        if (existingIdx >= 0) {
+          parts[existingIdx] = part as Record<string, unknown>
+        } else {
+          parts.push(part as Record<string, unknown>)
+        }
+        payload.parts = parts
+        return updateMessageMap(sessionID, found.id, { message_payload: payload })
+      }).catch((err) => console.error("[MonCoreSync] part update failed", err))
+      break
+    }
+
+    case "message.part.removed": {
+      const sessionID = String(properties.sessionID)
+      const messageID = String(properties.messageID)
+      const partID = String(properties.partID)
+      listMessageMaps(sessionID).then((messages) => {
+        const found = messages.find((m) => m.external_message_id === messageID)
+        if (!found) return null
+        const payload = (found.message_payload ?? {}) as Record<string, unknown>
+        const parts = ((payload.parts ?? []) as Array<Record<string, unknown>>).filter((p) => p.id !== partID)
+        payload.parts = parts
+        return updateMessageMap(sessionID, found.id, { message_payload: payload })
+      }).catch((err) => console.error("[MonCoreSync] part remove failed", err))
+      break
+    }
   }
-  if (val === undefined) {
-    throw new Error(
-      "Session update failure: pass `null` to clear a field instead of `undefined`: " + JSON.stringify(obj),
-    )
-  }
-  return val as X | undefined
-}
-
-export function toPartialRow(info: DeepPartial<Session.Info>) {
-  const obj = {
-    id: grab(info, "id"),
-    project_id: grab(info, "projectID"),
-    workspace_id: grab(info, "workspaceID"),
-    parent_id: grab(info, "parentID"),
-    slug: grab(info, "slug"),
-    directory: grab(info, "directory"),
-    path: grab(info, "path"),
-    title: grab(info, "title"),
-    version: grab(info, "version"),
-    share_url: grab(info, "share", (v) => grab(v, "url")),
-    summary_additions: grab(info, "summary", (v) => grab(v, "additions")),
-    summary_deletions: grab(info, "summary", (v) => grab(v, "deletions")),
-    summary_files: grab(info, "summary", (v) => grab(v, "files")),
-    summary_diffs: grab(info, "summary", (v) => grab(v, "diffs")),
-    revert: grab(info, "revert"),
-    permission: grab(info, "permission"),
-    time_created: grab(info, "time", (v) => grab(v, "created")),
-    time_updated: grab(info, "time", (v) => grab(v, "updated")),
-    time_compacting: grab(info, "time", (v) => grab(v, "compacting")),
-    time_archived: grab(info, "time", (v) => grab(v, "archived")),
-  }
-
-  return Object.fromEntries(Object.entries(obj).filter(([_, val]) => val !== undefined))
 }
 
 export default [
-  SyncEvent.project(Session.Event.Created, (db, data) => {
-    db.insert(SessionTable)
-      .values(Session.toRow(data.info as Session.Info))
-      .run()
-
+  SyncEvent.project(Session.Event.Created, (_db, data) => {
     if (data.info.workspaceID) {
-      db.update(WorkspaceTable).set({ time_used: Date.now() }).where(eq(WorkspaceTable.id, data.info.workspaceID)).run()
-    }
-  }),
-
-  SyncEvent.project(Session.Event.Updated, (db, data) => {
-    const info = data.info
-    const row = db
-      .update(SessionTable)
-      .set(toPartialRow(info as Session.Patch))
-      .where(eq(SessionTable.id, data.sessionID))
-      .returning()
-      .get()
-    if (!row) throw new NotFoundError({ message: `Session not found: ${data.sessionID}` })
-  }),
-
-  SyncEvent.project(Session.Event.Deleted, (db, data) => {
-    db.delete(SessionTable).where(eq(SessionTable.id, data.sessionID)).run()
-  }),
-
-  SyncEvent.project(MessageV2.Event.Updated, (db, data) => {
-    const time_created = data.info.time.created
-    const { id, sessionID, ...rest } = data.info
-
-    try {
-      db.insert(MessageTable)
-        .values({
-          id,
-          session_id: sessionID,
-          time_created,
-          data: rest,
+      import("@/storage/db").then(({ Database }) => {
+        import("drizzle-orm").then(({ eq }) => {
+          Database.use((db) => db.update(WorkspaceTable).set({ time_used: Date.now() }).where(eq(WorkspaceTable.id, data.info.workspaceID)).run())
         })
-        .onConflictDoUpdate({ target: MessageTable.id, set: { data: rest } })
-        .run()
-    } catch (err) {
-      if (!foreign(err)) throw err
-      log.warn("ignored late message update", { messageID: id, sessionID })
+      })
     }
   }),
-
-  SyncEvent.project(MessageV2.Event.Removed, (db, data) => {
-    db.delete(MessageTable)
-      .where(and(eq(MessageTable.id, data.messageID), eq(MessageTable.session_id, data.sessionID)))
-      .run()
-  }),
-
-  SyncEvent.project(MessageV2.Event.PartRemoved, (db, data) => {
-    db.delete(PartTable)
-      .where(and(eq(PartTable.id, data.partID), eq(PartTable.session_id, data.sessionID)))
-      .run()
-  }),
-
-  SyncEvent.project(MessageV2.Event.PartUpdated, (db, data) => {
-    const { id, messageID, sessionID, ...rest } = data.part
-
-    try {
-      db.insert(PartTable)
-        .values({
-          id,
-          message_id: messageID,
-          session_id: sessionID,
-          time_created: data.time,
-          data: rest,
-        })
-        .onConflictDoUpdate({ target: PartTable.id, set: { data: rest } })
-        .run()
-    } catch (err) {
-      if (!foreign(err)) throw err
-      log.warn("ignored late part update", { partID: id, messageID, sessionID })
-    }
-  }),
-
-  ...nextProjectors,
 ]

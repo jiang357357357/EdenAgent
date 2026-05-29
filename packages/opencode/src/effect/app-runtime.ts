@@ -55,6 +55,7 @@ import { SyncEvent } from "@/sync"
 import { Npm } from "@opencode-ai/core/npm"
 import { memoMap } from "@opencode-ai/core/effect/memo-map"
 import { DataMigration } from "@/data-migration"
+import * as MoncoreSync from "@/integrations/moncore/runtime"
 
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
@@ -108,6 +109,7 @@ export const AppLayer = Layer.mergeAll(
   SessionShare.defaultLayer,
   SyncEvent.defaultLayer,
   DataMigration.defaultLayer,
+  MoncoreSync.defaultLayer,
 ).pipe(Layer.provideMerge(InstanceLayer.layer), Layer.provideMerge(Observability.layer))
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })

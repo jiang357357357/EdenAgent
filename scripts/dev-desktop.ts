@@ -77,10 +77,10 @@ $current = $PID
 $targets = Get-CimInstance Win32_Process | Where-Object {
   $_.ProcessId -ne $current -and (
     ($_.Name -eq "opencode-desktop.exe" -and $_.ExecutablePath -like "$root*") -or
-    ($_.CommandLine -like "*--cwd packages/desktop dev*") -or
-    ($_.CommandLine -like "*--cwd packages*desktop dev*") -or
-    ($_.CommandLine -like "*packages*desktop*src-tauri*") -or
-    ($_.CommandLine -like "*packages/desktop/src-tauri*") -or
+    ($_.CommandLine -like "*--cwd frontend/desktop dev*") -or
+    ($_.CommandLine -like "*--cwd frontend*desktop dev*") -or
+    ($_.CommandLine -like "*frontend*desktop*src-tauri*") -or
+    ($_.CommandLine -like "*frontend/desktop/src-tauri*") -or
     ($_.CommandLine -like "*target*debug*opencode-desktop.exe*") -or
     ($_.CommandLine -like "*target/debug/opencode-desktop.exe*") -or
     ($_.Name -eq "cargo.exe" -and $_.CommandLine -like "*run --no-default-features --color always --*")
@@ -101,7 +101,7 @@ foreach ($id in $targets) {
 function waitForDesktopBinaryUnlock() {
   if (process.platform !== "win32") return
 
-  const exe = path.join(root, "packages", "desktop", "src-tauri", "target", "debug", "opencode-desktop.exe")
+  const exe = path.join(root, "frontend", "desktop", "src-tauri", "target", "debug", "opencode-desktop.exe")
   for (let i = 0; i < 12; i++) {
     killDesktopProjectProcesses()
     const result = Bun.spawnSync(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `
@@ -164,7 +164,7 @@ await waitForVite()
 waitForDesktopBinaryUnlock()
 
 desktopProc = spawn({
-  cmd: ["bun", "run", "--cwd", "packages/desktop", "dev"],
+  cmd: ["bun", "run", "--cwd", "frontend/desktop", "dev"],
   stdout: "pipe",
   stderr: "pipe",
   env: {

@@ -39,6 +39,8 @@ import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Option, Context, Schema, Types } from "effect"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, optionalOmitUndefined, withStatics } from "@opencode-ai/core/schema"
+import { getMoncoreConfig } from "@/integrations/moncore/config"
+import { getSessionMap, listMessageMaps, listSessionMaps } from "@/integrations/moncore"
 
 const log = Log.create({ service: "session" })
 
@@ -214,6 +216,71 @@ export const GlobalInfo = Schema.Struct({
   .annotate({ identifier: "GlobalSession" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type GlobalInfo = Types.DeepMutable<Schema.Schema.Type<typeof GlobalInfo>>
+
+const decodeSessionInfo = Schema.decodeUnknownSync(Info)
+const decodeMessageWithParts = Schema.decodeUnknownSync(MessageV2.WithParts)
+
+function coreSessionID(value: string | number) {
+  return String(value)
+}
+
+function isMoncoreSessionSourceEnabled() {
+  return getMoncoreConfig().enabled
+}
+
+function fromMoncoreSessionMap(map: {
+  id: string | number
+  title: string
+  updated_at: string
+  session_payload?: Record<string, unknown> | null
+}): Info {
+  if (!map.session_payload) throw new Error(`MonCore session ${map.id} is missing session_payload`)
+  const decoded = decodeSessionInfo({
+    ...map.session_payload,
+    id: coreSessionID(map.id) as SessionID,
+    title: map.title || map.session_payload.title,
+  })
+  return {
+    ...decoded,
+    id: coreSessionID(map.id) as SessionID,
+  } as Info
+}
+
+function fromMoncoreMessageMaps(
+  sessionID: SessionID,
+  maps: Array<{
+    id: string | number
+    external_message_id: string
+    external_parent_message_id?: string
+    message_payload?: Record<string, unknown> | null
+  }>,
+): MessageV2.WithParts[] {
+  const messageIDByExternalID = new Map<string, MessageID>(maps.map((item) => [item.external_message_id, coreSessionID(item.id) as MessageID]))
+  return maps.map((item) => {
+    if (!item.message_payload) throw new Error(`MonCore message ${item.id} is missing message_payload`)
+    const decoded = decodeMessageWithParts(item.message_payload)
+    const messageID = coreSessionID(item.id) as MessageID
+
+    const parentID = item.external_parent_message_id
+      ? messageIDByExternalID.get(item.external_parent_message_id) ?? item.external_parent_message_id as MessageID
+      : undefined
+
+    return {
+      info: {
+        ...decoded.info,
+        id: messageID,
+        sessionID,
+        ...(parentID ? { parentID } : {}),
+      } as MessageV2.Info,
+      parts: decoded.parts.map((part, index) => ({
+        ...part,
+        id: `${messageID}:${index + 1}` as PartID,
+        sessionID,
+        messageID,
+      })) as MessageV2.Part[],
+    } as MessageV2.WithParts
+  })
+}
 
 export const CreateInput = Schema.optional(
   Schema.Struct({
@@ -534,17 +601,42 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
     })
 
     const get = Effect.fn("Session.get")(function* (id: SessionID) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const map = yield* Effect.tryPromise({
+          try: () => getSessionMap(id),
+          catch: () => new NotFoundError({ message: `Session not found in MonCore: ${id}` }),
+        })
+        return fromMoncoreSessionMap(map)
+      }
       const row = yield* db((d) => d.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
       if (!row) return yield* Effect.fail(new NotFoundError({ message: `Session not found: ${id}` }))
       return fromRow(row)
     })
 
     const list = Effect.fn("Session.list")(function* (input?: ListInput) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const items = yield* Effect.promise(() => listSessionMaps())
+        let result = items.map(fromMoncoreSessionMap)
+        if (input?.directory) result = result.filter((item) => item.directory === input.directory)
+        if (input?.path)
+          result = result.filter((item) => item.path === input.path || item.path?.startsWith(`${input.path}/`))
+        if (input?.workspaceID) result = result.filter((item) => item.workspaceID === input.workspaceID)
+        if (input?.roots) result = result.filter((item) => !item.parentID)
+        if (input?.start) result = result.filter((item) => item.time.created >= input.start!)
+        if (input?.search) result = result.filter((item) => item.title.includes(input.search!))
+        result = result.sort((a, b) => b.time.updated - a.time.updated)
+        if (input?.limit !== undefined) result = result.slice(0, input.limit)
+        return result
+      }
       const ctx = yield* InstanceState.context
       return Array.from(listByProject({ projectID: ctx.project.id, ...input }))
     })
 
     const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const allSessions = yield* list()
+        return allSessions.filter((s) => s.parentID === parentID)
+      }
       const rows = yield* db((d) =>
         d
           .select()
@@ -596,6 +688,27 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       }).pipe(Effect.withSpan("Session.updatePart"))
 
     const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const items = yield* Effect.promise(() => listMessageMaps(input.sessionID)).pipe(
+          Effect.catch(() => Effect.succeed([])),
+        )
+        for (const item of items) {
+          if (coreSessionID(item.id) !== input.messageID) continue
+          if (!item.message_payload) return
+          const partIndexMatch = input.partID.match(/:(\d+)$/)
+          if (!partIndexMatch) return
+          const partIndex = parseInt(partIndexMatch[1], 10) - 1
+          const rawParts = (item.message_payload as Record<string, unknown>).parts
+          if (!Array.isArray(rawParts) || partIndex < 0 || partIndex >= rawParts.length) return
+          return {
+            ...(rawParts[partIndex] as Record<string, unknown>),
+            id: input.partID,
+            sessionID: input.sessionID,
+            messageID: input.messageID,
+          } as MessageV2.Part
+        }
+        return
+      }
       const row = Database.use((db) =>
         db
           .select()
@@ -729,6 +842,14 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
     })
 
     const messages = Effect.fn("Session.messages")(function* (input: { sessionID: SessionID; limit?: number }) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const items = yield* Effect.promise(() => listMessageMaps(input.sessionID))
+        const result = fromMoncoreMessageMaps(input.sessionID, items).sort(
+          (a, b) => a.info.time.created - b.info.time.created,
+        )
+        if (input.limit) return result.slice(-input.limit)
+        return result
+      }
       if (input.limit) {
         return MessageV2.page({ sessionID: input.sessionID, limit: input.limit }).items
       }
@@ -774,6 +895,13 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       sessionID: SessionID,
       predicate: (msg: MessageV2.WithParts) => boolean,
     ) {
+      if (isMoncoreSessionSourceEnabled()) {
+        const allMessages = yield* messages({ sessionID })
+        for (const item of allMessages) {
+          if (predicate(item)) return Option.some(item)
+        }
+        return Option.none<MessageV2.WithParts>()
+      }
       for (const item of MessageV2.stream(sessionID)) {
         if (predicate(item)) return Option.some(item)
       }
@@ -813,6 +941,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(SyncEvent.defaultLayer),
 )
 
+/** Fallback for non-MonCore mode. Called from `list()` when MonCore is not enabled. */
 function* listByProject(
   input: ListInput & {
     projectID: ProjectID
@@ -864,7 +993,7 @@ function* listByProject(
   }
 }
 
-export function* listGlobal(input?: {
+export function listGlobal(input?: {
   directory?: string
   roots?: boolean
   start?: number
@@ -872,65 +1001,120 @@ export function* listGlobal(input?: {
   search?: string
   limit?: number
   archived?: boolean
-}) {
-  const conditions: SQL[] = []
+}): Effect.Effect<GlobalInfo[]> {
+  if (isMoncoreSessionSourceEnabled()) {
+    return Effect.gen(function* () {
+      const maps = yield* Effect.promise(() => listSessionMaps())
+      let sessions = maps.map(fromMoncoreSessionMap)
 
-  if (input?.directory) {
-    conditions.push(eq(SessionTable.directory, input.directory))
-  }
-  if (input?.roots) {
-    conditions.push(isNull(SessionTable.parent_id))
-  }
-  if (input?.start) {
-    conditions.push(gte(SessionTable.time_updated, input.start))
-  }
-  if (input?.cursor) {
-    conditions.push(lt(SessionTable.time_updated, input.cursor))
-  }
-  if (input?.search) {
-    conditions.push(like(SessionTable.title, `%${input.search}%`))
-  }
-  if (!input?.archived) {
-    conditions.push(isNull(SessionTable.time_archived))
+      if (input?.directory) {
+        sessions = sessions.filter((s) => s.directory === input.directory)
+      }
+      if (input?.roots) {
+        sessions = sessions.filter((s) => !s.parentID)
+      }
+      if (input?.start) {
+        sessions = sessions.filter((s) => s.time.updated >= input.start!)
+      }
+      if (input?.cursor) {
+        sessions = sessions.filter((s) => s.time.updated < input.cursor!)
+      }
+      if (input?.search) {
+        sessions = sessions.filter((s) => s.title.includes(input.search!))
+      }
+      if (!input?.archived) {
+        sessions = sessions.filter((s) => !s.time.archived)
+      }
+
+      sessions.sort((a, b) => b.time.updated - a.time.updated || String(b.id).localeCompare(String(a.id)))
+
+      const limit = input?.limit ?? 100
+      sessions = sessions.slice(0, limit)
+
+      const ids = [...new Set(sessions.map((s) => s.projectID))]
+      const projects = new Map<string, ProjectInfo>()
+
+      if (ids.length > 0) {
+        const items = Database.use((db) =>
+          db
+            .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
+            .from(ProjectTable)
+            .where(inArray(ProjectTable.id, ids))
+            .all(),
+        )
+        for (const item of items) {
+          projects.set(item.id, {
+            id: item.id,
+            name: item.name ?? undefined,
+            worktree: item.worktree,
+          })
+        }
+      }
+
+      return sessions.map((s) => ({
+        ...s,
+        project: projects.get(s.projectID) ?? null,
+      }))
+    })
   }
 
-  const limit = input?.limit ?? 100
+  return Effect.sync(() => {
+    const conditions: SQL[] = []
 
-  const rows = Database.use((db) => {
-    const query =
-      conditions.length > 0
-        ? db
-            .select()
-            .from(SessionTable)
-            .where(and(...conditions))
-        : db.select().from(SessionTable)
-    return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all()
-  })
-
-  const ids = [...new Set(rows.map((row) => row.project_id))]
-  const projects = new Map<string, ProjectInfo>()
-
-  if (ids.length > 0) {
-    const items = Database.use((db) =>
-      db
-        .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
-        .from(ProjectTable)
-        .where(inArray(ProjectTable.id, ids))
-        .all(),
-    )
-    for (const item of items) {
-      projects.set(item.id, {
-        id: item.id,
-        name: item.name ?? undefined,
-        worktree: item.worktree,
-      })
+    if (input?.directory) {
+      conditions.push(eq(SessionTable.directory, input.directory))
     }
-  }
+    if (input?.roots) {
+      conditions.push(isNull(SessionTable.parent_id))
+    }
+    if (input?.start) {
+      conditions.push(gte(SessionTable.time_updated, input.start))
+    }
+    if (input?.cursor) {
+      conditions.push(lt(SessionTable.time_updated, input.cursor))
+    }
+    if (input?.search) {
+      conditions.push(like(SessionTable.title, `%${input.search}%`))
+    }
+    if (!input?.archived) {
+      conditions.push(isNull(SessionTable.time_archived))
+    }
 
-  for (const row of rows) {
-    const project = projects.get(row.project_id) ?? null
-    yield { ...fromRow(row), project }
-  }
+    const limit = input?.limit ?? 100
+
+    const rows = Database.use((db) => {
+      const query =
+        conditions.length > 0
+          ? db
+              .select()
+              .from(SessionTable)
+              .where(and(...conditions))
+          : db.select().from(SessionTable)
+      return query.orderBy(desc(SessionTable.time_updated), desc(SessionTable.id)).limit(limit).all()
+    })
+
+    const ids = [...new Set(rows.map((row) => row.project_id))]
+    const projects = new Map<string, ProjectInfo>()
+
+    if (ids.length > 0) {
+      const items = Database.use((db) =>
+        db
+          .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
+          .from(ProjectTable)
+          .where(inArray(ProjectTable.id, ids))
+          .all(),
+      )
+      for (const item of items) {
+        projects.set(item.id, {
+          id: item.id,
+          name: item.name ?? undefined,
+          worktree: item.worktree,
+        })
+      }
+    }
+
+    return rows.map((row) => ({ ...fromRow(row), project: projects.get(row.project_id) ?? null }))
+  })
 }
 
 export * as Session from "./session"

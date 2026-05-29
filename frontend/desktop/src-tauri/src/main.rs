@@ -5,7 +5,10 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
-use std::{env, path::Path};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use tauri::{
     Emitter,
@@ -16,7 +19,69 @@ use tauri::{
     window::Color,
 };
 
-const APP_WINDOW_TITLE: &str = "opencode — AI 个人助手";
+const APP_WINDOW_TITLE: &str = "MonAgent — AI 个人助手";
+const DEFAULT_CORE_HOST: &str = "127.0.0.1";
+const DEFAULT_CORE_PORT: u16 = 40011;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CoreLoginRequest {
+    username: String,
+    password: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CoreAuthUser {
+    id: i64,
+    username: String,
+    ws_session_id: Option<String>,
+    is_staff: bool,
+    is_superuser: bool,
+    date_joined: Option<String>,
+    last_login: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CoreLoginResponse {
+    message: String,
+    user: CoreAuthUser,
+    token: String,
+    expires_at: String,
+    expires_in: i64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CoreTokenInfo {
+    valid: bool,
+    user: String,
+    created_at: String,
+    expires_at: String,
+    remaining_hours: f64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CoreVerifyTokenResponse {
+    valid: bool,
+    user: CoreAuthUser,
+    token_info: Option<CoreTokenInfo>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CoreSimpleMessage {
+    message: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DevAccount {
+    username: String,
+    password: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CoreErrorResponse {
+    error: Option<String>,
+    message: Option<String>,
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -88,7 +153,7 @@ mod single_instance {
     }
 
     pub fn acquire_or_focus_existing(title: &str) -> bool {
-        let name = wide("Global\\opencode-ai-personal-assistant");
+        let name = wide("Global\\monagent-ai-personal-assistant");
         let mutex = unsafe { CreateMutexW(ptr::null_mut(), 0, name.as_ptr()) };
         if mutex.is_null() {
             return true;
@@ -136,6 +201,108 @@ struct WindowSizeRequest {
 fn clamp(value: f64, min: Option<f64>, max: Option<f64>) -> f64 {
     let with_min = min.map_or(value, |min| value.max(min));
     max.map_or(with_min, |max| with_min.min(max))
+}
+
+fn parse_monconfig_value(contents: &str, target_section: &str, target_key: &str) -> Option<String> {
+    let mut section = String::from("default");
+
+    for raw_line in contents.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_ascii_lowercase();
+            continue;
+        }
+
+        let Some(equals_index) = line.find('=') else {
+            continue;
+        };
+
+        let key = line[..equals_index].trim().to_ascii_uppercase();
+        let value = line[equals_index + 1..].trim();
+
+        if section == target_section && key == target_key {
+            return Some(value.to_string());
+        }
+    }
+
+    None
+}
+
+fn find_mon_root_from(start: &Path) -> Option<PathBuf> {
+    let mut current = Some(start);
+    while let Some(path) = current {
+        let backend_server = path.join("Backend").join("Server").join(".monconfig");
+        if backend_server.exists() {
+            return Some(path.to_path_buf());
+        }
+        current = path.parent();
+    }
+    None
+}
+
+fn find_mon_root() -> Option<PathBuf> {
+    let current_dir = env::current_dir().ok();
+    let exe_dir = env::current_exe().ok().and_then(|path| path.parent().map(Path::to_path_buf));
+
+    current_dir
+        .as_deref()
+        .and_then(find_mon_root_from)
+        .or_else(|| exe_dir.as_deref().and_then(find_mon_root_from))
+}
+
+fn find_agent_monconfig() -> Option<PathBuf> {
+    let root = find_mon_root()?;
+    let path = root.join("Agent").join(".monconfig");
+    if path.exists() { Some(path) } else { None }
+}
+
+fn resolve_core_base_url() -> Result<String, String> {
+    if let Ok(explicit) = env::var("MONCORE_CORE_BASE_URL") {
+        let trimmed = explicit.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.trim_end_matches('/').to_string());
+        }
+    }
+
+    let root = find_mon_root().ok_or_else(|| {
+        "未找到 Mon 工作区根目录，无法定位 Backend/Server/.monconfig".to_string()
+    })?;
+    let config_path = root.join("Backend").join("Server").join(".monconfig");
+    let contents = fs::read_to_string(&config_path)
+        .map_err(|error| format!("读取 MonCore 配置失败: {} ({})", config_path.display(), error))?;
+
+    let host = parse_monconfig_value(&contents, "server", "HOST")
+        .unwrap_or_else(|| DEFAULT_CORE_HOST.to_string());
+    let port = parse_monconfig_value(&contents, "server", "PORT")
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(DEFAULT_CORE_PORT);
+
+    let normalized_host = match host.as_str() {
+        "0.0.0.0" | "::" => DEFAULT_CORE_HOST,
+        _ => host.as_str(),
+    };
+
+    Ok(format!("http://{}:{}", normalized_host, port))
+}
+
+async fn parse_error(response: reqwest::Response) -> String {
+    let status = response.status();
+    match response.json::<CoreErrorResponse>().await {
+        Ok(body) => body
+            .error
+            .or(body.message)
+            .unwrap_or_else(|| format!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or("Request Failed"))),
+        Err(_) => format!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or("Request Failed")),
+    }
+}
+
+async fn core_client() -> Result<(reqwest::Client, String), String> {
+    let base_url = resolve_core_base_url()?;
+    Ok((reqwest::Client::new(), base_url))
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -255,6 +422,91 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
 }
 
 #[tauri::command]
+async fn resolve_core_base_url_command() -> Result<String, String> {
+    resolve_core_base_url()
+}
+
+#[tauri::command]
+fn get_dev_account() -> Result<Option<DevAccount>, String> {
+    let config_path = match find_agent_monconfig() {
+        Some(path) => path,
+        None => return Ok(None),
+    };
+    let contents = match fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+
+    let username = parse_monconfig_value(&contents, "auth_dev", "USERNAME");
+    let password = parse_monconfig_value(&contents, "auth_dev", "PASSWORD");
+
+    match (username, password) {
+        (Some(username), Some(password)) => Ok(Some(DevAccount { username, password })),
+        _ => Ok(None),
+    }
+}
+
+#[tauri::command]
+async fn core_login(request: CoreLoginRequest) -> Result<CoreLoginResponse, String> {
+    let (client, base_url) = core_client().await?;
+    let response = client
+        .post(format!("{}/api/users/login/", base_url))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|error| format!("请求 MonCore 登录接口失败: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(parse_error(response).await);
+    }
+
+    response
+        .json::<CoreLoginResponse>()
+        .await
+        .map_err(|error| format!("解析 MonCore 登录响应失败: {error}"))
+}
+
+#[tauri::command]
+async fn core_verify_token(token: String) -> Result<CoreVerifyTokenResponse, String> {
+    let (client, base_url) = core_client().await?;
+    let response = client
+        .get(format!("{}/api/users/verify-token/", base_url))
+        .header("Authorization", format!("Token {}", token))
+        .send()
+        .await
+        .map_err(|error| format!("请求 MonCore token 验证接口失败: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(parse_error(response).await);
+    }
+
+    response
+        .json::<CoreVerifyTokenResponse>()
+        .await
+        .map_err(|error| format!("解析 MonCore token 验证响应失败: {error}"))
+}
+
+#[tauri::command]
+async fn core_logout(token: String) -> Result<CoreSimpleMessage, String> {
+    let (client, base_url) = core_client().await?;
+    let response = client
+        .post(format!("{}/api/users/logout/", base_url))
+        .header("Authorization", format!("Token {}", token))
+        .send()
+        .await
+        .map_err(|error| format!("请求 MonCore 登出接口失败: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(parse_error(response).await);
+    }
+
+    response
+        .json::<CoreSimpleMessage>()
+        .await
+        .map_err(|error| format!("解析 MonCore 登出响应失败: {error}"))
+}
+
+#[tauri::command]
 fn set_window_size(window: tauri::WebviewWindow, request: WindowSizeRequest) -> Result<(), String> {
     let monitor_size = window
         .current_monitor()
@@ -358,6 +610,11 @@ fn main() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            resolve_core_base_url_command,
+            get_dev_account,
+            core_login,
+            core_verify_token,
+            core_logout,
             set_window_size,
             set_window_appearance,
             set_view_mode_state,

@@ -120,7 +120,7 @@ async function main() {
           }
 
           // In production, serve static files from web/dist
-          const filePath = `packages/web/dist${url.pathname === "/" ? "/index.html" : url.pathname}`
+          const filePath = `frontend/web/dist${url.pathname === "/" ? "/index.html" : url.pathname}`
           const file = Bun.file(filePath)
           if (await file.exists()) {
             return new Response(file, {

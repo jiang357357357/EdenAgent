@@ -1,22 +1,29 @@
 # ============================================================
-# opencode .monconfig
+# MonAgent .monconfig
 # AI personal assistant development environment
 # ============================================================
 
 [service]
-NAME=opencode
+NAME=MonAgent
 VERSION=0.1.0
 
 [server]
 HOST=127.0.0.1
-PORT=40082
-WEB_PORT=40081
-BASE_URL=http://127.0.0.1:40082
-WEB_URL=http://127.0.0.1:40081
+PORT=40092
+WEB_PORT=40091
+BASE_URL=http://127.0.0.1:40092
+WEB_URL=http://127.0.0.1:40091
 
 [desktop]
-TITLE=opencode — AI 个人助手
+TITLE=MonAgent — AI 个人助手
 QUIT_FLAG=.artifacts/desktop-quit.flag
 
 [log]
 LEVEL=DEBUG
+
+[auth]
+MODE=development
+
+[auth_dev]
+USERNAME=manager
+PASSWORD=zz357357357

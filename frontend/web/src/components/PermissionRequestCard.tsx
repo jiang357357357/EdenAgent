@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 interface PermissionRequestCardProps {
   request: PendingPermission;
   onReply: (requestID: string, reply: 'once' | 'always' | 'reject', message?: string) => Promise<void>;
+  tone?: 'default' | 'overlay';
 }
 
 function stringify(value: unknown) {
@@ -17,7 +18,7 @@ function stringify(value: unknown) {
   }
 }
 
-export function PermissionRequestCard({ request, onReply }: PermissionRequestCardProps) {
+export function PermissionRequestCard({ request, onReply, tone = 'default' }: PermissionRequestCardProps) {
   const [submitting, setSubmitting] = useState<'once' | 'always' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const metadata = useMemo(() => {
@@ -39,39 +40,65 @@ export function PermissionRequestCard({ request, onReply }: PermissionRequestCar
   }
 
   return (
-    <div className="rounded-2xl border border-amber-500/20 bg-card px-4 py-4 shadow-sm">
+    <div
+      className={cn(
+        'rounded-2xl border px-4 py-4',
+        tone === 'overlay'
+          ? 'border-orange-300/15 bg-stone-950/78 text-stone-100 shadow-none backdrop-blur-md'
+          : 'border-amber-500/20 bg-card shadow-sm',
+      )}
+    >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-400">
+        <div
+          className={cn(
+            'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border',
+            tone === 'overlay'
+              ? 'border-orange-300/20 bg-orange-300/10 text-orange-200'
+              : 'border-amber-500/25 bg-amber-500/10 text-amber-400',
+          )}
+        >
           <ShieldAlert className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-[0.15em] text-amber-400">Permission</span>
-            <span className="text-sm font-medium text-text">{request.permission}</span>
+            <span className={cn('text-[10px] uppercase tracking-[0.15em]', tone === 'overlay' ? 'text-orange-200/80' : 'text-amber-400')}>Permission</span>
+            <span className={cn('text-sm font-medium', tone === 'overlay' ? 'text-stone-50' : 'text-text')}>{request.permission}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {request.patterns.map((pattern) => (
               <span
                 key={pattern}
-                className="rounded-full border border-border bg-bg px-2.5 py-1 text-[11px] text-text-muted"
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px]',
+                  tone === 'overlay'
+                    ? 'border-white/10 bg-white/5 text-stone-300'
+                    : 'border-border bg-bg text-text-muted',
+                )}
               >
                 {pattern}
               </span>
             ))}
           </div>
           {request.tool && (
-            <div className="mt-3 text-xs text-text-muted">
-              tool call: {request.tool.callID}
+            <div className={cn('mt-3 text-xs', tone === 'overlay' ? 'text-stone-400' : 'text-text-muted')}>
+              工具调用: {request.tool.callID}
             </div>
           )}
           {metadata && (
-            <pre className="mt-3 overflow-x-auto rounded-xl border border-border bg-bg p-3 text-xs text-text-muted whitespace-pre-wrap">
+            <pre
+              className={cn(
+                'mt-3 whitespace-pre-wrap overflow-x-auto rounded-xl border p-3 text-xs',
+                tone === 'overlay'
+                  ? 'border-white/10 bg-black/20 text-stone-300'
+                  : 'border-border bg-bg text-text-muted',
+              )}
+            >
               {metadata}
             </pre>
           )}
           {request.always.length > 0 && (
-            <div className="mt-3 text-xs text-text-muted">
-              rememberable: {request.always.join(', ')}
+            <div className={cn('mt-3 text-xs', tone === 'overlay' ? 'text-stone-400' : 'text-text-muted')}>
+              可记住: {request.always.join(', ')}
             </div>
           )}
           {error && (
@@ -84,34 +111,40 @@ export function PermissionRequestCard({ request, onReply }: PermissionRequestCar
               onClick={() => void handleReply('once')}
               disabled={submitting !== null}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs transition-colors',
-                'border-border bg-bg text-text hover:border-accent/40 hover:text-accent disabled:cursor-wait disabled:opacity-60',
+                'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors',
+                tone === 'overlay'
+                  ? 'border-white/10 bg-white/5 text-stone-100 hover:border-white/20 hover:bg-white/10'
+                  : 'border-border bg-bg text-text hover:border-accent/40 hover:text-accent',
+                'disabled:cursor-wait disabled:opacity-60',
               )}
             >
               <Check className="h-3.5 w-3.5" />
-              Allow Once
+              本次允许
             </button>
             <button
               onClick={() => void handleReply('always')}
               disabled={submitting !== null}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs transition-colors',
-                'border-accent/25 bg-accent/10 text-accent hover:border-accent/40 disabled:cursor-wait disabled:opacity-60',
+                'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors',
+                tone === 'overlay'
+                  ? 'border-orange-300/25 bg-orange-300/10 text-orange-200 hover:border-orange-300/40'
+                  : 'border-accent/25 bg-accent/10 text-accent hover:border-accent/40',
+                'disabled:cursor-wait disabled:opacity-60',
               )}
             >
               <Check className="h-3.5 w-3.5" />
-              Always Allow
+              始终允许
             </button>
             <button
               onClick={() => void handleReply('reject')}
               disabled={submitting !== null}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs transition-colors',
+                'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors',
                 'border-red-500/25 bg-red-500/10 text-red-300 hover:border-red-500/40 disabled:cursor-wait disabled:opacity-60',
               )}
             >
               <X className="h-3.5 w-3.5" />
-              Reject
+              拒绝
             </button>
           </div>
         </div>

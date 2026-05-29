@@ -1,11 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
-  "productName": "opencode",
+  "productName": "MonAgent",
   "version": "0.1.0",
-  "identifier": "com.opencode.app",
+  "identifier": "com.monagent.app",
   "build": {
     "frontendDist": "../web/dist",
-    "devUrl": "http://localhost:40081",
+    "devUrl": "http://localhost:40091",
     "beforeDevCommand": "",
     "beforeBuildCommand": "bun run --cwd ../web build"
   },
@@ -15,7 +15,7 @@
   "app": {
     "windows": [
       {
-        "title": "opencode — AI 个人助手",
+        "title": "MonAgent — AI 个人助手",
         "width": 900,
         "height": 620,
         "resizable": true,

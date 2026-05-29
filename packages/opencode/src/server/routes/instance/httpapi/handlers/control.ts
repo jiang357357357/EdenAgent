@@ -1,4 +1,5 @@
 import { Auth } from "@/auth"
+import { getMoncoreAuthStatus, loginMoncore, logoutMoncore } from "@/integrations/moncore/auth"
 import { ProviderID } from "@/provider/schema"
 import * as Log from "@opencode-ai/core/util/log"
 import { Effect } from "effect"
@@ -23,12 +24,33 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       return true
     })
 
+    const moncoreAuthGet = Effect.fn("ControlHttpApi.moncoreAuthGet")(function* () {
+      return yield* Effect.promise(() => getMoncoreAuthStatus())
+    })
+
+    const moncoreLogin = Effect.fn("ControlHttpApi.moncoreLogin")(function* (ctx: {
+      payload: { baseUrl: string; username: string; password: string }
+    }) {
+      return yield* Effect.promise(() => loginMoncore(ctx.payload))
+    })
+
+    const moncoreAuthDelete = Effect.fn("ControlHttpApi.moncoreAuthDelete")(function* () {
+      yield* Effect.promise(() => logoutMoncore())
+      return true
+    })
+
     const log = Effect.fn("ControlHttpApi.log")(function* (ctx: { payload: typeof LogInput.Type }) {
       const logger = Log.create({ service: ctx.payload.service })
       logger[ctx.payload.level](ctx.payload.message, ctx.payload.extra)
       return true
     })
 
-    return handlers.handle("authSet", authSet).handle("authRemove", authRemove).handle("log", log)
+    return handlers
+      .handle("authSet", authSet)
+      .handle("authRemove", authRemove)
+      .handle("moncoreAuthGet", moncoreAuthGet)
+      .handle("moncoreLogin", moncoreLogin)
+      .handle("moncoreAuthDelete", moncoreAuthDelete)
+      .handle("log", log)
   }),
 )

@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "bun run scripts/dev.ts",
     "dev:server": "bun run --cwd packages/opencode src/server/dev.ts",
-    "dev:web": "bun run --cwd packages/web dev",
-    "dev:desktop": "bun run --cwd packages/desktop dev",
+    "dev:web": "bun run --cwd frontend/web dev",
+    "dev:desktop": "bun run --cwd frontend/desktop dev",
     "lint": "oxlint",
     "typecheck": "bun turbo typecheck",
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
@@ -22,7 +22,8 @@
   "workspaces": {
     "packages": [
       "packages/*",
-      "packages/public/*"
+      "frontend/*",
+      "public/*"
     ],
     "catalog": {
       "@effect/opentelemetry": "4.0.0-beta.57",
