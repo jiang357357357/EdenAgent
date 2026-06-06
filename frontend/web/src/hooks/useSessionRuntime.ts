@@ -10,7 +10,8 @@ import {
   replyQuestion,
   sendPromptAsync,
   subscribeEvents,
-} from '../lib/opencode';
+} from '../lib/mon_agent_api';
+import { getStoredToken } from '../lib/auth';
 import {
   applyRuntimeEvent,
   hydratePendingPermissions,
@@ -18,42 +19,65 @@ import {
   hydrateSessionList,
   hydrateSessionMessages,
   initialRuntimeState,
-  pushLocalUserMessage,
+  resetRuntime,
   runtimeReducer,
   setActiveSession,
   setConnectionState,
   setConnectionError,
 } from '../lib/session-reducer';
 import { selectActiveSession, selectPendingPermissions, selectPendingQuestions, selectSessions, selectSessionStatus } from '../lib/session-selectors';
+import type { PromptAttachment } from '../types';
 
-export function useSessionRuntime() {
+export function useSessionRuntime(enabled = true) {
   const [state, dispatch] = useReducer(runtimeReducer, initialRuntimeState);
   const activeSessionIdRef = useRef<string | undefined>(state.activeSessionId);
   const hasOpenedStreamRef = useRef(false);
+  const sendingSessionIdsRef = useRef(new Set<string>());
+
+  const isRuntimeReady = useCallback(() => enabled && Boolean(getStoredToken()), [enabled]);
 
   useEffect(() => {
     activeSessionIdRef.current = state.activeSessionId;
   }, [state.activeSessionId]);
 
+  useEffect(() => {
+    for (const [sessionID, session] of Object.entries(state.sessions)) {
+      if (session.status === 'idle') {
+        sendingSessionIdsRef.current.delete(sessionID);
+      } else {
+        sendingSessionIdsRef.current.add(sessionID);
+      }
+    }
+  }, [state.sessions]);
+
+  useEffect(() => {
+    if (enabled) return;
+    hasOpenedStreamRef.current = false;
+    dispatch(resetRuntime());
+  }, [enabled]);
+
   const refreshSessions = useCallback(async () => {
+    if (!isRuntimeReady()) return [];
     const sessions = await listSessionsRaw();
     dispatch(hydrateSessionList(sessions));
     return sessions;
-  }, []);
+  }, [isRuntimeReady]);
 
   const refreshSessionMessages = useCallback(async (sessionID?: string) => {
-    if (!sessionID) return;
+    if (!sessionID || !isRuntimeReady()) return;
     const messages = await listMessagesRaw(sessionID);
     dispatch(hydrateSessionMessages(sessionID, messages));
-  }, []);
+  }, [isRuntimeReady]);
 
   const refreshBlockers = useCallback(async () => {
+    if (!isRuntimeReady()) return;
     const [permissions, questions] = await Promise.all([listPermissionsRaw(), listQuestionsRaw()]);
     dispatch(hydratePendingPermissions(permissions));
     dispatch(hydratePendingQuestions(questions));
-  }, []);
+  }, [isRuntimeReady]);
 
   useEffect(() => {
+    if (!isRuntimeReady()) return;
     let cancelled = false;
 
     async function load() {
@@ -75,9 +99,10 @@ export function useSessionRuntime() {
     return () => {
       cancelled = true;
     };
-  }, [refreshBlockers, refreshSessionMessages, refreshSessions]);
+  }, [isRuntimeReady, refreshBlockers, refreshSessionMessages, refreshSessions]);
 
   useEffect(() => {
+    if (!isRuntimeReady()) return;
     const sessionID = state.activeSessionId;
     if (!sessionID) return;
     const session = state.sessions[sessionID];
@@ -100,9 +125,10 @@ export function useSessionRuntime() {
     return () => {
       cancelled = true;
     };
-  }, [state.activeSessionId, state.sessions]);
+  }, [isRuntimeReady, state.activeSessionId, state.sessions]);
 
   useEffect(() => {
+    if (!isRuntimeReady()) return;
     let disposed = false;
     let cleanup: (() => void) | undefined;
 
@@ -111,6 +137,7 @@ export function useSessionRuntime() {
         dispatch(setConnectionState('connected'));
         const sessionID = activeSessionIdRef.current;
         const reconcile = async () => {
+          if (!isRuntimeReady()) return;
           try {
             await Promise.all([refreshSessions(), refreshBlockers()]);
             if (sessionID) {
@@ -151,22 +178,33 @@ export function useSessionRuntime() {
       disposed = true;
       cleanup?.();
     };
-  }, [refreshBlockers, refreshSessionMessages, refreshSessions]);
+  }, [isRuntimeReady, refreshBlockers, refreshSessionMessages, refreshSessions]);
 
   const createSession = useCallback(async () => {
-    const session = await createSessionRaw();
-    dispatch(hydrateSessionList([session]));
-    dispatch(setActiveSession(session.id));
-    return session;
-  }, []);
+    if (!isRuntimeReady()) throw new Error('MonAgent runtime is not authenticated');
+    try {
+      const session = await createSessionRaw();
+      activeSessionIdRef.current = session.id;
+      dispatch(hydrateSessionList([session]));
+      dispatch(setActiveSession(session.id));
+      return session;
+    } catch (error) {
+      dispatch(setConnectionError(error instanceof Error ? error.message : String(error)));
+      throw error;
+    }
+  }, [isRuntimeReady]);
 
   const chooseSession = useCallback((sessionID?: string) => {
+    activeSessionIdRef.current = sessionID;
     dispatch(setActiveSession(sessionID));
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string, images: string[]) => {
-      let sessionID = state.activeSessionId;
+    async (content: string, attachments: PromptAttachment[]) => {
+      let sessionID = activeSessionIdRef.current;
+      if (!isRuntimeReady()) {
+        throw new Error('MonAgent runtime is not authenticated');
+      }
       if (!sessionID) {
         const session = await createSession();
         sessionID = session.id;
@@ -174,12 +212,21 @@ export function useSessionRuntime() {
       if (!sessionID) {
         throw new Error('No active session');
       }
+      if (sendingSessionIdsRef.current.has(sessionID)) {
+        return;
+      }
 
-      dispatch(pushLocalUserMessage(sessionID, content, images));
+      sendingSessionIdsRef.current.add(sessionID);
       dispatch(setConnectionError(undefined));
-      await sendPromptAsync(sessionID, content, images);
+      try {
+        await sendPromptAsync(sessionID, content, attachments);
+      } catch (error) {
+        sendingSessionIdsRef.current.delete(sessionID);
+        dispatch(setConnectionError(error instanceof Error ? error.message : String(error)));
+        throw error;
+      }
     },
-    [createSession, state.activeSessionId],
+    [createSession, isRuntimeReady, state.activeSessionId],
   );
 
   const respondPermission = useCallback(async (requestID: string, reply: 'once' | 'always' | 'reject', message?: string) => {
@@ -214,6 +261,7 @@ export function useSessionRuntime() {
     pendingPermissions,
     pendingQuestions,
     respondPermission,
+    reset: () => dispatch(resetRuntime()),
     selectSession: chooseSession,
     sendMessage,
     sessions,

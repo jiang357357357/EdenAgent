@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Wrench, Search, Code, Terminal, Eye, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ToolCall } from '../types';
@@ -10,6 +10,12 @@ interface ToolCardProps {
 
 export function ToolCard({ tool }: ToolCardProps) {
   const [expanded, setExpanded] = useState(tool.status === 'running' || tool.status === 'error');
+
+  useEffect(() => {
+    if (tool.status === 'running' || tool.status === 'error' || tool.output) {
+      setExpanded(true);
+    }
+  }, [tool.output, tool.status]);
 
   const getIcon = () => {
     switch (tool.name.toLowerCase()) {
@@ -28,9 +34,9 @@ export function ToolCard({ tool }: ToolCardProps) {
   };
 
   const getStatusLabel = () => {
-    if (tool.status === 'error') return 'error';
-    if (tool.status === 'running') return 'running';
-    return 'done';
+    if (tool.status === 'error') return '失败';
+    if (tool.status === 'running') return '运行中';
+    return '完成';
   };
 
   return (

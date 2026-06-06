@@ -1,4 +1,4 @@
-import { Plus, Menu, LogOut } from 'lucide-react';
+import { Plus, Menu, LogOut, Moon, Sun } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Session } from '../types';
 import type { AuthUser } from '../lib/auth';
@@ -29,9 +29,6 @@ export function Sidebar({
   onLogout,
 }: SidebarProps) {
   
-  // Group sessions by date
-  // For this mock, we'll just show them all in a single group, but structure supports grouping
-  
   return (
     <>
       {/* Backdrop */}
@@ -51,8 +48,8 @@ export function Sidebar({
         {/* Header / New Chat */}
         <div className="px-[2vw] py-[3vh] flex items-center justify-between">
             <div className="text-xl flex items-center gap-3 text-text font-serif tracking-[0.1em]">
-                <span className="w-8 h-8 bg-card border border-accent rounded flex items-center justify-center text-accent text-sm">O</span>
-                AETERNA
+                <span className="w-8 h-8 bg-card border border-accent rounded flex items-center justify-center text-accent text-sm">M</span>
+                MonAgent
             </div>
           <button 
             onClick={() => setIsOpen(false)}
@@ -68,14 +65,14 @@ export function Sidebar({
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border border-accent-dim text-accent hover:border-accent hover:bg-accent/5 transition-colors rounded-full font-sans text-xs uppercase tracking-[0.15em] shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            New Chat
+            新会话
           </button>
         </div>
 
         {/* Session List */}
         <div className="flex-1 overflow-y-auto px-[2vw] space-y-[3vh] py-[1vh]">
            <div>
-              <span className="block text-[10px] uppercase tracking-[0.2em] text-text-muted mb-4">Archive</span>
+              <span className="block text-[10px] uppercase tracking-[0.2em] text-text-muted mb-4">会话记录</span>
               <ul className="space-y-1">
                 {sessions.map(session => (
                     <li key={session.id}>
@@ -103,6 +100,13 @@ export function Sidebar({
               {currentUser?.is_superuser ? 'Core Admin' : currentUser?.is_staff ? 'Core Staff' : 'Core User'}
             </div>
           </div>
+          <button
+            onClick={toggleTheme}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-2.5 text-xs uppercase tracking-[0.15em] text-text-muted transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'dark' ? '浅色模式' : '深色模式'}
+          </button>
           <button
             onClick={onLogout}
             className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-2.5 text-xs uppercase tracking-[0.15em] text-text-muted transition-colors hover:border-accent/40 hover:text-accent"

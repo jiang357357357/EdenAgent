@@ -1,24 +1,20 @@
 const WINDOW_SIZES = {
+  login: {
+    widthRatio: 0.58,
+    heightRatio: 0.7,
+  },
   chatWithCharacter: {
-    widthRatio: 0.56,
-    heightRatio: 0.55,
-    minWidth: 820,
-    minHeight: 540,
-    maxWidth: 1040,
-    maxHeight: 640,
+    widthRatio: 0.72,
+    heightRatio: 0.78,
   },
   character: {
     aspectRatio: 9 / 16,
-    heightRatio: 0.72,
-    minWidth: 304,
-    minHeight: 540,
-    maxWidth: 428,
-    maxHeight: 760,
+    heightRatio: 0.78,
   },
 } as const;
 
 export type DesktopWindowMode = keyof typeof WINDOW_SIZES;
-export type DesktopViewMode = DesktopWindowMode;
+export type DesktopViewMode = 'chatWithCharacter' | 'character';
 
 export async function resizeDesktopWindow(mode: DesktopWindowMode) {
   if (!('__TAURI_INTERNALS__' in window)) return;
@@ -82,7 +78,7 @@ export async function listenDesktopViewMode(onMode: (mode: DesktopViewMode) => v
 
   try {
     const { listen } = await import('@tauri-apps/api/event');
-    return listen<string>('opencode-view-mode', (event) => {
+    return listen<string>('mon-agent-view-mode', (event) => {
       if (event.payload === 'character' || event.payload === 'chatWithCharacter') {
         onMode(event.payload);
       }

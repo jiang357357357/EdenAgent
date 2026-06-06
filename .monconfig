@@ -6,6 +6,7 @@
 [service]
 NAME=MonAgent
 VERSION=0.1.0
+PUBLIC_HOST=auto
 
 [server]
 HOST=127.0.0.1
@@ -21,9 +22,19 @@ QUIT_FLAG=.artifacts/desktop-quit.flag
 [log]
 LEVEL=DEBUG
 
+[hub]
+ENABLED=true
+SERVICE_ID=monagent-001
+SERVICE_NAME=MonAgent
+SERVICE_TYPE=agent_service
+DESCRIPTION=MonAgent 本地智能体服务
+HUB_ZMQ_HOST=127.0.0.1
+HUB_ZMQ_PORT=40051
+HEARTBEAT_INTERVAL=30
+
 [auth]
 MODE=development
 
 [auth_dev]
-USERNAME=manager
-PASSWORD=zz357357357
+USERNAME=admin1
+PASSWORD=123456

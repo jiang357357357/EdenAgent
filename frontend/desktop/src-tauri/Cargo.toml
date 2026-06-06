@@ -1,11 +1,11 @@
 [package]
-name = "opencode-desktop"
+name = "mon-agent-desktop"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.84"
 
 [package.metadata.tauri]
-identifier = "com.opencode.app"
+identifier = "com.monagent.desktop"
 bundle = { icon = ["icons/icon.ico"] }
 
 [dependencies]

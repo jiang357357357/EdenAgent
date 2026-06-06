@@ -8,6 +8,7 @@ use std::sync::{
 use std::{
     env, fs,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use tauri::{
@@ -67,6 +68,19 @@ struct CoreVerifyTokenResponse {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+struct CoreUserProfile {
+    id: i64,
+    username: String,
+    ws_session_id: Option<String>,
+    is_staff: bool,
+    is_superuser: bool,
+    date_joined: Option<String>,
+    last_login: Option<String>,
+    display_name: Option<String>,
+    avatar_url: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 struct CoreSimpleMessage {
     message: String,
 }
@@ -91,7 +105,7 @@ struct AppState {
 }
 
 fn has_quit_flag() -> bool {
-    env::var("OPENCODE_DESKTOP_QUIT_FLAG")
+    env::var("MON_AGENT_DESKTOP_QUIT_FLAG")
         .ok()
         .is_some_and(|path| Path::new(&path).exists())
 }
@@ -321,7 +335,7 @@ fn hide_main_window(app: &tauri::AppHandle) {
 
 fn set_view_mode(app: &tauri::AppHandle, mode: &str) {
     show_main_window(app);
-    let _ = app.emit("opencode-view-mode", mode);
+    let _ = app.emit("mon-agent-view-mode", mode);
 }
 
 fn update_view_mode_menu(app: &tauri::AppHandle, mode: &str) {
@@ -336,7 +350,7 @@ fn update_view_mode_menu(app: &tauri::AppHandle, mode: &str) {
         let text = if mode == "character" {
             "切换到三栏模式"
         } else {
-            "切换到角色模式"
+            "切换到桌宠模式"
         };
         let _ = item.set_text(text);
     }
@@ -371,7 +385,7 @@ fn fallback_tray_icon() -> Image<'static> {
 fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "隐藏到托盘", true, None::<&str>)?;
-    let toggle_view_mode = MenuItem::with_id(app, "toggle_view_mode", "切换到角色模式", true, None::<&str>)?;
+    let toggle_view_mode = MenuItem::with_id(app, "toggle_view_mode", "切换到桌宠模式", true, None::<&str>)?;
     let separator_view = PredefinedMenuItem::separator(app)?;
     let separator_quit = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -449,12 +463,24 @@ fn get_dev_account() -> Result<Option<DevAccount>, String> {
 #[tauri::command]
 async fn core_login(request: CoreLoginRequest) -> Result<CoreLoginResponse, String> {
     let (client, base_url) = core_client().await?;
+    let endpoint = "/api/users/login/";
+    let started = Instant::now();
     let response = client
-        .post(format!("{}/api/users/login/", base_url))
+        .post(format!("{}{}", base_url, endpoint))
         .json(&request)
         .send()
         .await
-        .map_err(|error| format!("请求 MonCore 登录接口失败: {error}"))?;
+        .map_err(|error| {
+            eprintln!("[MonAgent][CoreBridge][ERROR] POST {endpoint} failed: {error}");
+            format!("请求 MonCore 登录接口失败: {error}")
+        })?;
+
+    println!(
+        "[MonAgent][CoreBridge][INFO] POST {} -> {} {}ms",
+        endpoint,
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
 
     if !response.status().is_success() {
         return Err(parse_error(response).await);
@@ -469,12 +495,24 @@ async fn core_login(request: CoreLoginRequest) -> Result<CoreLoginResponse, Stri
 #[tauri::command]
 async fn core_verify_token(token: String) -> Result<CoreVerifyTokenResponse, String> {
     let (client, base_url) = core_client().await?;
+    let endpoint = "/api/users/verify-token/";
+    let started = Instant::now();
     let response = client
-        .get(format!("{}/api/users/verify-token/", base_url))
+        .get(format!("{}{}", base_url, endpoint))
         .header("Authorization", format!("Token {}", token))
         .send()
         .await
-        .map_err(|error| format!("请求 MonCore token 验证接口失败: {error}"))?;
+        .map_err(|error| {
+            eprintln!("[MonAgent][CoreBridge][ERROR] GET {endpoint} failed: {error}");
+            format!("请求 MonCore token 验证接口失败: {error}")
+        })?;
+
+    println!(
+        "[MonAgent][CoreBridge][INFO] GET {} -> {} {}ms",
+        endpoint,
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
 
     if !response.status().is_success() {
         return Err(parse_error(response).await);
@@ -487,14 +525,90 @@ async fn core_verify_token(token: String) -> Result<CoreVerifyTokenResponse, Str
 }
 
 #[tauri::command]
-async fn core_logout(token: String) -> Result<CoreSimpleMessage, String> {
+async fn core_default_assistant(token: String) -> Result<serde_json::Value, String> {
     let (client, base_url) = core_client().await?;
+    let endpoint = "/api/assistants/default/";
+    let started = Instant::now();
     let response = client
-        .post(format!("{}/api/users/logout/", base_url))
+        .get(format!("{}{}", base_url, endpoint))
         .header("Authorization", format!("Token {}", token))
         .send()
         .await
-        .map_err(|error| format!("请求 MonCore 登出接口失败: {error}"))?;
+        .map_err(|error| {
+            eprintln!("[MonAgent][CoreBridge][ERROR] GET {endpoint} failed: {error}");
+            format!("请求 MonCore 默认助手接口失败: {error}")
+        })?;
+
+    println!(
+        "[MonAgent][CoreBridge][INFO] GET {} -> {} {}ms",
+        endpoint,
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
+
+    if !response.status().is_success() {
+        return Err(parse_error(response).await);
+    }
+
+    response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|error| format!("解析 MonCore 默认助手响应失败: {error}"))
+}
+
+#[tauri::command]
+async fn core_user_profile(token: String) -> Result<CoreUserProfile, String> {
+    let (client, base_url) = core_client().await?;
+    let endpoint = "/api/users/me/profile/";
+    let started = Instant::now();
+    let response = client
+        .get(format!("{}{}", base_url, endpoint))
+        .header("Authorization", format!("Token {}", token))
+        .send()
+        .await
+        .map_err(|error| {
+            eprintln!("[MonAgent][CoreBridge][ERROR] GET {endpoint} failed: {error}");
+            format!("请求 MonCore 用户资料接口失败: {error}")
+        })?;
+
+    println!(
+        "[MonAgent][CoreBridge][INFO] GET {} -> {} {}ms",
+        endpoint,
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
+
+    if !response.status().is_success() {
+        return Err(parse_error(response).await);
+    }
+
+    response
+        .json::<CoreUserProfile>()
+        .await
+        .map_err(|error| format!("解析 MonCore 用户资料响应失败: {error}"))
+}
+
+#[tauri::command]
+async fn core_logout(token: String) -> Result<CoreSimpleMessage, String> {
+    let (client, base_url) = core_client().await?;
+    let endpoint = "/api/users/logout/";
+    let started = Instant::now();
+    let response = client
+        .post(format!("{}{}", base_url, endpoint))
+        .header("Authorization", format!("Token {}", token))
+        .send()
+        .await
+        .map_err(|error| {
+            eprintln!("[MonAgent][CoreBridge][ERROR] POST {endpoint} failed: {error}");
+            format!("请求 MonCore 登出接口失败: {error}")
+        })?;
+
+    println!(
+        "[MonAgent][CoreBridge][INFO] POST {} -> {} {}ms",
+        endpoint,
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
 
     if !response.status().is_success() {
         return Err(parse_error(response).await);
@@ -531,23 +645,25 @@ fn set_window_size(window: tauri::WebviewWindow, request: WindowSizeRequest) -> 
     }
     let width = clamp(width, request.min_width, request.max_width);
 
-    if request.min_width.is_some() || request.min_height.is_some() {
-        window
-            .set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
-                width: request.min_width.unwrap_or(1.0),
-                height: request.min_height.unwrap_or(1.0),
-            })))
-            .map_err(|error| error.to_string())?;
-    }
+    let min_size = if request.min_width.is_some() || request.min_height.is_some() {
+        Some(tauri::Size::Logical(tauri::LogicalSize {
+            width: request.min_width.unwrap_or(1.0),
+            height: request.min_height.unwrap_or(1.0),
+        }))
+    } else {
+        None
+    };
+    window.set_min_size(min_size).map_err(|error| error.to_string())?;
 
-    if request.max_width.is_some() || request.max_height.is_some() {
-        window
-            .set_max_size(Some(tauri::Size::Logical(tauri::LogicalSize {
-                width: request.max_width.unwrap_or(f64::INFINITY),
-                height: request.max_height.unwrap_or(f64::INFINITY),
-            })))
-            .map_err(|error| error.to_string())?;
-    }
+    let max_size = if request.max_width.is_some() || request.max_height.is_some() {
+        Some(tauri::Size::Logical(tauri::LogicalSize {
+            width: request.max_width.unwrap_or(100_000.0),
+            height: request.max_height.unwrap_or(100_000.0),
+        }))
+    } else {
+        None
+    };
+    window.set_max_size(max_size).map_err(|error| error.to_string())?;
 
     window
         .set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
@@ -614,6 +730,8 @@ fn main() {
             get_dev_account,
             core_login,
             core_verify_token,
+            core_default_assistant,
+            core_user_profile,
             core_logout,
             set_window_size,
             set_window_appearance,
@@ -637,8 +755,24 @@ fn main() {
         })
         .setup(|app| {
             setup_tray(app)?;
-            #[cfg(debug_assertions)]
             if let Some(window) = app.get_webview_window("main") {
+                let _ = set_window_size(
+                    window.clone(),
+                    WindowSizeRequest {
+                        width: None,
+                        height: None,
+                        aspect_ratio: None,
+                        width_ratio: Some(0.58),
+                        height_ratio: Some(0.7),
+                        min_width: None,
+                        min_height: None,
+                        max_width: None,
+                        max_height: None,
+                        center: Some(true),
+                    },
+                );
+
+                #[cfg(debug_assertions)]
                 window.open_devtools();
             }
             Ok(())

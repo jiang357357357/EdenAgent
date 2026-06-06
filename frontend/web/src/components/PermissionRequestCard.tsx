@@ -61,7 +61,7 @@ export function PermissionRequestCard({ request, onReply, tone = 'default' }: Pe
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn('text-[10px] uppercase tracking-[0.15em]', tone === 'overlay' ? 'text-orange-200/80' : 'text-amber-400')}>Permission</span>
+            <span className={cn('text-[10px] uppercase tracking-[0.15em]', tone === 'overlay' ? 'text-orange-200/80' : 'text-amber-400')}>权限请求</span>
             <span className={cn('text-sm font-medium', tone === 'overlay' ? 'text-stone-50' : 'text-text')}>{request.permission}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">

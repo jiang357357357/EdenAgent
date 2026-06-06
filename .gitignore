@@ -1,13 +1,14 @@
 node_modules/
 dist/
 target/
+.mon-agent/
 .env
 *.log
 .DS_Store
 Thumbs.db
 
 # Image assets
-packages/web/public/characters/
+frontend/web/public/characters/
 *.png
 *.jpg
 *.jpeg
@@ -15,3 +16,5 @@ packages/web/public/characters/
 *.webp
 *.svg
 *.ico
+!frontend/desktop/src-tauri/icons/
+!frontend/desktop/src-tauri/icons/icon.ico

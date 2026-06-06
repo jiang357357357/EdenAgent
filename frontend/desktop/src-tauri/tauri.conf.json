@@ -2,9 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "MonAgent",
   "version": "0.1.0",
-  "identifier": "com.monagent.app",
+  "identifier": "com.monagent.desktop",
   "build": {
-    "frontendDist": "../web/dist",
+    "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:40091",
     "beforeDevCommand": "",
     "beforeBuildCommand": "bun run --cwd ../web build"
@@ -21,15 +21,13 @@
         "resizable": true,
         "fullscreen": false,
         "transparent": true,
-        "center": true,
-        "minWidth": 480,
-        "minHeight": 380
+        "center": true
       }
     ],
     "security": {
       "assetProtocol": {
         "enable": true,
-        "scope": ["$TEMP/opencode/**"]
+        "scope": ["$TEMP/mon-agent/**"]
       },
       "csp": null
     }

@@ -142,6 +142,7 @@ DEBUG=false         # 来自全局配置
 | `SCRIPT_` | 脚本路径 | `SCRIPT_START`, `SCRIPT_STOP` |
 | `AI_` | AI服务相关 | `AI_CHROMA_DIR`, `AI_MODEL_NAME` |
 | `RENDER_` | 渲染日志 | `RENDER_PANELS`, `RENDER_SVG_DIR` |
+| `MON_AGENT_SEARCH_` | Agent 搜索工具 | `MON_AGENT_SEARCH_TIMEOUT_MS` |
 
 ### 5.3 布尔值规范
 
@@ -160,6 +161,25 @@ ENABLED=no
 ACTIVE=0
 PRODUCTION=off
 ```
+
+---
+
+### 5.4 MonAgent 搜索服务变量
+
+MonAgent 默认使用内置 DuckDuckGo 网页搜索入口。它不需要 Docker、Python 或额外账号，Windows 与 Linux 都可以直接使用。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MON_AGENT_SEARCH_TIMEOUT_MS` | 由运行时控制 | 预留变量，用于后续统一控制网页搜索超时 |
+
+示例：
+
+```ini
+[agent]
+# 默认无需配置，Agent 会直接使用 DuckDuckGo 网页搜索。
+```
+
+旧版外部搜索进程变量已废弃。Agent 不再读取外部搜索地址、启动命令、搜索端口等配置，也不会在 `.mon-agent/search` 下启动或维护搜索进程。
 
 ---
 
@@ -203,8 +223,8 @@ PLAIN_FILE=Data/Logs/Text/MonCore/MonCore_plain.log
 
 [process]
 NAME=MonCore-Django
-SCRIPT_START=scripts/Start/start_moncore.ps1
-SCRIPT_STOP=scripts/Start/stop_moncore.ps1
+SCRIPT_START=Script/Start/start_moncore.ps1
+SCRIPT_STOP=Script/Start/stop_moncore.ps1
 
 [discovery]
 UDP_PORT=40053

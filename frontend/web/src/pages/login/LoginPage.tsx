@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader, LockKeyhole, UserRound } from 'lucide-react';
+import { Bot, KeyRound, Loader, LockKeyhole, UserRound } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LoginPageProps {
@@ -22,39 +22,93 @@ export function LoginPage({ onLogin, isSubmitting = false, error }: LoginPagePro
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="min-h-screen bg-bg px-6 py-8 text-text"
+      className="h-[100vh] w-[100vw] overflow-hidden bg-[linear-gradient(135deg,#f7f5f1_0%,#f2eee7_46%,#eef3f0_100%)] px-[3vw] py-[4vh] text-text"
     >
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center">
-        <div className="grid w-full gap-6 md:grid-cols-[1.08fr_0.92fr]">
-          <section className="rounded-3xl border border-border bg-card px-8 py-10 shadow-sm">
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 text-accent">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10">
-                  <LockKeyhole className="h-5 w-5" />
+      <div className="pointer-events-none fixed inset-0 opacity-[0.42] [background-image:linear-gradient(rgba(120,113,108,0.13)_1px,transparent_1px),linear-gradient(90deg,rgba(120,113,108,0.1)_1px,transparent_1px)] [background-size:3vw_3vw]" />
+      <div className="relative flex h-[92vh] w-full items-center">
+        <div className="grid h-[84vh] w-full gap-[2vw] md:grid-cols-[1.08fr_0.92fr]">
+          <section className="relative h-full overflow-hidden rounded-[3vh] border border-white/80 bg-card/78 px-[3vw] py-[4vh] shadow-[0_3vh_8vh_rgba(41,37,36,0.1)] backdrop-blur">
+            <div className="absolute inset-x-0 top-0 h-[0.45vh] bg-accent" />
+            <div className="absolute right-[3vw] top-[7vh] h-[18vh] w-[18vh] rounded-full border border-accent/10" />
+
+            <div className="relative flex h-full flex-col justify-between">
+              <div className="space-y-[5vh]">
+                <div className="flex items-center justify-between gap-[1vw]">
+                  <div className="flex items-center gap-[1vw]">
+                    <div className="flex h-[5.6vh] w-[5.6vh] items-center justify-center rounded-[1.6vh] border border-accent/25 bg-accent/10 text-accent shadow-sm">
+                      <Bot className="h-[2.7vh] w-[2.7vh]" />
+                    </div>
+                    <div>
+                      <div className="font-serif text-2xl leading-none text-text">MonAgent</div>
+                      <div className="mt-1 text-xs tracking-[0.16em] text-text-muted">本地智能体工作台</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-[0.6vw] rounded-full border border-accent/25 bg-accent/10 px-[1vw] py-[0.8vh] text-xs font-medium text-accent">
+                    <span className="h-[0.9vh] w-[0.9vh] rounded-full bg-accent" />
+                    就绪
+                  </div>
                 </div>
-                <span className="text-xs uppercase tracking-[0.2em] text-text-muted">Agent Access</span>
+
+                <div className="rounded-[2.4vh] border border-border/90 bg-bg/62 p-[3vh] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+                  <div className="mb-[3vh] flex items-center justify-between border-b border-border/80 pb-[2.4vh]">
+                    <div>
+                      <div className="text-xs tracking-[0.16em] text-text-muted">AGENT ACCESS</div>
+                      <h1 className="mt-[1vh] font-serif text-4xl leading-tight text-text">进入工作台</h1>
+                    </div>
+                    <div className="flex h-[5vh] w-[5vh] items-center justify-center rounded-[1.4vh] border border-border bg-card text-accent">
+                      <KeyRound className="h-[2.2vh] w-[2.2vh]" />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-[1.4vh]">
+                    <div className="flex items-center justify-between rounded-[1.6vh] border border-border bg-card/82 px-[1.5vw] py-[1.55vh]">
+                      <span className="text-sm text-text">Core 用户</span>
+                      <span className="text-xs text-text-muted">统一身份</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-[1.6vh] border border-border bg-card/82 px-[1.5vw] py-[1.55vh]">
+                      <span className="text-sm text-text">Pi Runtime</span>
+                      <span className="text-xs text-text-muted">工具执行</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-[1.6vh] border border-border bg-card/82 px-[1.5vw] py-[1.55vh]">
+                      <span className="text-sm text-text">本地会话</span>
+                      <span className="text-xs text-text-muted">自动保持</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-3">
-                <h1 className="text-4xl font-serif text-text">登录 Agent 控制台</h1>
-                <p className="max-w-xl text-sm leading-7 text-text-muted">
-                  使用 Core 用户系统进入 Agent 工作台，登录后会保持本地会话，并在启动时自动验证 token。
-                </p>
+
+              <div className="grid grid-cols-3 gap-[1vw] text-xs text-text-muted">
+                <div className="rounded-[1.7vh] border border-border/80 bg-card/70 px-[1vw] py-[1.5vh]">
+                  <div className="mb-[1vh] h-[0.45vh] w-[3vw] rounded-full bg-accent" />
+                  Core
+                </div>
+                <div className="rounded-[1.7vh] border border-border/80 bg-card/70 px-[1vw] py-[1.5vh]">
+                  <div className="mb-[1vh] h-[0.45vh] w-[3vw] rounded-full bg-accent" />
+                  Agent
+                </div>
+                <div className="rounded-[1.7vh] border border-border/80 bg-card/70 px-[1vw] py-[1.5vh]">
+                  <div className="mb-[1vh] h-[0.45vh] w-[3vw] rounded-full bg-accent" />
+                  Local
+                </div>
               </div>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-border bg-bg px-8 py-10 shadow-sm">
-            <div className="space-y-6">
+          <section className="h-full rounded-[3vh] border border-white/80 bg-white/76 px-[3vw] py-[5vh] shadow-[0_3vh_8vh_rgba(41,37,36,0.1)] backdrop-blur">
+            <div className="space-y-[3vh]">
               <div>
-                <h2 className="text-2xl font-serif text-text">身份验证</h2>
-                <p className="mt-2 text-sm text-text-muted">输入账号信息进入工作台。</p>
+                <div className="mb-[2vh] flex h-[5.6vh] w-[5.6vh] items-center justify-center rounded-[1.6vh] border border-accent/20 bg-accent/10 text-accent">
+                  <KeyRound className="h-[2.4vh] w-[2.4vh]" />
+                </div>
+                <h2 className="text-3xl font-serif text-text">身份验证</h2>
+                <p className="mt-2 text-sm text-text-muted">进入 MonAgent 工作台</p>
               </div>
 
-              <form className="space-y-4" onSubmit={handleSubmit}>
+              <form className="space-y-[2.2vh]" onSubmit={handleSubmit}>
                 <label className="block">
-                  <span className="mb-2 block text-sm text-text-muted">用户名</span>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-                    <UserRound className="h-4 w-4 text-text-muted" />
+                  <span className="mb-[1vh] block text-sm text-text-muted">用户名</span>
+                  <div className="flex items-center gap-[1vw] rounded-[1.8vh] border border-border bg-card/90 px-[1.5vw] py-[1.7vh] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-colors focus-within:border-accent/50">
+                    <UserRound className="h-[2vh] w-[2vh] text-text-muted" />
                     <input
                       type="text"
                       value={username}
@@ -68,9 +122,9 @@ export function LoginPage({ onLogin, isSubmitting = false, error }: LoginPagePro
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm text-text-muted">密码</span>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-                    <LockKeyhole className="h-4 w-4 text-text-muted" />
+                  <span className="mb-[1vh] block text-sm text-text-muted">密码</span>
+                  <div className="flex items-center gap-[1vw] rounded-[1.8vh] border border-border bg-card/90 px-[1.5vw] py-[1.7vh] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-colors focus-within:border-accent/50">
+                    <LockKeyhole className="h-[2vh] w-[2vh] text-text-muted" />
                     <input
                       type="password"
                       value={password}
@@ -84,7 +138,7 @@ export function LoginPage({ onLogin, isSubmitting = false, error }: LoginPagePro
                 </label>
 
                 {error ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="rounded-[1.8vh] border border-red-200 bg-red-50 px-[1.5vw] py-[1.5vh] text-sm text-red-700">
                     {error}
                   </div>
                 ) : null}
@@ -92,9 +146,9 @@ export function LoginPage({ onLogin, isSubmitting = false, error }: LoginPagePro
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm font-medium text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-[0.8vw] rounded-[1.8vh] border border-accent bg-accent px-[1.5vw] py-[1.8vh] text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSubmitting ? <Loader className="h-4 w-4 animate-spin" /> : null}
+                  {isSubmitting ? <Loader className="h-[2vh] w-[2vh] animate-spin" /> : null}
                   {isSubmitting ? '登录中...' : '登录'}
                 </button>
               </form>

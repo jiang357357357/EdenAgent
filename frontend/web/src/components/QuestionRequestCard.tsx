@@ -93,7 +93,7 @@ export function QuestionRequestCard({ request, onReply, onReject, tone = 'defaul
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn('text-[10px] uppercase tracking-[0.15em]', tone === 'overlay' ? 'text-sky-200/80' : 'text-sky-400')}>Question</span>
+            <span className={cn('text-[10px] uppercase tracking-[0.15em]', tone === 'overlay' ? 'text-sky-200/80' : 'text-sky-400')}>问题确认</span>
             {request.tool && <span className={cn('text-xs', tone === 'overlay' ? 'text-stone-400' : 'text-text-muted')}>工具调用: {request.tool.callID}</span>}
           </div>
 
