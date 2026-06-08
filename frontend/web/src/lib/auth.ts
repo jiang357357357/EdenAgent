@@ -68,6 +68,41 @@ const browserCoreBaseUrl = (import.meta as unknown as { env?: { DEV?: boolean; V
 const TOKEN_KEY = "agent.auth_token"
 const USER_KEY = "agent.auth_user"
 const EXPIRES_KEY = "agent.auth_expires_at"
+const CLIENT_ID_KEY = "agent.client_id"
+
+function randomClientSuffix() {
+  const webCrypto = globalThis.crypto
+
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID()
+  }
+
+  if (webCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(16)
+    webCrypto.getRandomValues(bytes)
+    return Array.from(bytes)
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+function getClientMetadata() {
+  const clientType = isTauriRuntime() ? "agent_desktop" : "agent_web"
+  let clientId = window.localStorage.getItem(CLIENT_ID_KEY)
+  if (!clientId) {
+    clientId = `mon-${clientType}:${randomClientSuffix()}`
+    window.localStorage.setItem(CLIENT_ID_KEY, clientId)
+  }
+
+  return {
+    client_id: clientId,
+    client_type: clientType,
+    clientId,
+    clientType,
+  }
+}
 
 function parseExpiresAt(value: string | null) {
   if (!value) return undefined
@@ -205,8 +240,17 @@ export function saveAuth(payload: { token: string; user: AuthUser; expiresAt?: s
 }
 
 export async function loginWithCore(username: string, password: string) {
+  const client = getClientMetadata()
+
   if (isTauriRuntime()) {
-    const response = await invokeTauri<LoginResponse>("core_login", { request: { username, password } })
+    const response = await invokeTauri<LoginResponse>("core_login", {
+      request: {
+        username,
+        password,
+        clientId: client.clientId,
+        clientType: client.clientType,
+      },
+    })
     const profile = await fetchUserProfile(response.token).catch(() => null)
     const user = mergeUserProfile(response.user, profile)
     saveAuth({
@@ -219,7 +263,16 @@ export async function loginWithCore(username: string, password: string) {
 
   const response = await request<LoginResponse>("/api/users/login/", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({
+      username,
+      password,
+      client_id: client.client_id,
+      client_type: client.client_type,
+    }),
+    headers: {
+      "X-MON-CLIENT-ID": client.client_id,
+      "X-MON-CLIENT-TYPE": client.client_type,
+    },
   })
 
   const profile = await fetchUserProfile(response.token).catch(() => null)

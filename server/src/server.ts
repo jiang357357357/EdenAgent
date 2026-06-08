@@ -2,7 +2,7 @@ import { serve } from "bun"
 import { createAgentApp } from "./app/bootstrap"
 import { loadAgentServerConfig } from "./app/config"
 import { CoreAuthenticationExpiredError } from "./core"
-import { requireCoreToken } from "./core/auth"
+import { readAuthToken, requireCoreToken } from "./core/auth"
 import { HubRegistryClient } from "./hub"
 import { proxyToVite } from "./http/dev-proxy"
 import { eventStreamResponse, jsonResponse, notFoundResponse, readJsonBody, stripApiPrefix } from "./http/response"
@@ -118,7 +118,12 @@ async function handleApi(request: Request, url: URL) {
 
   if (request.method === "POST" && url.pathname === "/internal/self-awake/run") {
     const body = await readJsonBody<SelfAwakeRequest>(request)
-    const decision = await runSelfAwake(body, logger)
+    const token = readAuthToken(request)
+    const decision = await runSelfAwake(body, logger, {
+      coreToken: token,
+      resolveCoreConfig: (coreToken) => coreClient.resolveRuntimeConfig(coreToken),
+      workspaceRoot: config.workspaceRoot,
+    })
     return jsonResponse(decision)
   }
 

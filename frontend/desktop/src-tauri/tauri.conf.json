@@ -16,8 +16,8 @@
     "windows": [
       {
         "title": "MonAgent — AI 个人助手",
-        "width": 900,
-        "height": 620,
+        "width": 960,
+        "height": 540,
         "resizable": true,
         "fullscreen": false,
         "transparent": true,

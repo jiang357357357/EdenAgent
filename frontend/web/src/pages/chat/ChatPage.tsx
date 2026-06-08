@@ -11,9 +11,9 @@ import { cn } from "../../lib/utils"
 import type { PendingPermission, PendingQuestion, PromptAttachment, Session } from "../../types"
 
 const fullScreenMotion = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  initial: { opacity: 0, x: -18, filter: "blur(3px)" },
+  animate: { opacity: 1, x: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, x: -26, filter: "blur(3px)" },
 }
 
 const screenTransition = {
@@ -97,7 +97,7 @@ export function ChatPage({
       key="chat-with-character"
       {...fullScreenMotion}
       transition={screenTransition}
-      className="flex h-[100vh] w-[100vw] bg-bg text-text font-sans overflow-hidden"
+      className="fixed inset-0 z-10 flex h-[100vh] w-[100vw] overflow-hidden bg-bg font-sans text-text"
     >
       <Sidebar
         sessions={sessions}
@@ -115,25 +115,25 @@ export function ChatPage({
         onLogout={onLogout}
       />
 
-      <main className="flex h-[100vh] min-w-0 flex-1 flex-col relative">
-        <header className="flex items-center justify-between px-[2vw] py-[2vh] border-b border-border bg-bg/80 backdrop-blur-md z-10 sticky top-0">
-          <div className="min-w-0 font-serif text-lg text-text flex items-center gap-3">
+      <main className="relative flex h-[100vh] w-[66vw] flex-none flex-col">
+        <header className="sticky top-0 z-10 flex h-[12.5vh] items-center justify-between border-b border-border bg-bg/80 px-[3.2vw] backdrop-blur-md">
+          <div className="flex min-w-0 items-center gap-[1.6vw] font-serif text-[3.1vh] text-text">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="mr-1 rounded-md p-2 text-text-muted transition-colors hover:bg-card hover:text-text"
+              className="rounded-[1vh] p-[1.4vh] text-text-muted transition-colors hover:bg-card hover:text-text"
               aria-label="打开会话抽屉"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-[3.2vh] w-[3.2vh]" />
             </button>
-            <MessageSquare className="w-4 h-4 text-accent" />
+            <MessageSquare className="h-[2.7vh] w-[2.7vh] text-accent" />
             <span className="truncate">{activeSession?.title || "新会话"}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-[1vw]">
             <button
               type="button"
               onClick={toggleAutoScroll}
               className={cn(
-                "flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] tracking-[0.12em] shadow-sm transition-colors",
+                "flex items-center gap-[0.6vw] rounded-full border px-[1.6vw] py-[1.35vh] text-[1.75vh] tracking-[0.12em] shadow-sm transition-colors",
                 autoScrollEnabled
                   ? "border-accent/25 bg-card text-accent hover:border-accent/45"
                   : "border-border bg-card text-text-muted hover:border-accent/35 hover:text-accent",
@@ -141,17 +141,17 @@ export function ChatPage({
               title={autoScrollEnabled ? "自动滚动已开启，点击关闭" : "自动滚动已关闭，点击恢复到底部"}
               aria-label={autoScrollEnabled ? "关闭自动滚动" : "开启自动滚动"}
             >
-              {autoScrollEnabled ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+              {autoScrollEnabled ? <Lock className="h-[2.45vh] w-[2.45vh]" /> : <Unlock className="h-[2.45vh] w-[2.45vh]" />}
               <span className="hidden sm:inline">{autoScrollEnabled ? "自动滚动" : "已关闭"}</span>
             </button>
             <button
               type="button"
               onClick={onSwitchMode}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1.5 text-[10px] tracking-[0.12em] text-text-muted shadow-sm transition-colors hover:border-accent/40 hover:text-accent"
+              className="flex items-center gap-[0.6vw] rounded-full border border-border bg-card px-[1.6vw] py-[1.35vh] text-[1.75vh] tracking-[0.12em] text-text-muted shadow-sm transition-colors hover:border-accent/40 hover:text-accent"
               title="切换到桌宠模式"
               aria-label="切换到桌宠模式"
             >
-              <User className="h-3.5 w-3.5" />
+              <User className="h-[2.45vh] w-[2.45vh]" />
               <span className="hidden sm:inline">桌宠模式</span>
             </button>
           </div>
@@ -162,19 +162,19 @@ export function ChatPage({
           ref={messagesScrollRef}
           className="flex-1 overflow-y-auto scroll-smooth"
         >
-          <div className="mx-auto w-full max-w-[min(62vw,720px)] px-[2vw]">
+          <div className="mx-auto w-[calc(100%_-_5vw)] max-w-[52vw] px-[1vw]">
             {connectionError ? (
-              <div className="h-full min-h-[50vh] flex flex-col items-center justify-center text-center">
-                <div className="mb-3 rounded-full border border-border bg-card px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-accent shadow-sm">
+              <div className="flex h-[61vh] flex-col items-center justify-center text-center">
+                <div className="mb-[2vh] rounded-full border border-border bg-card px-[2vw] py-[1.2vh] text-[1.8vh] uppercase tracking-[0.15em] text-accent shadow-sm">
                   后端离线
                 </div>
-                <p className="max-w-md text-sm leading-relaxed text-text-muted">
+                <p className="max-w-[46vw] text-[2.2vh] leading-relaxed text-text-muted">
                   无法连接 MonAgent 服务：{connectionError}
                 </p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="h-full min-h-[50vh] flex flex-col items-center justify-center text-center text-text-muted">
-                <div className="w-16 h-16 bg-card border border-border text-accent rounded-2xl flex items-center justify-center mb-6 shadow-sm overflow-hidden">
+              <div className="flex h-[61vh] flex-col items-center justify-center text-center text-text-muted">
+                <div className="mb-[4vh] flex h-[13vh] w-[13vh] items-center justify-center overflow-hidden rounded-[2.6vh] border border-border bg-card text-accent shadow-sm">
                   {assistantAvatarUrl ? (
                     <img
                       src={assistantAvatarUrl}
@@ -183,16 +183,16 @@ export function ChatPage({
                       draggable={false}
                     />
                   ) : (
-                    <span className="text-3xl font-serif">{assistantInitial}</span>
+                    <span className="font-serif text-[5.2vh]">{assistantInitial}</span>
                   )}
                 </div>
-                <h2 className="text-2xl font-serif text-text mb-2">想聊点什么？</h2>
-                <p className="text-text-muted max-w-sm text-[14px]">
+                <h2 className="mb-[1.4vh] font-serif text-[4.4vh] text-text">想聊点什么？</h2>
+                <p className="max-w-[48vw] text-[2.35vh] leading-[1.55] text-text-muted">
                   可以问我项目结构、代码问题，也可以让我查看截图、分析页面或协助构建工具。
                 </p>
               </div>
             ) : (
-              <div className="py-6 min-h-full">
+              <div className="min-h-full py-[4vh]">
                 {messages.map((msg) => (
                   <MessageBubble
                     key={msg.id}
@@ -208,8 +208,8 @@ export function ChatPage({
                   />
                 ))}
                 {isThinking && !hasStreamingAssistantMessage && (
-                  <div className="flex gap-4 w-full px-4 py-6 md:px-0 opacity-70">
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded border border-accent bg-card text-accent text-sm overflow-hidden">
+                  <div className="flex w-full gap-[1.7vw] px-[1vw] py-[4vh] opacity-70 md:px-0">
+                    <div className="flex h-[5.9vh] w-[5.9vh] flex-shrink-0 items-center justify-center overflow-hidden rounded-[1vh] border border-accent bg-card text-[2vh] text-accent">
                       {assistantAvatarUrl ? (
                         <img
                           src={assistantAvatarUrl}
@@ -222,22 +222,22 @@ export function ChatPage({
                       )}
                     </div>
                     <div className="flex items-center">
-                      <span className="text-sm font-serif text-text-muted animate-pulse">
+                      <span className="animate-pulse font-serif text-[2.2vh] text-text-muted">
                         {assistant?.name || assistant?.character?.name || "助手"}正在思考...
                       </span>
                     </div>
                   </div>
                 )}
-                <div ref={messagesEndRef} className="h-10" />
+                <div ref={messagesEndRef} className="h-[7vh]" />
               </div>
             )}
           </div>
         </div>
 
-        <div className="px-[2vw]">
-          <div className="mx-auto w-full max-w-[min(62vw,720px)]">
+        <div className="px-[3vw]">
+          <div className="mx-auto w-[calc(100%_-_5vw)] max-w-[52vw]">
             {(activePendingPermissions.length > 0 || activePendingQuestions.length > 0) && (
-              <div className="mb-3 grid gap-3">
+              <div className="mb-[2vh] grid gap-[2vh]">
                 {activePendingPermissions.map((request) => (
                   <PermissionRequestCard key={request.id} request={request} onReply={onPermissionReply} />
                 ))}

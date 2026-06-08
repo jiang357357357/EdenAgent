@@ -4,6 +4,7 @@ import { Agent, type AgentEvent, type AgentMessage, type ThinkingLevel } from "@
 import { getEnvApiKey, getModel, type ImageContent, type Model } from "@earendil-works/pi-ai"
 import { CoreAuthenticationExpiredError, type CoreAIEntity, type CoreRuntimeConfig } from "../core"
 import { PermissionBroker, QuestionBroker } from "../interaction"
+import { buildChatSystemPrompt } from "../prompting"
 import { SessionStore } from "../sessions"
 import { createID, createLogger, type EventBus, type Logger } from "../shared"
 import { createMonAgentTools } from "../tooling"
@@ -21,7 +22,7 @@ interface RuntimeOptions {
   syncCoreMessage?: (token: string, sessionID: string, message: ApiMessage, core?: CoreRuntimeConfig) => Promise<void>
 }
 
-interface RuntimeModelConfig {
+export interface RuntimeModelConfig {
   source: "core" | "env"
   model: Model<any>
   apiKey?: string
@@ -198,7 +199,7 @@ function buildOpenAICompatibleModel(aiEntity: CoreAIEntity, provider: string, ba
   } as Model<any>
 }
 
-function resolveCoreModel(core: CoreRuntimeConfig): RuntimeModelConfig {
+export function resolveCoreModel(core: CoreRuntimeConfig): RuntimeModelConfig {
   const aiEntity = core.aiEntity
   const provider = normalizeVendor(aiEntity.vendor)
   const baseUrl = trimEndpointToBase(aiEntity.api_endpoint)
@@ -674,35 +675,7 @@ export class MonAgentRuntime {
   }
 
   private buildSystemPrompt(core?: CoreRuntimeConfig) {
-    const lines = [
-      core
-        ? `你是「${core.character.name}」。你需要以这个角色的身份理解用户、思考和回复。`
-        : "你是一个运行在 Mon 项目中的本地智能体。",
-      "不要告诉用户你是默认助手，也不要用助手配置名称称呼自己；你对外呈现的身份就是当前角色。",
-      "你需要用中文和用户沟通，除非用户明确要求其他语言。",
-      "如果模型输出思考、推理、计划或工具调用分析，这些中间内容也必须使用中文。",
-      "不要在思考内容中使用英文解释用户意图，除非用户原文或技术名词本身需要英文。",
-      "你运行在 MonAgent 中，因此可以在需要时使用本地工具协助用户。",
-      "你可以使用工具读取、搜索和修改当前工作区文件。",
-      "你可以使用 web_search 搜索实时网页信息，使用 web_fetch 抓取网页正文，使用 ask_user 向用户确认信息，使用 analyze_image 请求分析图片。",
-      "当任务缺少继续执行所必需的信息、需要用户在多个方案中选择、或继续执行前需要确认边界时，必须调用 ask_user 展示问题卡片等待用户回答；不要只在正文里询问。",
-      "调用 ask_user 时，问题、标题和选项都使用中文；能列出选项时给出 2 到 4 个清晰选项，并保留用户自定义回答的空间。",
-      "只有闲聊、反问式表达或不影响继续执行的小问题，才可以直接写在回复正文里。",
-      "用户上传的文本附件会直接出现在本轮消息中；图片附件会通过视觉通道提供。",
-      "进行写入文件或执行 shell 命令前，系统会向用户请求权限。",
-      "读取、列出或搜索工作区外路径时，也必须等待用户明确授权。",
-    ]
-
-    if (core) {
-      if (core.character.signature) {
-        lines.push(`角色签名：${core.character.signature}`)
-      }
-      if (core.character.description) {
-        lines.push(`角色描述：${core.character.description}`)
-      }
-    }
-
-    return lines.join("\n")
+    return buildChatSystemPrompt(core)
   }
 
   private async syncCoreSession(sessionID: string, authToken?: string | null, core?: CoreRuntimeConfig) {

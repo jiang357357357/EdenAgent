@@ -30,7 +30,7 @@ export function loadAgentServerConfig(): AgentServerConfig {
   const hubPort = Number(process.env.MON_AGENT_HUB_PORT ?? "") || config.number("hub", "HUB_ZMQ_PORT", 40051)
 
   return {
-    host: process.env.MON_AGENT_HOST ?? config.get("server", "HOST", "127.0.0.1") ?? "127.0.0.1",
+    host: process.env.MON_AGENT_HOST ?? config.get("server", "HOST", "0.0.0.0") ?? "0.0.0.0",
     port: Number(process.env.MON_AGENT_PORT ?? "") || config.number("server", "PORT", 40092),
     vitePort: config.number("server", "WEB_PORT", 40091),
     isDev: !process.env.MON_AGENT_PROD,

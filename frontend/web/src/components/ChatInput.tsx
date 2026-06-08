@@ -86,7 +86,7 @@ export function ChatInput({
         return
       }
       textareaRef.current.style.height = "auto"
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, window.innerHeight * 0.24)}px`
     }
   }, [input, overlay])
 
@@ -188,7 +188,7 @@ export function ChatInput({
     <div
       className={cn(
         "sticky bottom-0 z-10",
-        overlay ? "h-[40vh] bg-transparent p-0" : "bg-gradient-to-t from-bg via-bg/95 to-transparent pt-2 pb-3",
+        overlay ? "h-[40vh] bg-transparent p-0" : "bg-gradient-to-t from-bg via-bg/95 to-transparent pt-[1.2vh] pb-[2.8vh]",
       )}
     >
       <AnimatePresence>
@@ -202,18 +202,18 @@ export function ChatInput({
             {attachments.map((attachment, idx) => (
               <div key={`${attachment.filename ?? "attachment"}-${idx}`} className="relative group flex-shrink-0">
                 {attachment.mime.startsWith("image/") ? (
-                  <img src={attachment.url} alt={attachment.filename ?? "附件预览"} className="h-14 w-14 object-cover rounded-lg border border-border" />
+                  <img src={attachment.url} alt={attachment.filename ?? "附件预览"} className="h-[10vh] w-[10vh] rounded-[1.4vh] border border-border object-cover" />
                 ) : (
-                  <div className="flex h-14 min-w-36 max-w-56 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs text-text">
-                    <FileText className="h-4 w-4 flex-shrink-0 text-text-muted" />
+                  <div className="flex h-[10vh] w-[24vw] items-center gap-[1vw] rounded-[1.4vh] border border-border bg-card px-[1.8vw] text-[1.8vh] text-text">
+                    <FileText className="h-[2.6vh] w-[2.6vh] flex-shrink-0 text-text-muted" />
                     <span className="truncate">{attachment.filename ?? "附件"}</span>
                   </div>
                 )}
                 <button
                   onClick={() => removeAttachment(idx)}
-                  className="absolute -top-1.5 -right-1.5 bg-card text-accent border border-border rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute right-[-0.9vh] top-[-0.9vh] rounded-full border border-border bg-card p-[0.35vh] text-accent opacity-0 transition-opacity group-hover:opacity-100"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-[2vh] w-[2vh]" />
                 </button>
               </div>
             ))}
@@ -223,10 +223,10 @@ export function ChatInput({
 
       <div
         className={cn(
-          "min-h-[68px] rounded-2xl transition-colors",
+          "rounded-[2.4vh] transition-colors",
           overlay
             ? "relative h-full border border-white/15 bg-stone-950/76 shadow-none backdrop-blur-md focus-within:border-orange-300/40"
-            : "flex items-center gap-3 border border-border bg-card px-4 py-3 shadow-sm focus-within:border-accent/40",
+            : "flex min-h-[11vh] items-center gap-[1.8vw] border border-border bg-card px-[2.7vw] py-[1.8vh] shadow-sm focus-within:border-accent/40",
         )}
       >
         <input
@@ -237,48 +237,48 @@ export function ChatInput({
           onChange={handleFileChange}
         />
         {overlay ? (
-          <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5">
+          <div className="absolute left-[1.8vh] right-[1.8vh] top-[1.4vh] z-10 flex items-center justify-end gap-[0.9vh]">
             {hasDialog && (
               <button
                 type="button"
                 onClick={toggleOverlayMode}
-                className="rounded-lg p-2.5 text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-[1.2vh] p-[1.3vh] text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label={isDialogMode ? "切换到输入" : "切换到对话"}
                 title={isDialogMode ? "切换到输入" : "切换到对话"}
               >
-                {isDialogMode ? <Keyboard className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                {isDialogMode ? <Keyboard className="h-[2.2vh] w-[2.2vh]" /> : <MessageSquare className="h-[2.2vh] w-[2.2vh]" />}
               </button>
             )}
             {!isDialogMode && (
               <button
                 type="button"
                 onClick={handleFilePick}
-                className="rounded-lg p-2.5 text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-[1.2vh] p-[1.3vh] text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="添加附件"
                 title="添加附件"
               >
-                <Paperclip className="w-4 h-4" />
+                <Paperclip className="h-[2.2vh] w-[2.2vh]" />
               </button>
             )}
             <button
               type="button"
               onClick={onHistory}
-              className="rounded-lg p-2.5 text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-[1.2vh] p-[1.3vh] text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="历史会话"
               title="历史会话"
             >
-              <History className="w-4 h-4" />
+              <History className="h-[2.2vh] w-[2.2vh]" />
             </button>
             {isDialogMode && (
               <button
                 type="button"
                 onClick={previousOutput}
                 disabled={outputIndex === 0}
-                className="rounded-lg p-2.5 text-stone-200 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+                className="rounded-[1.2vh] p-[1.3vh] text-stone-200 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
                 aria-label="上一条"
                 title="上一条"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="h-[2.2vh] w-[2.2vh]" />
               </button>
             )}
             <button
@@ -288,11 +288,11 @@ export function ChatInput({
               onPointerLeave={clearDragTimer}
               onPointerCancel={clearDragTimer}
               onContextMenu={(event) => event.preventDefault()}
-              className="rounded-lg p-2.5 text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-[1.2vh] p-[1.3vh] text-stone-200 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="长按移动窗口"
               title="长按移动窗口"
             >
-              <Move className="w-4 h-4" />
+              <Move className="h-[2.2vh] w-[2.2vh]" />
             </button>
             {!isDialogMode && (
               <motion.button
@@ -304,29 +304,29 @@ export function ChatInput({
                 }}
                 onClick={handleSend}
                 disabled={disabled || (!input.trim() && attachments.length === 0)}
-                className="rounded-lg p-2.5 text-orange-300 transition-colors hover:bg-orange-300/10 disabled:cursor-not-allowed"
+                className="rounded-[1.2vh] p-[1.3vh] text-orange-300 transition-colors hover:bg-orange-300/10 disabled:cursor-not-allowed"
                 aria-label="发送"
                 title="发送"
               >
-                <Send className="w-4 h-4" />
+                <Send className="h-[2.2vh] w-[2.2vh]" />
               </motion.button>
             )}
           </div>
         ) : (
           <button
             onClick={handleFilePick}
-            className="flex-shrink-0 rounded-lg p-2.5 text-text-muted transition-colors hover:bg-bg hover:text-accent"
+            className="flex-shrink-0 rounded-[1.2vh] p-[1.4vh] text-text-muted transition-colors hover:bg-bg hover:text-accent"
             aria-label="添加附件"
             title="添加附件"
           >
-            <Paperclip className="w-4 h-4" />
+            <Paperclip className="h-[2.9vh] w-[2.9vh]" />
           </button>
         )}
 
         {isDialogMode ? (
           <div
             onClick={advanceOutput}
-            className="absolute inset-0 box-border h-full w-full cursor-pointer overflow-y-auto overflow-x-hidden px-5 py-5 pr-16 text-left text-[15px] leading-relaxed text-stone-100 [overflow-wrap:anywhere] [&::-webkit-scrollbar]:hidden"
+            className="absolute inset-0 box-border h-full w-full cursor-pointer overflow-y-auto overflow-x-hidden px-[2.4vh] pb-[2.4vh] pt-[8.4vh] text-left text-[2.05vh] leading-relaxed text-stone-100 [overflow-wrap:anywhere] [&::-webkit-scrollbar]:hidden"
           >
             {currentOutput ? (
               <div>
@@ -437,10 +437,10 @@ export function ChatInput({
             rows={overlay ? 10 : 1}
             style={overlay ? { height: "100%", overflow: "hidden", scrollbarWidth: "none" } : undefined}
             className={cn(
-              "resize-none overflow-x-hidden bg-transparent outline-none text-[15px] leading-relaxed",
+              "resize-none overflow-x-hidden bg-transparent outline-none leading-relaxed",
               overlay
-                ? "absolute inset-0 box-border h-full max-h-none min-h-0 w-full overflow-hidden py-5 pl-5 pr-16 text-stone-100 placeholder:text-stone-400 [&::-webkit-scrollbar]:hidden"
-                : "min-h-[40px] max-h-[220px] min-w-0 flex-1 py-1 text-text placeholder:text-text-muted",
+                ? "absolute inset-0 box-border h-full max-h-none min-h-0 w-full overflow-hidden px-[2.4vh] pb-[2.4vh] pt-[8.4vh] text-stone-100 placeholder:text-stone-400 [&::-webkit-scrollbar]:hidden"
+                : "min-h-[5vh] max-h-[24vh] min-w-0 flex-1 py-[0.8vh] text-[2.45vh] text-text placeholder:text-text-muted",
             )}
           />
         )}
@@ -454,9 +454,9 @@ export function ChatInput({
             }}
             onClick={handleSend}
             disabled={disabled || (!input.trim() && attachments.length === 0)}
-            className="flex-shrink-0 rounded-lg p-2.5 text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed"
+            className="flex-shrink-0 rounded-[1.2vh] p-[1.4vh] text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed"
           >
-            <Send className="w-4 h-4" />
+            <Send className="h-[2.9vh] w-[2.9vh]" />
           </motion.button>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { X } from "lucide-react"
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, LayoutGroup, motion } from "motion/react"
 import { ChatPage } from "./pages/chat"
 import { CharacterPage } from "./pages/character"
 import { LoginPage } from "./pages/login"
@@ -37,6 +37,14 @@ const screenTransition = {
   ease: [0.16, 1, 0.3, 1],
 } as const
 
+function wait(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+}
+
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+}
+
 export default function App() {
   const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "unauthenticated">("checking")
   const [authError, setAuthError] = useState<string | undefined>()
@@ -45,6 +53,7 @@ export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [characterMode, setCharacterMode] = useState(false)
+  const [modeContentVisible, setModeContentVisible] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyView, setHistoryView] = useState<"messages" | "sessions">("messages")
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | undefined>()
@@ -55,6 +64,8 @@ export default function App() {
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const authProbeInFlightRef = useRef(false)
+  const modeResizeTimerRef = useRef<number | undefined>(undefined)
+  const modeSwitchTokenRef = useRef(0)
   const {
     activeSession,
     activeSessionId,
@@ -80,6 +91,12 @@ export default function App() {
   }
 
   function resetRuntimeState() {
+    modeSwitchTokenRef.current += 1
+    if (modeResizeTimerRef.current) {
+      window.clearTimeout(modeResizeTimerRef.current)
+      modeResizeTimerRef.current = undefined
+    }
+    setModeContentVisible(true)
     setSidebarOpen(false)
     resetSessionRuntime()
     setDefaultAssistant(null)
@@ -432,7 +449,7 @@ export default function App() {
     let disposed = false
 
     void listenDesktopViewMode((mode) => {
-      switchCharacterMode(mode === "character")
+      void switchCharacterMode(mode === "character")
     }).then((dispose) => {
       if (disposed) {
         dispose?.()
@@ -446,6 +463,14 @@ export default function App() {
       cleanup?.()
     }
   }, [authStatus])
+
+  useEffect(() => {
+    return () => {
+      if (modeResizeTimerRef.current) {
+        window.clearTimeout(modeResizeTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (authStatus !== "authenticated") return
@@ -540,17 +565,36 @@ export default function App() {
     await dismissQuestion(requestID)
   }
 
-  function switchCharacterMode(enabled: boolean) {
+  async function switchCharacterMode(enabled: boolean) {
+    if (enabled === characterMode) return
+
     const mode = enabled ? "character" : "chatWithCharacter"
-    setCharacterMode(enabled)
+    const token = modeSwitchTokenRef.current + 1
+    modeSwitchTokenRef.current = token
+    if (modeResizeTimerRef.current) {
+      window.clearTimeout(modeResizeTimerRef.current)
+      modeResizeTimerRef.current = undefined
+    }
+
     setHistoryOpen(false)
     setHistoryView("messages")
+    setSidebarOpen(false)
+    setModeContentVisible(false)
+
+    await wait(180)
+    if (modeSwitchTokenRef.current !== token) return
+
     document.documentElement.classList.toggle("character-transparent", enabled)
     void setDesktopViewModeState(mode)
-    void setDesktopWindowAppearance(mode)
-    window.setTimeout(() => {
-      void resizeDesktopWindow(mode)
-    }, 220)
+    await setDesktopWindowAppearance(mode)
+    await resizeDesktopWindow(mode)
+
+    if (modeSwitchTokenRef.current !== token) return
+    setCharacterMode(enabled)
+    await waitForNextFrame()
+
+    if (modeSwitchTokenRef.current !== token) return
+    setModeContentVisible(true)
   }
 
   if (authStatus === "checking") {
@@ -570,64 +614,75 @@ export default function App() {
 
   return (
     <>
-      <AnimatePresence mode="wait" initial={false}>
-        {characterMode ? (
-          <CharacterPage
-            isThinking={isThinking}
-            activeSession={activeSession}
-            activeReplyMessage={activeReplyMessage}
-            activePendingPermissions={activePendingPermissions}
-            activePendingQuestions={activePendingQuestions}
-            historyOpen={historyOpen}
-            historyView={historyView}
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            dialogSegments={dialogSegments}
-            onSetHistoryOpen={setHistoryOpen}
-            onSetHistoryView={setHistoryView}
-            onSelectSession={selectRuntimeSession}
-            onSendMessage={handleSendMessage}
-            onPermissionReply={handlePermissionReply}
-            onQuestionReply={handleQuestionReply}
-            onQuestionReject={handleQuestionReject}
-            onStartWindowDrag={startDesktopWindowDrag}
-            assistant={defaultAssistant}
-            assistantError={defaultAssistantError}
-            onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
-            onSwitchMode={() => switchCharacterMode(false)}
-          />
-        ) : (
-          <ChatPage
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            activeSession={activeSession}
-            sidebarOpen={sidebarOpen}
-            setSidebarOpen={setSidebarOpen}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            currentUser={currentUser}
-            assistant={defaultAssistant}
-            assistantError={defaultAssistantError}
-            isThinking={isThinking}
-            connectionError={connectionError}
-            activePendingPermissions={activePendingPermissions}
-            activePendingQuestions={activePendingQuestions}
-            messagesScrollRef={messagesScrollRef}
-            messagesEndRef={messagesEndRef}
-            autoScrollEnabled={autoScrollEnabled}
-            onAutoScrollChange={handleAutoScrollChange}
-            onSelectSession={selectRuntimeSession}
-            onNewSession={handleNewSession}
-            onSendMessage={handleSendMessage}
-            onPermissionReply={handlePermissionReply}
-            onQuestionReply={handleQuestionReply}
-            onQuestionReject={handleQuestionReject}
-            onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
-            onLogout={handleLogout}
-            onSwitchMode={() => switchCharacterMode(true)}
-          />
-        )}
-      </AnimatePresence>
+      <motion.div
+        animate={{
+          opacity: modeContentVisible ? 1 : 0,
+          filter: modeContentVisible ? "blur(0px)" : "blur(6px)",
+        }}
+        transition={{ duration: modeContentVisible ? 0.22 : 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed inset-0"
+      >
+        <LayoutGroup id="mon-agent-mode-switch">
+          <AnimatePresence mode="wait" initial={false}>
+            {characterMode ? (
+              <CharacterPage
+                isThinking={isThinking}
+                activeSession={activeSession}
+                activeReplyMessage={activeReplyMessage}
+                activePendingPermissions={activePendingPermissions}
+                activePendingQuestions={activePendingQuestions}
+                historyOpen={historyOpen}
+                historyView={historyView}
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                dialogSegments={dialogSegments}
+                onSetHistoryOpen={setHistoryOpen}
+                onSetHistoryView={setHistoryView}
+                onSelectSession={selectRuntimeSession}
+                onSendMessage={handleSendMessage}
+                onPermissionReply={handlePermissionReply}
+                onQuestionReply={handleQuestionReply}
+                onQuestionReject={handleQuestionReject}
+                onStartWindowDrag={startDesktopWindowDrag}
+                assistant={defaultAssistant}
+                assistantError={defaultAssistantError}
+                onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
+                onSwitchMode={() => void switchCharacterMode(false)}
+              />
+            ) : (
+              <ChatPage
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                activeSession={activeSession}
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                theme={theme}
+                toggleTheme={toggleTheme}
+                currentUser={currentUser}
+                assistant={defaultAssistant}
+                assistantError={defaultAssistantError}
+                isThinking={isThinking}
+                connectionError={connectionError}
+                activePendingPermissions={activePendingPermissions}
+                activePendingQuestions={activePendingQuestions}
+                messagesScrollRef={messagesScrollRef}
+                messagesEndRef={messagesEndRef}
+                autoScrollEnabled={autoScrollEnabled}
+                onAutoScrollChange={handleAutoScrollChange}
+                onSelectSession={selectRuntimeSession}
+                onNewSession={handleNewSession}
+                onSendMessage={handleSendMessage}
+                onPermissionReply={handlePermissionReply}
+                onQuestionReply={handleQuestionReply}
+                onQuestionReject={handleQuestionReject}
+                onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
+                onLogout={handleLogout}
+                onSwitchMode={() => void switchCharacterMode(true)}
+              />
+            )}
+          </AnimatePresence>
+        </LayoutGroup>
+      </motion.div>
       <AnimatePresence>
         {previewImage && (
           <motion.div

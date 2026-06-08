@@ -1,8 +1,19 @@
-import { complete, getEnvApiKey, getModel } from "@earendil-works/pi-ai"
-import type { Logger } from "../shared"
+import { Agent, type AgentEvent, type AgentMessage } from "@earendil-works/pi-agent-core"
+import { getEnvApiKey, getModel } from "@earendil-works/pi-ai"
+import type { CoreRuntimeConfig } from "../core"
+import { buildSelfAwakeSystemPrompt, buildSelfAwakeUserPrompt, type CharacterPromptView } from "../prompting"
+import { resolveCoreModel, type RuntimeModelConfig } from "../runtime/mon-agent-runtime"
+import { createID, printKeyValuePanel, type Logger } from "../shared"
+import { createMonAgentTools } from "../tooling"
 import type { SelfAwakeDecision, SelfAwakeRequest } from "./types"
 
-function envModel() {
+interface SelfAwakeRunOptions {
+  coreToken?: string | null
+  resolveCoreConfig?: (token?: string | null) => Promise<CoreRuntimeConfig | undefined>
+  workspaceRoot?: string
+}
+
+function envModel(): RuntimeModelConfig {
   const raw = process.env.MON_AGENT_SELFAWAKE_MODEL || process.env.MON_AGENT_MODEL || "openai/gpt-4o-mini"
   const slash = raw.indexOf("/")
   const provider = slash > 0 ? raw.slice(0, slash) : "openai"
@@ -12,18 +23,324 @@ function envModel() {
     throw new Error(`Unknown Pi model: ${provider}/${modelID}`)
   }
   return {
+    source: "env",
     model,
     label: `${provider}/${modelID}`,
     apiKey: getEnvApiKey(provider),
+    thinkingLevel: "off",
   }
 }
 
-function extractText(message: Awaited<ReturnType<typeof complete>>) {
-  return message.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("")
-    .trim()
+async function resolveSelfAwakeModel(
+  options: SelfAwakeRunOptions | undefined,
+  logger?: Logger,
+): Promise<RuntimeModelConfig> {
+  if (options?.coreToken && options.resolveCoreConfig) {
+    const core = await options.resolveCoreConfig(options.coreToken)
+    if (core) {
+      const runtimeConfig = resolveCoreModel(core)
+      logger?.info("自醒已使用 Core 默认助手配置", {
+        assistantID: core.assistant.id,
+        assistant: core.assistant.name,
+        characterID: core.character.id,
+        character: core.character.name,
+        aiEntityID: core.aiEntity.id,
+        aiEntity: core.aiEntity.ai_name,
+        model: runtimeConfig.label,
+      })
+      return runtimeConfig
+    }
+  }
+
+  logger?.warn("自醒未拿到 Core 默认助手配置，临时回退到环境模型")
+  return envModel()
+}
+
+type AssistantAgentMessage = Extract<AgentMessage, { role: "assistant" }>
+
+function isAssistantMessage(message: AgentMessage): message is AssistantAgentMessage {
+  return "role" in message && message.role === "assistant"
+}
+
+function contentTypes(message: AssistantAgentMessage) {
+  return message.content.map((part) => part.type)
+}
+
+function finalAssistantMessage(messages: AgentMessage[]) {
+  return [...messages].reverse().find(isAssistantMessage)
+}
+
+function finalAssistantText(messages: AgentMessage[]) {
+  const textBlocks = [...messages]
+    .filter(isAssistantMessage)
+    .flatMap((message) => message.content.filter((part) => part.type === "text").map((part) => part.text.trim()))
+    .filter(Boolean)
+  return textBlocks.at(-1) ?? ""
+}
+
+function textPreview(text: string, maxLength = 800) {
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength)}...`
+}
+
+function usageSummary(usage: unknown) {
+  if (!usage || typeof usage !== "object") return "-"
+  const data = usage as Record<string, unknown>
+  const cost = data.cost && typeof data.cost === "object" ? (data.cost as Record<string, unknown>) : undefined
+  const parts = [
+    data.input !== undefined ? `输入 ${data.input}` : "",
+    data.output !== undefined ? `输出 ${data.output}` : "",
+    data.totalTokens !== undefined ? `总计 ${data.totalTokens}` : "",
+    cost?.total !== undefined ? `费用 ${cost.total}` : "",
+  ].filter(Boolean)
+  return parts.length ? parts.join(" / ") : "-"
+}
+
+function summarizeDiary(value: unknown) {
+  if (!value) return "-"
+  if (typeof value === "string") return textPreview(value, 220)
+  if (typeof value === "object") {
+    const data = value as Record<string, unknown>
+    const title = typeof data.title === "string" ? data.title : ""
+    const content = typeof data.content === "string" ? data.content : ""
+    const text = [title, content].filter(Boolean).join("：")
+    if (text) return textPreview(text, 220)
+  }
+  try {
+    return textPreview(JSON.stringify(value), 220)
+  } catch {
+    return textPreview(String(value), 220)
+  }
+}
+
+function contextSummary(context: Record<string, unknown> | undefined) {
+  const data = context ?? {}
+  const keys = Object.keys(data)
+  const userActivity = data.user_activity
+  return {
+    keys,
+    userActivity:
+      typeof userActivity === "string" && userActivity.trim()
+        ? textPreview(userActivity.trim(), 160)
+        : undefined,
+  }
+}
+
+function summarizeSelfAwakeContext(context: Record<string, unknown> | undefined) {
+  const data = context ?? {}
+  const lastState = data.last_state && typeof data.last_state === "object" ? (data.last_state as Record<string, unknown>) : {}
+  const modules = Array.isArray(data.module_status) ? data.module_status : []
+  return [
+    ["当前时间", data.current_time],
+    ["用户活动", data.user_activity],
+    ["模块数量", modules.length],
+    ["上次自醒", lastState.last_run_at],
+    ["下次计划", lastState.next_wake_at],
+    ["上次来源", (lastState.last_decision as Record<string, unknown> | undefined)?.source],
+    ["日记摘要", summarizeDiary(data.last_diary)],
+  ] satisfies Array<[string, unknown]>
+}
+
+function printSelfAwakeConfig(runtimeConfig: RuntimeModelConfig, characterName: string) {
+  printKeyValuePanel(
+    [
+      ["助手", runtimeConfig.core?.assistant.name ?? "环境配置"],
+      ["角色", characterName],
+      ["AI 实体", runtimeConfig.core?.aiEntity.ai_name ?? "-"],
+      ["模型", runtimeConfig.label],
+      ["来源", runtimeConfig.source === "core" ? "Core 默认助手配置" : "环境变量"],
+      ["思考", runtimeConfig.model.reasoning && runtimeConfig.thinkingLevel !== "off" ? runtimeConfig.thinkingLevel : "关闭"],
+    ],
+    { title: "MonAgent 自醒配置", level: "info" },
+  )
+}
+
+function printSelfAwakeDecision(decision: SelfAwakeDecision, model: string, durationMs: number) {
+  printKeyValuePanel(
+    [
+      ["模型", model],
+      ["心情", decision.mood],
+      ["想做", decision.current_desire],
+      ["动作", decision.action.type],
+      ["打扰用户", decision.should_interrupt_user ? "是" : "否"],
+      ["下次唤醒", `${decision.next_wake.after_minutes} 分钟后`],
+      ["原因", decision.next_wake.reason],
+      ["日记标题", decision.diary.title],
+      ["耗时", `${durationMs}ms`],
+    ],
+    { title: "MonAgent 自醒决策", level: decision.should_interrupt_user ? "warn" : "info" },
+  )
+}
+
+function printSelfAwakeModelReturn(
+  model: string,
+  durationMs: number,
+  message: AssistantAgentMessage | undefined,
+  text: string,
+) {
+  printKeyValuePanel(
+    [
+      ["模型", model],
+      ["耗时", `${durationMs}ms`],
+      ["内容类型", message ? contentTypes(message).join(", ") || "-" : "-"],
+      ["文本长度", text.length],
+      ["用量", usageSummary(message && "usage" in message ? message.usage : undefined)],
+      ["预览", textPreview(text, 360)],
+    ],
+    { title: "MonAgent 自醒 Agent 返回", level: "debug" },
+  )
+}
+
+const selfAwakeAllowedTools = new Set([
+  "loaded_tools",
+  "read",
+  "ls",
+  "grep",
+  "web_search",
+  "web_fetch",
+  "analyze_image",
+  "set_self_awake_timer",
+])
+
+function toolPattern(toolName: string, args: unknown) {
+  if (typeof args === "object" && args) {
+    const record = args as Record<string, unknown>
+    if (typeof record.path === "string") return record.path
+    if (typeof record.url === "string") return record.url
+    if (typeof record.query === "string") return record.query
+    if (typeof record.command === "string") return record.command
+  }
+  return toolName
+}
+
+function handleSelfAwakeAgentEvent(logger: Logger | undefined, sessionID: string, event: AgentEvent) {
+  if (event.type === "message_start" && event.message.role === "assistant") {
+    logger?.info("自醒 Agent 助手消息开始", {
+      sessionID,
+      model: event.message.model,
+      provider: event.message.provider,
+    })
+    return
+  }
+  if (event.type === "message_end" && event.message.role === "assistant") {
+    logger?.info("自醒 Agent 助手消息结束", {
+      sessionID,
+      model: event.message.model,
+      provider: event.message.provider,
+      contentTypes: contentTypes(event.message),
+      error: event.message.errorMessage,
+    })
+    return
+  }
+  if (event.type === "tool_execution_start") {
+    logger?.info("自醒 Agent 工具开始执行", {
+      sessionID,
+      tool: event.toolName,
+      callID: event.toolCallId,
+    })
+    return
+  }
+  if (event.type === "tool_execution_end") {
+    logger?.[event.isError ? "warn" : "info"](event.isError ? "自醒 Agent 工具执行失败" : "自醒 Agent 工具执行完成", {
+      sessionID,
+      tool: event.toolName,
+      callID: event.toolCallId,
+      isError: event.isError,
+    })
+  }
+}
+
+async function runSelfAwakeAgent(input: {
+  request: SelfAwakeRequest
+  runtimeConfig: RuntimeModelConfig
+  character: CharacterPromptView
+  logger?: Logger
+  options?: SelfAwakeRunOptions
+}) {
+  const { request, runtimeConfig, character, logger, options } = input
+  const { model, label, apiKey, thinkingLevel } = runtimeConfig
+  if (!apiKey) {
+    throw new Error(`模型 ${label} 缺少 API Key`)
+  }
+
+  const workspaceRoot = options?.workspaceRoot ?? process.cwd()
+  const sessionID = createID("selfawake")
+  const tools = createMonAgentTools(workspaceRoot, {
+    sessionID,
+    getCurrentFiles: () => [],
+  })
+  const systemPrompt = buildSelfAwakeSystemPrompt(character)
+  const userPrompt = buildSelfAwakeUserPrompt(request.context)
+
+  logger?.info("自醒 Agent 调用开始", {
+    sessionID,
+    model: label,
+    workspaceRoot,
+    tools: tools.map((tool) => tool.name),
+    contextKeys: Object.keys(request.context ?? {}),
+  })
+  logger?.debug("自醒 Agent 提示词已准备", {
+    sessionID,
+    systemPromptLength: systemPrompt.length,
+    userPromptLength: userPrompt.length,
+  })
+  printKeyValuePanel(
+    [
+      ["内部会话", sessionID],
+      ["模型", label],
+      ["工具数量", tools.length],
+      ["工具", tools.map((tool) => tool.name).join("、")],
+      ["策略", "后台非交互：只允许观察类工具，拦截写入、shell、ask_user 等副作用工具。"],
+    ],
+    { title: "MonAgent 自醒 Agent 运行", level: "info" },
+  )
+
+  const agent = new Agent({
+    sessionId: sessionID,
+    toolExecution: "sequential",
+    initialState: {
+      model,
+      thinkingLevel,
+      systemPrompt,
+      tools,
+      messages: [],
+    },
+    getApiKey: (provider) => apiKey ?? getEnvApiKey(provider),
+    beforeToolCall: async ({ toolCall, args }) => {
+      const pattern = toolPattern(toolCall.name, args)
+      if (selfAwakeAllowedTools.has(toolCall.name)) {
+        logger?.info("自醒 Agent 工具已允许", { sessionID, tool: toolCall.name, pattern })
+        return undefined
+      }
+
+      logger?.warn("自醒 Agent 后台工具已拦截", { sessionID, tool: toolCall.name, pattern })
+      return {
+        block: true,
+        reason:
+          "当前轮次是后台非交互观察，不能直接执行需要用户确认或可能产生副作用的工具。请在最终 JSON 的 action 字段中说明需要的动作。",
+      }
+    },
+  })
+
+  agent.subscribe(async (event) => {
+    handleSelfAwakeAgentEvent(logger, sessionID, event)
+  })
+
+  await agent.prompt({
+    role: "user",
+    timestamp: Date.now(),
+    content: [{ type: "text", text: userPrompt }],
+  })
+
+  const messages = agent.state.messages
+  const assistant = finalAssistantMessage(messages)
+  const text = finalAssistantText(messages)
+  return {
+    sessionID,
+    messages,
+    assistant,
+    text,
+  }
 }
 
 function parseDecision(text: string): SelfAwakeDecision {
@@ -73,8 +390,8 @@ function sanitizeDecision(raw: Partial<SelfAwakeDecision>): SelfAwakeDecision {
   }
 }
 
-function fallbackDecision(request: SelfAwakeRequest, reason: string): SelfAwakeDecision {
-  const name = request.character?.name || "我"
+function fallbackDecision(request: SelfAwakeRequest, reason: string, fallbackName?: string): SelfAwakeDecision {
+  const name = fallbackName || request.character?.name || "我"
   const userActivity = request.context?.user_activity
   const activityText = typeof userActivity === "string" && userActivity.trim() ? userActivity.trim() : "暂未观察到明确的新活动。"
   return {
@@ -97,62 +414,90 @@ function fallbackDecision(request: SelfAwakeRequest, reason: string): SelfAwakeD
   }
 }
 
-export async function runSelfAwake(request: SelfAwakeRequest, logger?: Logger): Promise<SelfAwakeDecision> {
+export async function runSelfAwake(
+  request: SelfAwakeRequest,
+  logger?: Logger,
+  options?: SelfAwakeRunOptions,
+): Promise<SelfAwakeDecision> {
+  const startedAt = Date.now()
+  let runtimeConfig: RuntimeModelConfig | undefined
   try {
-    const { model, label, apiKey } = envModel()
-    if (!apiKey) {
-      throw new Error(`模型 ${label} 缺少 API Key`)
+    runtimeConfig = await resolveSelfAwakeModel(options, logger)
+  } catch (error) {
+    logger?.warn("解析 Core 默认助手配置失败，自醒将使用环境模型", {
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    runtimeConfig = envModel()
+  }
+
+  const coreCharacter = runtimeConfig.core?.character
+  const character = coreCharacter ?? request.character ?? {}
+  const name = character.name || "当前角色"
+  logger?.info("自醒请求已收到", {
+    character: name,
+    context: contextSummary(request.context),
+  })
+  printSelfAwakeConfig(runtimeConfig, name)
+  printKeyValuePanel(summarizeSelfAwakeContext(request.context), {
+    title: "MonAgent 自醒上下文",
+    level: "debug",
+  })
+
+  try {
+    const agentResult = await runSelfAwakeAgent({
+      request,
+      runtimeConfig,
+      character,
+      logger,
+      options,
+    })
+    const text = agentResult.text
+    const durationMs = Date.now() - startedAt
+    logger?.info("自醒 Agent 返回已收到", {
+      sessionID: agentResult.sessionID,
+      model: runtimeConfig.label,
+      durationMs,
+      textLength: text.length,
+      contentTypes: agentResult.assistant ? contentTypes(agentResult.assistant) : [],
+      agentMessages: agentResult.messages.length,
+    })
+    logger?.debug("自醒 Agent 返回预览", {
+      preview: textPreview(text, 500),
+    })
+    printSelfAwakeModelReturn(runtimeConfig.label, durationMs, agentResult.assistant, text)
+
+    let decision: SelfAwakeDecision
+    try {
+      decision = parseDecision(text)
+    } catch (parseError) {
+      logger?.warn("自醒 Agent 返回解析失败", {
+        reason: parseError instanceof Error ? parseError.message : String(parseError),
+        textLength: text.length,
+        preview: textPreview(text, 1200),
+      })
+      throw parseError
     }
 
-    const character = request.character ?? {}
-    const name = character.name || "当前角色"
-    const systemPrompt = [
-      `你是「${name}」，正在进行一次后台自醒。`,
-      "你需要判断此刻自己想做什么、是否应该打扰用户、下次什么时候醒来、工作日记应该写什么。",
-      "你必须使用中文。",
-      "你必须只输出一个 JSON 对象，不要输出 Markdown，不要输出额外解释。",
-      "动作只能使用：observe_only、write_diary、remind_user、create_task、ask_user、run_safe_check、sync_context。",
-      "除非确有必要，否则不要打扰用户。",
-      character.description ? `角色描述：${character.description}` : "",
-      character.signature ? `角色签名：${character.signature}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n")
-
-    const userPrompt = JSON.stringify(
-      {
-        context: request.context ?? {},
-        expected_schema: {
-          mood: "当前状态或情绪",
-          current_desire: "此刻想做什么",
-          should_interrupt_user: false,
-          action: { type: "write_diary", message: "动作说明", payload: {} },
-          next_wake: { after_minutes: 720, reason: "为什么这个时间后再醒" },
-          diary: { title: "日记标题", content: "工作日记内容" },
-        },
-      },
-      null,
-      2,
-    )
-
-    const message = await complete(
-      model,
-      {
-        systemPrompt,
-        messages: [{ role: "user", content: userPrompt, timestamp: Date.now() }],
-      },
-      {
-        apiKey,
-        temperature: 0.6,
-        maxTokens: 900,
-      },
-    )
-    const decision = parseDecision(extractText(message))
-    logger?.info("自醒决策已生成", { model: label, action: decision.action.type, nextWake: decision.next_wake.after_minutes })
+    logger?.info("自醒决策已生成", {
+      model: runtimeConfig.label,
+      action: decision.action.type,
+      nextWake: decision.next_wake.after_minutes,
+      shouldInterruptUser: decision.should_interrupt_user,
+      durationMs: Date.now() - startedAt,
+    })
+    printSelfAwakeDecision(decision, runtimeConfig.label, Date.now() - startedAt)
     return decision
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
-    logger?.warn("自醒模型调用失败，使用保守 fallback", { reason })
-    return fallbackDecision(request, reason)
+    logger?.warn("自醒 Agent 调用失败，使用保守 fallback", { reason })
+    const decision = fallbackDecision(request, reason, name)
+    logger?.info("自醒 fallback 已生成", {
+      action: decision.action.type,
+      nextWake: decision.next_wake.after_minutes,
+      shouldInterruptUser: decision.should_interrupt_user,
+      durationMs: Date.now() - startedAt,
+    })
+    printSelfAwakeDecision(decision, "fallback", Date.now() - startedAt)
+    return decision
   }
 }

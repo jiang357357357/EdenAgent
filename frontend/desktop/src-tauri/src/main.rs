@@ -29,6 +29,10 @@ const DEFAULT_CORE_PORT: u16 = 40011;
 struct CoreLoginRequest {
     username: String,
     password: String,
+    #[serde(default)]
+    client_id: Option<String>,
+    #[serde(default)]
+    client_type: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -465,9 +469,15 @@ async fn core_login(request: CoreLoginRequest) -> Result<CoreLoginResponse, Stri
     let (client, base_url) = core_client().await?;
     let endpoint = "/api/users/login/";
     let started = Instant::now();
+    let payload = serde_json::json!({
+        "username": request.username,
+        "password": request.password,
+        "client_id": request.client_id.unwrap_or_default(),
+        "client_type": request.client_type.unwrap_or_default(),
+    });
     let response = client
         .post(format!("{}{}", base_url, endpoint))
-        .json(&request)
+        .json(&payload)
         .send()
         .await
         .map_err(|error| {
@@ -759,11 +769,11 @@ fn main() {
                 let _ = set_window_size(
                     window.clone(),
                     WindowSizeRequest {
-                        width: None,
-                        height: None,
+                        width: Some(960.0),
+                        height: Some(540.0),
                         aspect_ratio: None,
-                        width_ratio: Some(0.58),
-                        height_ratio: Some(0.7),
+                        width_ratio: None,
+                        height_ratio: None,
                         min_width: None,
                         min_height: None,
                         max_width: None,

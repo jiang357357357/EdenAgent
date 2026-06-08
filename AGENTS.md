@@ -13,7 +13,7 @@
 ## 默认运行链路
 
 1. `bun run dev:server` 启动 `server/src/server.ts`。
-2. 服务端读取 `.monconfig`，默认监听 `127.0.0.1:40092`。
+2. 服务端读取 `.monconfig`，默认监听 `0.0.0.0:40092`，并向 Hub 注册局域网可访问地址。
 3. Web 前端开发代理走 `/api`，生产默认连接 `http://localhost:40092`。
 4. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
 

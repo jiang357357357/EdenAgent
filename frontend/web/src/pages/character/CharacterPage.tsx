@@ -14,9 +14,9 @@ const screenTransition = {
 } as const
 
 const characterScreenMotion = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  initial: { opacity: 0, scale: 0.985 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.985 },
 }
 
 function toolStatusLabel(status?: ToolCall["status"]) {
@@ -93,7 +93,7 @@ export function CharacterPage({
       key="character"
       {...characterScreenMotion}
       transition={screenTransition}
-      className="h-[100vh] w-[100vw] !bg-transparent text-text font-sans overflow-hidden"
+      className="fixed inset-0 z-20 h-[100vh] w-[100vw] overflow-hidden !bg-transparent font-sans text-text"
     >
       <main className="relative mx-auto h-[100vh] w-[100vw] overflow-hidden !bg-transparent">
         <button
@@ -108,14 +108,16 @@ export function CharacterPage({
         </button>
         <section className="pointer-events-none absolute inset-0 flex items-end justify-center text-center">
           <motion.div
-            initial={{ opacity: 0, y: 28, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 1 }}
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
             transition={{ ...screenTransition, delay: 0.08 }}
             className="relative h-[100vh] w-[100vw] overflow-hidden !bg-transparent shadow-none"
           >
             {characterImage ? (
-              <img
+              <motion.img
+                layoutId="mon-agent-character-standee"
+                transition={screenTransition}
                 src={characterImage}
                 alt={displayName}
                 className="absolute bottom-0 left-1/2 h-[100vh] w-auto max-w-none -translate-x-1/2 object-contain object-bottom shadow-none drop-shadow-none"

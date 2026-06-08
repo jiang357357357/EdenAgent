@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer"
-import { readdir, readFile, stat, writeFile, mkdir } from "node:fs/promises"
+import { readdir, readFile, stat, writeFile, mkdir, rename } from "node:fs/promises"
 import path from "node:path"
 import type { AgentTool } from "@earendil-works/pi-agent-core"
 import { Type } from "@earendil-works/pi-ai"
@@ -96,6 +96,107 @@ function normalizeOutput(stdout: string, stderr: string) {
 function stringifyJson(value: unknown) {
   if (typeof value === "string") return value
   return JSON.stringify(value, null, 2)
+}
+
+async function pathExists(target: string) {
+  try {
+    await stat(target)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function findMonRoot(workspaceRoot: string) {
+  let current = path.resolve(workspaceRoot)
+  for (let index = 0; index < 8; index += 1) {
+    if (await pathExists(path.join(current, "Backend", "BaseOs", ".monconfig"))) {
+      return current
+    }
+    const parent = path.dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  throw new Error(`无法从工作区定位 Mon 根目录: ${workspaceRoot}`)
+}
+
+function readIniValue(content: string, section: string, key: string) {
+  let currentSection = ""
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith("#") || line.startsWith(";")) continue
+    const sectionMatch = line.match(/^\[([^\]]+)]$/)
+    if (sectionMatch) {
+      currentSection = sectionMatch[1]?.trim() ?? ""
+      continue
+    }
+    if (currentSection !== section) continue
+    const eqIndex = line.indexOf("=")
+    if (eqIndex < 0) continue
+    const itemKey = line.slice(0, eqIndex).trim()
+    if (itemKey !== key) continue
+    return line.slice(eqIndex + 1).trim()
+  }
+  return undefined
+}
+
+function parseConfigNumber(value: string | undefined, fallback: number) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+async function resolveSelfAwakeStatePath(workspaceRoot: string) {
+  const monRoot = await findMonRoot(workspaceRoot)
+  const baseOsRoot = path.join(monRoot, "Backend", "BaseOs")
+  const monConfigPath = path.join(baseOsRoot, ".monconfig")
+  const config = await readFile(monConfigPath, "utf8").catch(() => "")
+  const dataDir = readIniValue(config, "self_awake", "DATA_DIR") || "Data/SelfAwake"
+  const statePath = path.join(path.isAbsolute(dataDir) ? dataDir : path.join(baseOsRoot, dataDir), "state.json")
+  return {
+    monRoot,
+    baseOsRoot,
+    statePath,
+    minMinutes: parseConfigNumber(readIniValue(config, "self_awake", "MIN_WAKE_MINUTES"), 1),
+    maxMinutes: parseConfigNumber(readIniValue(config, "self_awake", "MAX_WAKE_MINUTES"), 1440),
+  }
+}
+
+function parseJsonRecord(raw: string) {
+  if (!raw.trim()) return {}
+  try {
+    const data = JSON.parse(raw)
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function resolveWakeTime(input: { after_minutes?: number; at?: string }, minMinutes: number, maxMinutes: number) {
+  const now = new Date()
+  if (input.at?.trim()) {
+    const at = new Date(input.at)
+    if (!Number.isFinite(at.getTime())) {
+      throw new Error(`无法解析自醒时间: ${input.at}`)
+    }
+    const afterMinutes = Math.ceil((at.getTime() - now.getTime()) / 60_000)
+    if (afterMinutes < minMinutes) {
+      throw new Error(`自醒时间过近，至少需要 ${minMinutes} 分钟后。`)
+    }
+    if (afterMinutes > maxMinutes) {
+      throw new Error(`自醒时间过远，最多允许 ${maxMinutes} 分钟后。`)
+    }
+    return { nextWakeAt: at, afterMinutes }
+  }
+
+  const rawMinutes = Number(input.after_minutes ?? 720)
+  if (!Number.isFinite(rawMinutes)) {
+    throw new Error("after_minutes 必须是有效数字。")
+  }
+  const afterMinutes = Math.min(Math.max(Math.round(rawMinutes), minMinutes), maxMinutes)
+  return {
+    nextWakeAt: new Date(now.getTime() + afterMinutes * 60_000),
+    afterMinutes,
+  }
 }
 
 interface DuckSearchResult {
@@ -564,6 +665,53 @@ export function createMonTools(workspaceRoot: string, options: MonToolOptions = 
         return text(flattened.join("\n") || "用户未提供回答。", {
           answers,
         })
+      },
+    },
+    {
+      name: "set_self_awake_timer",
+      label: "设置自醒定时器",
+      description:
+        "调用 MonOs 自醒定时器，设置下一次后台自醒时间。可传 after_minutes 或 at；自醒任务应在决定下次醒来时调用此工具。",
+      parameters: Type.Object({
+        after_minutes: Type.Optional(Type.Number({ description: "多少分钟后再次自醒。默认 720，受 MonOs 最小/最大范围约束。" })),
+        at: Type.Optional(Type.String({ description: "下一次自醒的 ISO 时间字符串。传入后优先于 after_minutes。" })),
+        reason: Type.Optional(Type.String({ description: "设置这个自醒时间的原因。" })),
+      }),
+      executionMode: "sequential",
+      async execute(_toolCallID, rawInput) {
+        const input = rawInput as { after_minutes?: number; at?: string; reason?: string }
+        const timer = await resolveSelfAwakeStatePath(workspaceRoot)
+        const wake = resolveWakeTime(input, timer.minMinutes, timer.maxMinutes)
+        const now = new Date()
+        const reason = input.reason?.trim() || "Agent 设置下一次自醒时间。"
+
+        await mkdir(path.dirname(timer.statePath), { recursive: true })
+        const state = parseJsonRecord(await readFile(timer.statePath, "utf8").catch(() => ""))
+        state.enabled = true
+        state.next_wake_at = wake.nextWakeAt.toISOString()
+        state.next_wake_after_minutes = wake.afterMinutes
+        state.next_wake_reason = reason
+        state.last_timer_tool_at = now.toISOString()
+        state.last_timer_tool_source = "monagent"
+
+        const tmpPath = `${timer.statePath}.tmp`
+        await writeFile(tmpPath, `${JSON.stringify(state, null, 2)}\n`, "utf8")
+        await rename(tmpPath, timer.statePath)
+
+        return text(
+          [
+            "已调用 MonOs 自醒定时器。",
+            `下次自醒: ${wake.nextWakeAt.toISOString()}`,
+            `间隔: ${wake.afterMinutes} 分钟`,
+            `原因: ${reason}`,
+          ].join("\n"),
+          {
+            next_wake_at: wake.nextWakeAt.toISOString(),
+            after_minutes: wake.afterMinutes,
+            reason,
+            state_path: timer.statePath,
+          },
+        )
       },
     },
     {

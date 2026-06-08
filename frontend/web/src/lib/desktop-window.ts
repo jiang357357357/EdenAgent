@@ -1,15 +1,15 @@
 const WINDOW_SIZES = {
   login: {
-    widthRatio: 0.58,
-    heightRatio: 0.7,
+    width: 960,
+    height: 540,
   },
   chatWithCharacter: {
-    widthRatio: 0.72,
-    heightRatio: 0.78,
+    width: 960,
+    height: 540,
   },
   character: {
     aspectRatio: 9 / 16,
-    heightRatio: 0.78,
+    heightRatio: 0.5,
   },
 } as const;
 

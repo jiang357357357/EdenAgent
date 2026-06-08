@@ -1,5 +1,11 @@
 import { Bot, ImageOff } from 'lucide-react';
+import { motion } from 'motion/react';
 import { resolveCoreAssetUrl, type CoreAssistant } from '../lib/auth';
+
+const standeeTransition = {
+  duration: 0.34,
+  ease: [0.16, 1, 0.3, 1],
+} as const;
 
 interface CharacterPanelProps {
   assistant?: CoreAssistant | null;
@@ -12,10 +18,12 @@ export function CharacterPanel({ assistant, assistantError }: CharacterPanelProp
   const image = resolveCoreAssetUrl(character?.default_standing_image_url || character?.avatar_url);
 
   return (
-    <aside className="hidden aspect-[9/16] h-[100vh] shrink-0 items-end justify-center overflow-hidden border-l border-border bg-bg md:flex">
+    <aside className="flex h-[100vh] w-[34vw] flex-none items-end justify-center overflow-hidden border-l border-border bg-bg">
       <div className="relative h-full w-full overflow-hidden">
         {image ? (
-          <img
+          <motion.img
+            layoutId="mon-agent-character-standee"
+            transition={standeeTransition}
             src={image}
             alt={displayName}
             className="absolute bottom-0 left-1/2 h-[96vh] w-auto max-w-none -translate-x-1/2 object-contain object-bottom"
