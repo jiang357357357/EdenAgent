@@ -1,4 +1,4 @@
-import { Plus, Menu, LogOut, Moon, Sun } from 'lucide-react';
+import { Plus, Menu, LogOut, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Session } from '../types';
 import type { AuthUser } from '../lib/auth';
@@ -10,9 +10,8 @@ interface SidebarProps {
   onNew: () => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  theme: 'dark' | 'light';
-  toggleTheme: () => void;
   currentUser?: AuthUser | null;
+  onSelfAwake: () => void;
   onLogout: () => void;
 }
 
@@ -23,9 +22,8 @@ export function Sidebar({
   onNew, 
   isOpen, 
   setIsOpen,
-  theme,
-  toggleTheme,
   currentUser,
+  onSelfAwake,
   onLogout,
 }: SidebarProps) {
   
@@ -101,11 +99,11 @@ export function Sidebar({
             </div>
           </div>
           <button
-            onClick={toggleTheme}
+            onClick={onSelfAwake}
             className="mb-[1.5vh] flex w-full items-center justify-center gap-[0.8vw] rounded-full border border-border bg-card px-[1vw] py-[1.65vh] text-[1.85vh] uppercase tracking-[0.15em] text-text-muted transition-colors hover:border-accent/40 hover:text-accent"
           >
-            {theme === 'dark' ? <Sun className="h-[2.5vh] w-[2.5vh]" /> : <Moon className="h-[2.5vh] w-[2.5vh]" />}
-            {theme === 'dark' ? '浅色模式' : '深色模式'}
+            <Sparkles className="h-[2.5vh] w-[2.5vh]" />
+            自醒
           </button>
           <button
             onClick={onLogout}

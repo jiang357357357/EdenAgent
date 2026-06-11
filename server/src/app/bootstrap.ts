@@ -32,6 +32,7 @@ export function createAgentApp(config: AgentServerConfig) {
     questions,
     store,
     logger: runtimeLogger,
+    coreClient,
     resolveCoreConfig: (token) => coreClient.resolveRuntimeConfig(token),
     syncCoreSession: async (token, sessionID, core) => {
       const session = store.requireSession(sessionID)

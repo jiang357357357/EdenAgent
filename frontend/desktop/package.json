@@ -2,12 +2,13 @@
   "name": "mon-agent-desktop",
   "private": true,
   "type": "module",
+  "main": "src/main.cjs",
   "scripts": {
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "tauri": "tauri"
+    "dev": "electron .",
+    "start": "electron .",
+    "build": "bun run --cwd ../web build"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "electron": "42.4.0"
   }
 }

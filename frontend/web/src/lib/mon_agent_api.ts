@@ -38,6 +38,94 @@ export type ToolStatus = {
   }
 }
 
+export type ApiSelfAwakeDiary = {
+  id: number
+  run: number
+  user: number
+  title: string
+  content: string
+  visible_to_user: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type ApiSelfAwakeAction = {
+  id: number
+  run: number
+  user: number
+  action_type: string
+  message: string
+  payload?: Record<string, unknown> | null
+  status: string
+  error: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type ApiSelfAwakeRun = {
+  id: number
+  user: number
+  assistant?: number | null
+  character?: number | null
+  source_service: string
+  external_run_id: string
+  status: string
+  started_at?: string
+  finished_at?: string | null
+  context_payload?: Record<string, unknown> | null
+  decision_payload?: Record<string, unknown> | null
+  mood: string
+  current_desire: string
+  should_interrupt_user: boolean
+  next_wake_at?: string | null
+  next_wake_after_minutes?: number | null
+  next_wake_reason: string
+  error: string
+  created_at?: string
+  updated_at?: string
+  diaries?: ApiSelfAwakeDiary[]
+  actions?: ApiSelfAwakeAction[]
+}
+
+export type ApiMemoKind = "note" | "reminder" | "todo"
+export type ApiMemoStatus = "active" | "done" | "archived" | "cancelled"
+export type ApiMemoPriority = "low" | "normal" | "high"
+
+export type ApiMemo = {
+  id: number
+  user: number
+  title: string
+  content: string
+  kind: ApiMemoKind
+  status: ApiMemoStatus
+  priority: ApiMemoPriority
+  remind_at?: string | null
+  due_at?: string | null
+  repeat_rule: string
+  source: string
+  related_session_id: string
+  related_message_id: string
+  semantic_task_id: string
+  last_triggered_at?: string | null
+  snoozed_until?: string | null
+  completed_at?: string | null
+  metadata?: Record<string, unknown>
+  trigger_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type ApiMemoInput = {
+  title: string
+  content?: string
+  kind?: ApiMemoKind
+  priority?: ApiMemoPriority
+  remind_at?: string | null
+  due_at?: string | null
+  repeat_rule?: string
+  metadata?: Record<string, unknown>
+}
+
 export type ApiMessageInfo =
   | {
       id: string
@@ -525,21 +613,13 @@ export function resolveMonAgentUrl(url: string) {
   if (!url) return url
   if (/^(data:|blob:|https?:\/\/)/i.test(url)) return url
   if (url.startsWith("file://")) {
-    if (!("__TAURI_INTERNALS__" in window)) return url
+    if (!window.monAgentDesktop?.convertFileSrc) return url
 
     try {
       const fileUrl = new URL(url)
       const pathname = decodeURIComponent(fileUrl.pathname)
       const filePath = pathname.replace(/^\/([A-Za-z]:\/)/, "$1").replace(/\//g, "\\")
-      return (
-        (
-          window as unknown as {
-            __TAURI_INTERNALS__?: {
-              convertFileSrc?: (filePath: string, protocol?: string) => string
-            }
-          }
-        ).__TAURI_INTERNALS__?.convertFileSrc?.(filePath) ?? url
-      )
+      return window.monAgentDesktop.convertFileSrc(filePath)
     } catch {
       return url
     }
@@ -725,6 +805,47 @@ export async function rejectQuestion(requestID: string) {
 
 export async function getToolStatus() {
   return request<ToolStatus>("/tools/status")
+}
+
+export async function listSelfAwakeRuns(limit = 30) {
+  return request<ApiSelfAwakeRun[]>(`/self-awake/runs?limit=${encodeURIComponent(String(limit))}`)
+}
+
+export async function listMemos(params: {
+  kind?: string
+  status?: string
+  priority?: string
+  q?: string
+  limit?: number
+} = {}) {
+  const search = new URLSearchParams()
+  if (params.kind) search.set("kind", params.kind)
+  if (params.status) search.set("status", params.status)
+  if (params.priority) search.set("priority", params.priority)
+  if (params.q) search.set("q", params.q)
+  search.set("limit", String(params.limit ?? 80))
+  return request<ApiMemo[]>(`/memos?${search.toString()}`)
+}
+
+export async function createMemo(input: ApiMemoInput) {
+  return request<ApiMemo>("/memos", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export async function completeMemo(id: number) {
+  return request<ApiMemo>(`/memos/${encodeURIComponent(String(id))}/complete`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  })
+}
+
+export async function snoozeMemo(id: number, input: { until?: string | null; minutes?: number }) {
+  return request<ApiMemo>(`/memos/${encodeURIComponent(String(id))}/snooze`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
 }
 
 export async function subscribeEvents(handlers: SubscribeHandlers | ((event: ApiEvent) => void)) {

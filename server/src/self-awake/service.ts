@@ -1,7 +1,7 @@
 import { Agent, type AgentEvent, type AgentMessage } from "@earendil-works/pi-agent-core"
 import { getEnvApiKey, getModel } from "@earendil-works/pi-ai"
-import type { CoreRuntimeConfig } from "../core"
-import { buildSelfAwakeSystemPrompt, buildSelfAwakeUserPrompt, type CharacterPromptView } from "../prompting"
+import type { CoreClient, CoreRuntimeConfig } from "../core"
+import { buildAgentSystemPrompt, buildAgentTaskPrompt, type CharacterPromptView } from "../prompting"
 import { resolveCoreModel, type RuntimeModelConfig } from "../runtime/mon-agent-runtime"
 import { createID, printKeyValuePanel, type Logger } from "../shared"
 import { createMonAgentTools } from "../tooling"
@@ -9,6 +9,7 @@ import type { SelfAwakeDecision, SelfAwakeRequest } from "./types"
 
 interface SelfAwakeRunOptions {
   coreToken?: string | null
+  coreClient?: CoreClient
   resolveCoreConfig?: (token?: string | null) => Promise<CoreRuntimeConfig | undefined>
   workspaceRoot?: string
 }
@@ -64,6 +65,33 @@ function isAssistantMessage(message: AgentMessage): message is AssistantAgentMes
 
 function contentTypes(message: AssistantAgentMessage) {
   return message.content.map((part) => part.type)
+}
+
+function textFromToolResult(result: { content?: Array<{ type: string; text?: string }> }) {
+  return (
+    result.content
+      ?.filter((item) => item.type === "text")
+      .map((item) => item.text ?? "")
+      .join("\n") ?? ""
+  )
+}
+
+function contentPreviewRows(message: AssistantAgentMessage) {
+  return message.content.map((part, index) => {
+    if (part.type === "thinking") {
+      return [`思考 ${index + 1}`, textPreview(part.thinking, 600)] satisfies [string, unknown]
+    }
+    if (part.type === "text") {
+      return [`文本 ${index + 1}`, textPreview(part.text, 600)] satisfies [string, unknown]
+    }
+    if (part.type === "toolCall") {
+      return [
+        `工具调用 ${index + 1}`,
+        `${part.name} ${textPreview(JSON.stringify(part.arguments ?? {}), 260)}`,
+      ] satisfies [string, unknown]
+    }
+    return [`内容 ${index + 1}`, textPreview(JSON.stringify(part), 260)] satisfies [string, unknown]
+  })
 }
 
 function finalAssistantMessage(messages: AgentMessage[]) {
@@ -156,16 +184,19 @@ function printSelfAwakeConfig(runtimeConfig: RuntimeModelConfig, characterName: 
 }
 
 function printSelfAwakeDecision(decision: SelfAwakeDecision, model: string, durationMs: number) {
+  const observations = Array.isArray(decision.observations) ? decision.observations.filter(Boolean) : []
   printKeyValuePanel(
     [
       ["模型", model],
       ["心情", decision.mood],
       ["想做", decision.current_desire],
+      ["观察事实", observations.length ? observations.join("\n") : "-"],
       ["动作", decision.action.type],
       ["打扰用户", decision.should_interrupt_user ? "是" : "否"],
       ["下次唤醒", `${decision.next_wake.after_minutes} 分钟后`],
       ["原因", decision.next_wake.reason],
       ["日记标题", decision.diary.title],
+      ["日记内容", textPreview(decision.diary.content, 420)],
       ["耗时", `${durationMs}ms`],
     ],
     { title: "MonAgent 自醒决策", level: decision.should_interrupt_user ? "warn" : "info" },
@@ -199,6 +230,13 @@ const selfAwakeAllowedTools = new Set([
   "web_search",
   "web_fetch",
   "analyze_image",
+  "create_memo",
+  "create_reminder",
+  "list_memos",
+  "list_due_memos",
+  "dispatch_due_memos",
+  "get_next_memo_wake",
+  "mark_memo_triggered",
   "set_self_awake_timer",
 ])
 
@@ -230,6 +268,13 @@ function handleSelfAwakeAgentEvent(logger: Logger | undefined, sessionID: string
       contentTypes: contentTypes(event.message),
       error: event.message.errorMessage,
     })
+    const previewRows = contentPreviewRows(event.message).filter(([, value]) => String(value || "").trim())
+    if (previewRows.length) {
+      printKeyValuePanel(previewRows, {
+        title: "MonAgent 自醒消息内容预览",
+        level: "debug",
+      })
+    }
     return
   }
   if (event.type === "tool_execution_start") {
@@ -241,12 +286,23 @@ function handleSelfAwakeAgentEvent(logger: Logger | undefined, sessionID: string
     return
   }
   if (event.type === "tool_execution_end") {
+    const output = textFromToolResult(event.result)
     logger?.[event.isError ? "warn" : "info"](event.isError ? "自醒 Agent 工具执行失败" : "自醒 Agent 工具执行完成", {
       sessionID,
       tool: event.toolName,
       callID: event.toolCallId,
       isError: event.isError,
+      outputPreview: textPreview(output || "-", 600),
     })
+    printKeyValuePanel(
+      [
+        ["工具", event.toolName],
+        ["调用 ID", event.toolCallId],
+        ["状态", event.isError ? "失败" : "完成"],
+        ["输出", textPreview(output || "-", 700)],
+      ],
+      { title: event.isError ? "MonAgent 自醒工具失败" : "MonAgent 自醒工具结果", level: event.isError ? "warn" : "debug" },
+    )
   }
 }
 
@@ -267,10 +323,15 @@ async function runSelfAwakeAgent(input: {
   const sessionID = createID("selfawake")
   const tools = createMonAgentTools(workspaceRoot, {
     sessionID,
+    coreClient: options?.coreClient,
+    coreToken: options?.coreToken,
     getCurrentFiles: () => [],
   })
-  const systemPrompt = buildSelfAwakeSystemPrompt(character)
-  const userPrompt = buildSelfAwakeUserPrompt(request.context)
+  const systemPrompt = buildAgentSystemPrompt({ character })
+  const userPrompt = buildAgentTaskPrompt({
+    source: "self_awake",
+    context: request.context,
+  })
 
   logger?.info("自醒 Agent 调用开始", {
     sessionID,
@@ -290,7 +351,8 @@ async function runSelfAwakeAgent(input: {
       ["模型", label],
       ["工具数量", tools.length],
       ["工具", tools.map((tool) => tool.name).join("、")],
-      ["策略", "后台非交互：只允许观察类工具，拦截写入、shell、ask_user 等副作用工具。"],
+      ["任务来源", "系统自醒"],
+      ["策略", "统一智能体提示词；本轮任务协议为后台非交互，运行时拦截高风险工具。"],
     ],
     { title: "MonAgent 自醒 Agent 运行", level: "info" },
   )
@@ -368,6 +430,9 @@ function sanitizeDecision(raw: Partial<SelfAwakeDecision>): SelfAwakeDecision {
   return {
     mood: String(raw.mood || "安静观察"),
     current_desire: String(raw.current_desire || "想先观察当前状态，不急着打扰用户。"),
+    observations: Array.isArray(raw.observations)
+      ? raw.observations.map((item) => String(item).trim()).filter(Boolean).slice(0, 8)
+      : [],
     should_interrupt_user: Boolean(raw.should_interrupt_user),
     action: {
       type: allowed.has(actionType) ? actionType : "write_diary",
@@ -387,6 +452,8 @@ function sanitizeDecision(raw: Partial<SelfAwakeDecision>): SelfAwakeDecision {
           "我完成了一次后台自醒。当前没有必须打扰用户的事项，因此选择记录状态并安排下一次醒来。",
       ),
     },
+    source: raw.source === "fallback" ? "fallback" : "agent",
+    error: typeof raw.error === "string" ? raw.error : "",
   }
 }
 
@@ -397,6 +464,10 @@ function fallbackDecision(request: SelfAwakeRequest, reason: string, fallbackNam
   return {
     mood: "安静、谨慎",
     current_desire: "想先保持观察，确认系统和用户状态是否稳定。",
+    observations: [
+      "本轮自醒 Agent 调用失败，已进入保守 fallback。",
+      activityText,
+    ],
     should_interrupt_user: false,
     action: {
       type: "write_diary",
@@ -411,6 +482,8 @@ function fallbackDecision(request: SelfAwakeRequest, reason: string, fallbackNam
       title: "一次保守的自醒",
       content: `${name}尝试进行后台自醒，但模型判断暂不可用。当前观察：${activityText} 因此我选择不打扰用户，只记录这次状态。`,
     },
+    source: "fallback",
+    error: reason,
   }
 }
 

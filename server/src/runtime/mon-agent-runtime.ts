@@ -2,9 +2,9 @@ import path from "node:path"
 import { Buffer } from "node:buffer"
 import { Agent, type AgentEvent, type AgentMessage, type ThinkingLevel } from "@earendil-works/pi-agent-core"
 import { getEnvApiKey, getModel, type ImageContent, type Model } from "@earendil-works/pi-ai"
-import { CoreAuthenticationExpiredError, type CoreAIEntity, type CoreRuntimeConfig } from "../core"
+import { CoreAuthenticationExpiredError, type CoreAIEntity, type CoreClient, type CoreRuntimeConfig } from "../core"
 import { PermissionBroker, QuestionBroker } from "../interaction"
-import { buildChatSystemPrompt } from "../prompting"
+import { buildAgentSystemPromptFromCore, buildAgentTaskPrompt } from "../prompting"
 import { SessionStore } from "../sessions"
 import { createID, createLogger, type EventBus, type Logger } from "../shared"
 import { createMonAgentTools } from "../tooling"
@@ -17,6 +17,7 @@ interface RuntimeOptions {
   permissions: PermissionBroker
   questions: QuestionBroker
   logger?: Logger
+  coreClient?: CoreClient
   resolveCoreConfig?: (token?: string | null) => Promise<CoreRuntimeConfig | undefined>
   syncCoreSession?: (token: string, sessionID: string, core?: CoreRuntimeConfig) => Promise<void>
   syncCoreMessage?: (token: string, sessionID: string, message: ApiMessage, core?: CoreRuntimeConfig) => Promise<void>
@@ -528,6 +529,8 @@ export class MonAgentRuntime {
       const files = promptFiles(parts)
       const tools = createMonAgentTools(this.workspaceRoot, {
         sessionID,
+        coreClient: this.options.coreClient,
+        coreToken: authToken,
         permissions: this.options.permissions,
         questions: this.options.questions,
         getMessageID: () => runState.assistantMessageID,
@@ -545,7 +548,11 @@ export class MonAgentRuntime {
       )
       const systemPrompt = this.buildSystemPrompt(runtimeConfig.core)
       const attachmentContext = buildAttachmentContext(files)
-      const promptTextForModel = [promptContent, attachmentContext].filter(Boolean).join("\n\n")
+      const promptTextForModel = buildAgentTaskPrompt({
+        source: "user_chat",
+        text: promptContent,
+        attachmentContext,
+      })
       this.logger.info("本轮 Pi 上下文已准备", {
         sessionID,
         workspaceRoot: this.workspaceRoot,
@@ -587,6 +594,7 @@ export class MonAgentRuntime {
             url: truncateText(file.url, 240),
           })),
           attachmentContext: truncateText(attachmentContext, 1200),
+          taskPrompt: truncateText(promptTextForModel, 1200),
         },
         tools: tools.map((tool) => ({
           name: tool.name,
@@ -675,7 +683,7 @@ export class MonAgentRuntime {
   }
 
   private buildSystemPrompt(core?: CoreRuntimeConfig) {
-    return buildChatSystemPrompt(core)
+    return buildAgentSystemPromptFromCore(core)
   }
 
   private async syncCoreSession(sessionID: string, authToken?: string | null, core?: CoreRuntimeConfig) {

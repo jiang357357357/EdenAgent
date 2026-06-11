@@ -53,8 +53,13 @@ function requestDesktopQuitSync() {
   const script = `
 $root = '${escapedRoot}'
 $targets = Get-CimInstance Win32_Process | Where-Object {
-  ($_.ExecutablePath -like "$root*") -and
-    ($_.Name -eq "mon-agent-desktop.exe" -or $_.CommandLine -like "*target*debug*mon-agent-desktop.exe*")
+  ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*") -and (
+    $_.Name -eq "electron.exe" -or
+    $_.Name -eq "mon-agent-desktop.exe" -or
+    $_.CommandLine -like "*frontend*desktop*src*main.cjs*" -or
+    $_.CommandLine -like "*--cwd frontend/desktop dev*" -or
+    $_.CommandLine -like "*--cwd frontend*desktop dev*"
+  )
 } | Select-Object -ExpandProperty ProcessId -Unique
 
 foreach ($id in $targets) {
@@ -77,14 +82,12 @@ $root = '${escapedRoot}'
 $current = $PID
 $targets = Get-CimInstance Win32_Process | Where-Object {
   $_.ProcessId -ne $current -and (
-    ($_.Name -eq "mon-agent-desktop.exe" -and $_.ExecutablePath -like "$root*") -or
+    ($_.Name -eq "electron.exe" -and ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*")) -or
+    ($_.Name -eq "mon-agent-desktop.exe" -and ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*")) -or
     ($_.CommandLine -like "*--cwd frontend/desktop dev*") -or
     ($_.CommandLine -like "*--cwd frontend*desktop dev*") -or
-    ($_.CommandLine -like "*frontend*desktop*src-tauri*") -or
-    ($_.CommandLine -like "*frontend/desktop/src-tauri*") -or
-    ($_.CommandLine -like "*target*debug*mon-agent-desktop.exe*") -or
-    ($_.CommandLine -like "*target/debug/mon-agent-desktop.exe*") -or
-    ($_.Name -eq "cargo.exe" -and $_.CommandLine -like "*run --no-default-features --color always --*")
+    ($_.CommandLine -like "*frontend*desktop*src*main.cjs*") -or
+    ($_.CommandLine -like "*frontend/desktop/src/main.cjs*")
   )
 } | Select-Object -ExpandProperty ProcessId -Unique
 
@@ -97,31 +100,6 @@ foreach ($id in $targets) {
     stdout: "ignore",
     stderr: "ignore",
   })
-}
-
-function waitForDesktopBinaryUnlock() {
-  if (process.platform !== "win32") return
-
-  const exe = path.join(root, "frontend", "desktop", "src-tauri", "target", "debug", "mon-agent-desktop.exe")
-  for (let i = 0; i < 12; i++) {
-    killDesktopProjectProcesses()
-    const result = Bun.spawnSync(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `
-$path = '${exe.replaceAll("'", "''")}'
-if (!(Test-Path -LiteralPath $path)) { exit 0 }
-try {
-  $stream = [System.IO.File]::Open($path, 'Open', 'ReadWrite', 'None')
-  $stream.Close()
-  exit 0
-} catch {
-  exit 1
-}
-`], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    if (result.exitCode === 0) return
-    sleepSync(500)
-  }
 }
 
 let cleaned = false
@@ -162,7 +140,7 @@ process.on("exit", () => {
 })
 
 await waitForVite()
-waitForDesktopBinaryUnlock()
+killDesktopProjectProcesses()
 
 desktopProc = spawn({
   cmd: [bunExe, "run", "--cwd", "frontend/desktop", "dev"],

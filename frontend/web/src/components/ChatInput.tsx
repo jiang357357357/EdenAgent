@@ -86,7 +86,10 @@ export function ChatInput({
         return
       }
       textareaRef.current.style.height = "auto"
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, window.innerHeight * 0.24)}px`
+      const maxHeight = window.innerHeight * 0.24
+      const contentHeight = textareaRef.current.scrollHeight
+      textareaRef.current.style.height = `${Math.min(contentHeight, maxHeight)}px`
+      textareaRef.current.style.overflowY = contentHeight > maxHeight + 1 ? "auto" : "hidden"
     }
   }, [input, overlay])
 
@@ -437,7 +440,7 @@ export function ChatInput({
             rows={overlay ? 10 : 1}
             style={overlay ? { height: "100%", overflow: "hidden", scrollbarWidth: "none" } : undefined}
             className={cn(
-              "resize-none overflow-x-hidden bg-transparent outline-none leading-relaxed",
+              "resize-none overflow-x-hidden overflow-y-hidden bg-transparent outline-none leading-relaxed",
               overlay
                 ? "absolute inset-0 box-border h-full max-h-none min-h-0 w-full overflow-hidden px-[2.4vh] pb-[2.4vh] pt-[8.4vh] text-stone-100 placeholder:text-stone-400 [&::-webkit-scrollbar]:hidden"
                 : "min-h-[5vh] max-h-[24vh] min-w-0 flex-1 py-[0.8vh] text-[2.45vh] text-text placeholder:text-text-muted",

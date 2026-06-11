@@ -12,6 +12,7 @@ export interface SelfAwakeRequest {
 export interface SelfAwakeDecision {
   mood: string
   current_desire: string
+  observations?: string[]
   should_interrupt_user: boolean
   action: {
     type: "observe_only" | "write_diary" | "remind_user" | "create_task" | "ask_user" | "run_safe_check" | "sync_context"
@@ -26,4 +27,6 @@ export interface SelfAwakeDecision {
     title: string
     content: string
   }
+  source?: "agent" | "fallback"
+  error?: string
 }

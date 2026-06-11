@@ -1,0 +1,19 @@
+const { contextBridge, ipcRenderer } = require("electron")
+
+function convertFileSrc(filePath) {
+  const normalized = String(filePath || "").replace(/\\/g, "/")
+  const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`
+  return `monagent-file://${encodeURI(withLeadingSlash).replace(/#/g, "%23")}`
+}
+
+contextBridge.exposeInMainWorld("monAgentDesktop", {
+  invoke(command, args) {
+    return ipcRenderer.invoke("mon-agent:invoke", command, args ?? {})
+  },
+  onViewMode(callback) {
+    const handler = (_event, mode) => callback(mode)
+    ipcRenderer.on("mon-agent-view-mode", handler)
+    return () => ipcRenderer.removeListener("mon-agent-view-mode", handler)
+  },
+  convertFileSrc,
+})

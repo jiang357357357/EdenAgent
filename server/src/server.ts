@@ -19,6 +19,103 @@ async function ensureRuntimeSession(request: Request, sessionID: string) {
   return sessionHydrator.ensure(requireCoreToken(request), sessionID)
 }
 
+function formatLocalDateTime(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date)
+}
+
+function enrichSelfAwakeContext(context: Record<string, unknown> = {}) {
+  const rawCurrentTime = typeof context.current_time === "string" ? context.current_time : ""
+  const parsedCurrentTime = rawCurrentTime ? new Date(rawCurrentTime) : undefined
+  const currentDate =
+    parsedCurrentTime && Number.isFinite(parsedCurrentTime.getTime()) ? parsedCurrentTime : new Date()
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local"
+  const offsetMinutes = -currentDate.getTimezoneOffset()
+  const offsetHours = Math.trunc(offsetMinutes / 60)
+  const offsetRemainder = Math.abs(offsetMinutes % 60)
+  const offsetLabel = `UTC${offsetMinutes >= 0 ? "+" : "-"}${String(Math.abs(offsetHours)).padStart(2, "0")}:${String(offsetRemainder).padStart(2, "0")}`
+
+  return {
+    ...context,
+    current_time: currentDate.toISOString(),
+    current_time_local: formatLocalDateTime(currentDate),
+    current_timezone: timezone,
+    current_timezone_offset: offsetLabel,
+    time_display_rule:
+      "面向用户的日记正文、标题和动作说明统一使用 current_time_local 对应的本地时间；不要直接写 UTC 或 ISO 时间。",
+  }
+}
+
+function buildStartupSelfAwakeContext() {
+  return enrichSelfAwakeContext({
+    trigger: "agent_startup",
+    source_service: "monagent",
+    user_activity: "MonAgent 服务刚刚启动，测试模式下由 Agent 主动执行一次自醒。",
+  })
+}
+
+async function runStartupSelfAwake() {
+  if (!config.selfAwake.startupWakeEnabled) {
+    logger.info("Agent 启动自醒已关闭")
+    return
+  }
+
+  const delayMs = Math.max(0, config.selfAwake.startupWakeDelaySeconds) * 1000
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+  }
+
+  const { username, password } = config.authDev
+  if (!username || !password) {
+    logger.warn("Agent 启动自醒缺少 Core 测试账号，已跳过")
+    return
+  }
+
+  const startedAtMs = Date.now()
+  try {
+    logger.info("Agent 启动后执行一次自醒", { username })
+    const token = await coreClient.loginForToken({
+      username,
+      password,
+      clientId: "monagent-startup-self-awake",
+      clientType: "monagent",
+    })
+    const context = buildStartupSelfAwakeContext()
+    const decision = await runSelfAwake({ context }, logger, {
+      coreToken: token,
+      coreClient,
+      resolveCoreConfig: (coreToken) => coreClient.resolveRuntimeConfig(coreToken),
+      workspaceRoot: config.workspaceRoot,
+    })
+    const core = await coreClient.resolveRuntimeConfig(token)
+    const persisted = await coreClient.persistSelfAwakeRun(token, {
+      decision,
+      context,
+      core,
+      startedAtMs,
+      finishedAtMs: Date.now(),
+      sourceService: "monagent",
+    })
+    logger.info("Agent 启动自醒完成", {
+      action: decision.action.type,
+      nextWake: decision.next_wake.after_minutes,
+      serverRunID: persisted?.id,
+    })
+  } catch (error) {
+    logger.warn("Agent 启动自醒失败", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
 async function handleApi(request: Request, url: URL) {
   if (request.method === "OPTIONS") {
     logger.debug("preflight 已处理", { path: url.pathname })
@@ -116,15 +213,108 @@ async function handleApi(request: Request, url: URL) {
     })
   }
 
+  if (request.method === "GET" && url.pathname === "/self-awake/runs") {
+    const token = requireCoreToken(request)
+    const limit = Number(url.searchParams.get("limit") ?? 30)
+    return jsonResponse(await coreClient.listSelfAwakeRuns(token, limit))
+  }
+
+  if (request.method === "GET" && url.pathname === "/memos") {
+    const token = requireCoreToken(request)
+    return jsonResponse(
+      await coreClient.listMemos(token, {
+        kind: url.searchParams.get("kind") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+        priority: url.searchParams.get("priority") ?? undefined,
+        q: url.searchParams.get("q") ?? undefined,
+        limit: Number(url.searchParams.get("limit") ?? 80),
+      }),
+    )
+  }
+
+  if (request.method === "POST" && url.pathname === "/memos") {
+    const token = requireCoreToken(request)
+    const body = await readJsonBody<{
+      title: string
+      content?: string
+      kind?: "note" | "reminder" | "todo"
+      priority?: "low" | "normal" | "high"
+      remind_at?: string | null
+      due_at?: string | null
+      repeat_rule?: string
+      metadata?: Record<string, unknown>
+    }>(request)
+    return jsonResponse(
+      await coreClient.createMemo(token, {
+        ...body,
+        source: "monagent_ui",
+      }),
+      201,
+    )
+  }
+
+  if (request.method === "GET" && url.pathname === "/memos/next-wake") {
+    const token = requireCoreToken(request)
+    return jsonResponse(await coreClient.getNextMemoWake(token, { after: url.searchParams.get("after") ?? undefined }))
+  }
+
+  if (request.method === "POST" && url.pathname === "/memos/dispatch-due") {
+    const token = requireCoreToken(request)
+    const body = await readJsonBody<{ before?: string; limit?: number; mark_dispatched?: boolean }>(request)
+    return jsonResponse(await coreClient.dispatchDueMemos(token, body))
+  }
+
+  const memoActionMatch = url.pathname.match(/^\/memos\/(\d+)\/(complete|snooze|triggered)$/)
+  if (memoActionMatch && request.method === "POST") {
+    const token = requireCoreToken(request)
+    const memoID = Number(memoActionMatch[1])
+    const action = memoActionMatch[2]
+    if (action === "complete") {
+      return jsonResponse(await coreClient.completeMemo(token, memoID))
+    }
+    if (action === "snooze") {
+      const body = await readJsonBody<{ until?: string | null; minutes?: number }>(request)
+      return jsonResponse(await coreClient.snoozeMemo(token, memoID, body))
+    }
+    return jsonResponse(await coreClient.markMemoTriggered(token, memoID))
+  }
+
   if (request.method === "POST" && url.pathname === "/internal/self-awake/run") {
     const body = await readJsonBody<SelfAwakeRequest>(request)
+    const context = enrichSelfAwakeContext(body.context)
     const token = readAuthToken(request)
-    const decision = await runSelfAwake(body, logger, {
+    const startedAtMs = Date.now()
+    const decision = await runSelfAwake({ ...body, context }, logger, {
       coreToken: token,
+      coreClient,
       resolveCoreConfig: (coreToken) => coreClient.resolveRuntimeConfig(coreToken),
       workspaceRoot: config.workspaceRoot,
     })
-    return jsonResponse(decision)
+    let serverRunID: number | undefined
+    let serverError = ""
+    if (token) {
+      try {
+        const core = await coreClient.resolveRuntimeConfig(token)
+        const persisted = await coreClient.persistSelfAwakeRun(token, {
+          decision,
+          context,
+          core,
+          startedAtMs,
+          finishedAtMs: Date.now(),
+        })
+        if (persisted?.id) serverRunID = persisted.id
+      } catch (error) {
+        serverError = error instanceof Error ? error.message : String(error)
+        logger.warn("Agent 自醒记录写入 Core 失败", { error: serverError })
+      }
+    } else {
+      logger.warn("自醒请求未携带 Core token，跳过 Server 持久化")
+    }
+    return jsonResponse({
+      ...decision,
+      server_run_id: serverRunID,
+      server_error: serverError,
+    })
   }
 
   const questionReplyMatch = url.pathname.match(/^\/question\/([^/]+)\/reply$/)
@@ -231,3 +421,4 @@ logger.info(`工作区路径：${config.workspaceRoot}`)
 logger.info("session 存储：Core Server（当前进程仅保留运行期内存缓存）")
 logger.info(`Core 地址：${coreClient.baseUrl}`)
 logger.info("搜索提供方：DuckDuckGo 内置搜索")
+void runStartupSelfAwake()

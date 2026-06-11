@@ -4,6 +4,8 @@ import { AnimatePresence, LayoutGroup, motion } from "motion/react"
 import { ChatPage } from "./pages/chat"
 import { CharacterPage } from "./pages/character"
 import { LoginPage } from "./pages/login"
+import { MemoPage } from "./pages/memo"
+import { SelfAwakePage } from "./pages/self-awake"
 import { useSessionRuntime } from "./hooks/useSessionRuntime"
 import {
   clearAuth,
@@ -50,9 +52,9 @@ export default function App() {
   const [authError, setAuthError] = useState<string | undefined>()
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
-  const [theme, setTheme] = useState<"light" | "dark">("light")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [characterMode, setCharacterMode] = useState(false)
+  const [activePage, setActivePage] = useState<"chat" | "selfAwake" | "memo">("chat")
   const [modeContentVisible, setModeContentVisible] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyView, setHistoryView] = useState<"messages" | "sessions">("messages")
@@ -102,6 +104,7 @@ export default function App() {
     setDefaultAssistant(null)
     setDefaultAssistantError(undefined)
     setCharacterMode(false)
+    setActivePage("chat")
     setHistoryOpen(false)
     setHistoryView("messages")
     document.documentElement.classList.remove("character-transparent")
@@ -484,19 +487,6 @@ export default function App() {
     }
   }, [activeSessionError, authStatus, connectionError])
 
-  // Handle theme toggle
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [theme])
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"))
-  }
-
   const handleLogin = async (username: string, password: string) => {
     if (!username || !password) {
       setAuthError("请输入用户名和密码。")
@@ -579,6 +569,7 @@ export default function App() {
     setHistoryOpen(false)
     setHistoryView("messages")
     setSidebarOpen(false)
+    setActivePage("chat")
     setModeContentVisible(false)
 
     await wait(180)
@@ -649,6 +640,15 @@ export default function App() {
                 onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
                 onSwitchMode={() => void switchCharacterMode(false)}
               />
+            ) : activePage === "selfAwake" ? (
+              <SelfAwakePage
+                currentUser={currentUser}
+                assistant={defaultAssistant}
+                toolStatus={toolStatus}
+                onBack={() => setActivePage("chat")}
+              />
+            ) : activePage === "memo" ? (
+              <MemoPage onBack={() => setActivePage("chat")} />
             ) : (
               <ChatPage
                 sessions={sessions}
@@ -656,8 +656,6 @@ export default function App() {
                 activeSession={activeSession}
                 sidebarOpen={sidebarOpen}
                 setSidebarOpen={setSidebarOpen}
-                theme={theme}
-                toggleTheme={toggleTheme}
                 currentUser={currentUser}
                 assistant={defaultAssistant}
                 assistantError={defaultAssistantError}
@@ -678,6 +676,14 @@ export default function App() {
                 onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
                 onLogout={handleLogout}
                 onSwitchMode={() => void switchCharacterMode(true)}
+                onOpenSelfAwake={() => {
+                  setSidebarOpen(false)
+                  setActivePage("selfAwake")
+                }}
+                onOpenMemo={() => {
+                  setSidebarOpen(false)
+                  setActivePage("memo")
+                }}
               />
             )}
           </AnimatePresence>

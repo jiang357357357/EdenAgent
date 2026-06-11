@@ -36,6 +36,11 @@ export interface CoreRuntimeConfig {
   aiEntity: CoreAIEntity
 }
 
+interface CoreLoginResponse {
+  token?: string
+  message?: string
+}
+
 export interface CoreAgentSessionMap {
   id: number
   source: string
@@ -62,6 +67,148 @@ export interface CoreAgentMessageMap {
   sync_status?: string
   created_at?: string
   updated_at?: string
+}
+
+export interface CoreSelfAwakeDecision {
+  mood: string
+  current_desire: string
+  should_interrupt_user: boolean
+  action: {
+    type: string
+    message: string
+    payload?: Record<string, unknown>
+  }
+  next_wake: {
+    after_minutes: number
+    reason: string
+  }
+  diary: {
+    title: string
+    content: string
+  }
+  source?: string
+  error?: string
+}
+
+export interface CoreSelfAwakeDiary {
+  id: number
+  run: number
+  user: number
+  title: string
+  content: string
+  visible_to_user: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CoreSelfAwakeAction {
+  id: number
+  run: number
+  user: number
+  action_type: string
+  message: string
+  payload?: Record<string, unknown> | null
+  status: string
+  error: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CoreSelfAwakeRun {
+  id: number
+  user: number
+  assistant?: number | null
+  character?: number | null
+  source_service: string
+  external_run_id: string
+  status: string
+  started_at?: string
+  finished_at?: string | null
+  context_payload?: Record<string, unknown> | null
+  decision_payload?: CoreSelfAwakeDecision | Record<string, unknown> | null
+  mood: string
+  current_desire: string
+  should_interrupt_user: boolean
+  next_wake_at?: string | null
+  next_wake_after_minutes?: number | null
+  next_wake_reason: string
+  error: string
+  created_at?: string
+  updated_at?: string
+  diaries?: CoreSelfAwakeDiary[]
+  actions?: CoreSelfAwakeAction[]
+}
+
+export interface CoreMemo {
+  id: number
+  user: number
+  title: string
+  content: string
+  kind: "note" | "reminder" | "todo"
+  status: "active" | "done" | "archived" | "cancelled"
+  priority: "low" | "normal" | "high"
+  remind_at?: string | null
+  due_at?: string | null
+  repeat_rule: string
+  source: string
+  related_session_id: string
+  related_message_id: string
+  semantic_task_id: string
+  last_triggered_at?: string | null
+  snoozed_until?: string | null
+  completed_at?: string | null
+  metadata?: Record<string, unknown>
+  trigger_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CoreMemoInput {
+  title: string
+  content?: string
+  kind?: CoreMemo["kind"]
+  priority?: CoreMemo["priority"]
+  remind_at?: string | null
+  due_at?: string | null
+  repeat_rule?: string
+  source?: string
+  related_session_id?: string
+  related_message_id?: string
+  semantic_task_id?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface CoreMemoListInput {
+  kind?: string
+  status?: string
+  priority?: string
+  source?: string
+  q?: string
+  limit?: number
+}
+
+export interface CoreMemoNextWake {
+  next_wake_at?: string | null
+  memo?: CoreMemo | null
+}
+
+export interface CoreMemoDispatchResult {
+  dispatched_count: number
+  mark_dispatched: boolean
+  dispatched_at: string
+  memos: CoreMemo[]
+  next_wake_at?: string | null
+  next_memo?: CoreMemo | null
+}
+
+interface PersistSelfAwakeRunInput {
+  decision: CoreSelfAwakeDecision
+  context?: Record<string, unknown>
+  core?: CoreRuntimeConfig
+  startedAtMs?: number
+  finishedAtMs?: number
+  sourceService?: string
+  externalRunID?: string
 }
 
 interface CoreClientOptions {
@@ -131,6 +278,22 @@ function toMillis(value: unknown, fallback = Date.now()) {
   return fallback
 }
 
+function runIDFromMillis(prefix: string, millis: number) {
+  const stamp = new Date(millis).toISOString().replace(/[-:.TZ]/g, "")
+  const suffix = Math.random().toString(36).slice(2, 8)
+  return `${prefix}-${stamp}-${suffix}`
+}
+
+function safeMinutes(value: unknown, fallback = 720) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
+function actionStatus(decision: CoreSelfAwakeDecision) {
+  if (decision.source === "fallback") return "failed"
+  return decision.action.type === "observe_only" || decision.action.type === "write_diary" ? "succeeded" : "pending"
+}
+
 function isApiSessionPayload(value: unknown): value is ApiSession {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.title !== "string") return false
   const time = value.time
@@ -194,6 +357,31 @@ export class CoreClient {
   constructor(options: CoreClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl)
     this.logger = options.logger
+  }
+
+  async loginForToken(input: { username: string; password: string; clientId: string; clientType: string }) {
+    const response = await fetch(`${this.baseUrl}/api/api-token-auth/`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: input.username,
+        password: input.password,
+        client_id: input.clientId,
+        client_type: input.clientType,
+      }),
+    })
+    const text = await response.text().catch(() => "")
+    if (!response.ok) {
+      throw new Error(`Core 登录失败: ${errorMessage(response.status, response.statusText, text)}`)
+    }
+    const data = parseJson<CoreLoginResponse>(text)
+    if (!data?.token) {
+      throw new Error("Core 登录成功但未返回 token")
+    }
+    return data.token
   }
 
   async resolveRuntimeConfig(token?: string | null): Promise<CoreRuntimeConfig | undefined> {
@@ -337,6 +525,137 @@ export class CoreClient {
       kind: payload.kind,
     })
     return result
+  }
+
+  async persistSelfAwakeRun(token: string | null | undefined, input: PersistSelfAwakeRunInput) {
+    if (!token) return undefined
+
+    const finishedAtMs = input.finishedAtMs ?? Date.now()
+    const startedAtMs = input.startedAtMs ?? finishedAtMs
+    const afterMinutes = safeMinutes(input.decision.next_wake?.after_minutes)
+    const nextWakeAt = new Date(finishedAtMs + afterMinutes * 60 * 1000).toISOString()
+    const failed = input.decision.source === "fallback"
+    const payload = {
+      source_service: input.sourceService ?? "monagent",
+      external_run_id: input.externalRunID ?? runIDFromMillis("monagent", startedAtMs),
+      assistant: input.core?.assistant.id,
+      character: input.core?.character.id,
+      status: failed ? "failed" : "succeeded",
+      started_at: new Date(startedAtMs).toISOString(),
+      finished_at: new Date(finishedAtMs).toISOString(),
+      context: input.context ?? null,
+      decision: input.decision,
+      mood: input.decision.mood,
+      current_desire: input.decision.current_desire,
+      should_interrupt_user: input.decision.should_interrupt_user,
+      next_wake_at: nextWakeAt,
+      next_wake_after_minutes: afterMinutes,
+      next_wake_reason: input.decision.next_wake?.reason ?? "",
+      error: input.decision.error ?? "",
+      diary: {
+        title: input.decision.diary?.title ?? "",
+        content: input.decision.diary?.content ?? "",
+        visible_to_user: true,
+      },
+      action: {
+        action_type: input.decision.action?.type ?? "write_diary",
+        message: input.decision.action?.message ?? "",
+        payload: input.decision.action?.payload ?? {},
+        status: actionStatus(input.decision),
+        error: failed ? input.decision.error ?? "自醒 Agent 使用 fallback 决策。" : "",
+      },
+    }
+
+    const result = await this.request<{ id?: number }>("/api/agent/self-awake/runs/", token, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+    this.logger?.info("Agent 自醒记录已写入 Core", {
+      runID: result.id,
+      source: payload.source_service,
+      status: payload.status,
+      assistantID: input.core?.assistant.id,
+      characterID: input.core?.character.id,
+    })
+    return result
+  }
+
+  async listSelfAwakeRuns(token: string, limit = 30): Promise<CoreSelfAwakeRun[]> {
+    const raw = await this.request<CoreSelfAwakeRun[] | { results?: CoreSelfAwakeRun[] }>(
+      `/api/agent/self-awake/runs/?limit=${encodeURIComponent(String(limit))}`,
+      token,
+    )
+    return unwrapResults(raw)
+  }
+
+  async createMemo(token: string, input: CoreMemoInput): Promise<CoreMemo> {
+    return this.request<CoreMemo>("/api/memos/", token, {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async listMemos(token: string, input: CoreMemoListInput = {}): Promise<CoreMemo[]> {
+    const params = new URLSearchParams()
+    for (const key of ["kind", "status", "priority", "source", "q"] as const) {
+      const value = input[key]
+      if (typeof value === "string" && value.trim()) params.set(key, value.trim())
+    }
+    const path = `/api/memos/${params.toString() ? `?${params.toString()}` : ""}`
+    const raw = await this.request<CoreMemo[] | { results?: CoreMemo[] }>(path, token)
+    const memos = unwrapResults(raw)
+    const limit = Number(input.limit)
+    if (Number.isFinite(limit) && limit > 0) return memos.slice(0, Math.round(limit))
+    return memos
+  }
+
+  async listDueMemos(token: string, input: { before?: string; limit?: number } = {}): Promise<CoreMemo[]> {
+    const params = new URLSearchParams()
+    if (input.before?.trim()) params.set("before", input.before.trim())
+    const path = `/api/memos/due/${params.toString() ? `?${params.toString()}` : ""}`
+    const raw = await this.request<CoreMemo[] | { results?: CoreMemo[] }>(path, token)
+    const memos = unwrapResults(raw)
+    const limit = Number(input.limit)
+    if (Number.isFinite(limit) && limit > 0) return memos.slice(0, Math.round(limit))
+    return memos
+  }
+
+  async dispatchDueMemos(
+    token: string,
+    input: { before?: string; limit?: number; mark_dispatched?: boolean } = {},
+  ): Promise<CoreMemoDispatchResult> {
+    return this.request<CoreMemoDispatchResult>("/api/memos/dispatch-due/", token, {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async getNextMemoWake(token: string, input: { after?: string } = {}): Promise<CoreMemoNextWake> {
+    const params = new URLSearchParams()
+    if (input.after?.trim()) params.set("after", input.after.trim())
+    const path = `/api/memos/next-wake/${params.toString() ? `?${params.toString()}` : ""}`
+    return this.request<CoreMemoNextWake>(path, token)
+  }
+
+  async completeMemo(token: string, id: number): Promise<CoreMemo> {
+    return this.request<CoreMemo>(`/api/memos/${encodeURIComponent(String(id))}/complete/`, token, {
+      method: "POST",
+      body: JSON.stringify({}),
+    })
+  }
+
+  async snoozeMemo(token: string, id: number, input: { until?: string | null; minutes?: number }): Promise<CoreMemo> {
+    return this.request<CoreMemo>(`/api/memos/${encodeURIComponent(String(id))}/snooze/`, token, {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async markMemoTriggered(token: string, id: number): Promise<CoreMemo> {
+    return this.request<CoreMemo>(`/api/memos/${encodeURIComponent(String(id))}/mark-triggered/`, token, {
+      method: "POST",
+      body: JSON.stringify({}),
+    })
   }
 
   private async request<T>(path: string, token: string, init?: RequestInit): Promise<T> {

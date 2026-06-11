@@ -16,5 +16,9 @@ frontend/web/public/characters/
 *.webp
 *.svg
 *.ico
-!frontend/desktop/src-tauri/icons/
-!frontend/desktop/src-tauri/icons/icon.ico
+!frontend/web/src/assets/
+!frontend/web/src/assets/self-awake/
+!frontend/web/src/assets/self-awake/diary-paper.png
+!frontend/web/src/assets/self-awake/journal-workspace-bg.png
+!frontend/desktop/assets/
+!frontend/desktop/assets/icon.ico

@@ -1,8 +1,11 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core"
+import type { CoreClient } from "../core"
 import type { PermissionBroker, QuestionBroker } from "../interaction"
 
 export interface ToolRuntimeContext {
   sessionID?: string
+  coreClient?: CoreClient
+  coreToken?: string | null
   permissions?: PermissionBroker
   questions?: QuestionBroker
   getMessageID?: () => string | undefined

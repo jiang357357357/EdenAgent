@@ -89,7 +89,7 @@ function randomClientSuffix() {
 }
 
 function getClientMetadata() {
-  const clientType = isTauriRuntime() ? "agent_desktop" : "agent_web"
+  const clientType = isDesktopRuntime() ? "agent_desktop" : "agent_web"
   let clientId = window.localStorage.getItem(CLIENT_ID_KEY)
   if (!clientId) {
     clientId = `mon-${clientType}:${randomClientSuffix()}`
@@ -153,13 +153,16 @@ export function isAuthExpiredError(error: unknown) {
   return /authentication_expired|core_authentication_expired|not_authenticated|token无效|登录已失效/i.test(message)
 }
 
-function isTauriRuntime() {
-  return "__TAURI_INTERNALS__" in window
+function isDesktopRuntime() {
+  return Boolean(window.monAgentDesktop)
 }
 
-async function invokeTauri<T>(command: string, args?: Record<string, unknown>) {
-  const { invoke } = await import("@tauri-apps/api/core")
-  return invoke<T>(command, args)
+async function invokeDesktop<T>(command: string, args?: Record<string, unknown>) {
+  const bridge = window.monAgentDesktop
+  if (!bridge) {
+    throw new Error("MonAgent 桌面桥接不可用")
+  }
+  return bridge.invoke<T>(command, args)
 }
 
 function mergeUserProfile(user: AuthUser, profile?: Partial<AuthUser> | null): AuthUser {
@@ -242,8 +245,8 @@ export function saveAuth(payload: { token: string; user: AuthUser; expiresAt?: s
 export async function loginWithCore(username: string, password: string) {
   const client = getClientMetadata()
 
-  if (isTauriRuntime()) {
-    const response = await invokeTauri<LoginResponse>("core_login", {
+  if (isDesktopRuntime()) {
+    const response = await invokeDesktop<LoginResponse>("core_login", {
       request: {
         username,
         password,
@@ -288,8 +291,8 @@ export async function loginWithCore(username: string, password: string) {
 }
 
 export async function verifyTokenWithCore(token: string) {
-  if (isTauriRuntime()) {
-    const response = await invokeTauri<VerifyTokenResponse>("core_verify_token", { token })
+  if (isDesktopRuntime()) {
+    const response = await invokeDesktop<VerifyTokenResponse>("core_verify_token", { token })
     if (!response.valid) {
       throw new Error("Token无效")
     }
@@ -318,16 +321,16 @@ export async function verifyTokenWithCore(token: string) {
 }
 
 export async function fetchUserProfile(token: string) {
-  if (isTauriRuntime()) {
-    return invokeTauri<AuthUser>("core_user_profile", { token })
+  if (isDesktopRuntime()) {
+    return invokeDesktop<AuthUser>("core_user_profile", { token })
   }
 
   return request<AuthUser>("/api/users/me/profile/", { method: "GET" }, token)
 }
 
 export async function fetchDefaultAssistant(token: string) {
-  if (isTauriRuntime()) {
-    return invokeTauri<CoreAssistant>("core_default_assistant", { token })
+  if (isDesktopRuntime()) {
+    return invokeDesktop<CoreAssistant>("core_default_assistant", { token })
   }
 
   return request<CoreAssistant>("/api/assistants/default/", { method: "GET" }, token)
@@ -347,8 +350,8 @@ export async function logoutWithCore(token: string | null) {
   }
 
   try {
-    if (isTauriRuntime()) {
-      await invokeTauri<{ message: string }>("core_logout", { token })
+    if (isDesktopRuntime()) {
+      await invokeDesktop<{ message: string }>("core_logout", { token })
       return
     }
     await request<{ message: string }>("/api/users/logout/", { method: "POST" }, token)
@@ -363,6 +366,6 @@ export interface DevAccount {
 }
 
 export async function getDevAccount(): Promise<DevAccount | null> {
-  if (!isTauriRuntime()) return null
-  return invokeTauri<DevAccount | null>("get_dev_account")
+  if (!isDesktopRuntime()) return null
+  return invokeDesktop<DevAccount | null>("get_dev_account")
 }

@@ -1,4 +1,4 @@
-import { Lock, Menu, MessageSquare, Unlock, User } from "lucide-react"
+import { Lock, Menu, MessageSquare, NotebookPen, Unlock, User } from "lucide-react"
 import { motion } from "motion/react"
 import { CharacterPanel } from "../../components/CharacterPanel"
 import { ChatInput } from "../../components/ChatInput"
@@ -27,8 +27,6 @@ interface ChatPageProps {
   activeSession?: Session
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
-  theme: "light" | "dark"
-  toggleTheme: () => void
   currentUser?: AuthUser | null
   assistant?: CoreAssistant | null
   assistantError?: string
@@ -49,6 +47,8 @@ interface ChatPageProps {
   onPreviewImage: (src: string, alt?: string) => void
   onLogout: () => Promise<void> | void
   onSwitchMode: () => void
+  onOpenSelfAwake: () => void
+  onOpenMemo: () => void
 }
 
 export function ChatPage({
@@ -57,8 +57,6 @@ export function ChatPage({
   activeSession,
   sidebarOpen,
   setSidebarOpen,
-  theme,
-  toggleTheme,
   currentUser,
   assistant,
   assistantError,
@@ -79,6 +77,8 @@ export function ChatPage({
   onPreviewImage,
   onLogout,
   onSwitchMode,
+  onOpenSelfAwake,
+  onOpenMemo,
 }: ChatPageProps) {
   const assistantName = assistant?.name || assistant?.character?.name || "助手"
   const assistantInitial = assistantName.trim().slice(0, 1) || "助"
@@ -109,9 +109,8 @@ export function ChatPage({
         onNew={onNewSession}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
-        theme={theme}
-        toggleTheme={toggleTheme}
         currentUser={currentUser}
+        onSelfAwake={onOpenSelfAwake}
         onLogout={onLogout}
       />
 
@@ -129,6 +128,16 @@ export function ChatPage({
             <span className="truncate">{activeSession?.title || "新会话"}</span>
           </div>
           <div className="flex items-center gap-[1vw]">
+            <button
+              type="button"
+              onClick={onOpenMemo}
+              className="flex items-center gap-[0.6vw] rounded-full border border-border bg-card px-[1.6vw] py-[1.35vh] text-[1.75vh] tracking-[0.12em] text-text-muted shadow-sm transition-colors hover:border-accent/40 hover:text-accent"
+              title="打开备忘录"
+              aria-label="打开备忘录"
+            >
+              <NotebookPen className="h-[2.45vh] w-[2.45vh]" />
+              <span className="hidden sm:inline">备忘录</span>
+            </button>
             <button
               type="button"
               onClick={toggleAutoScroll}

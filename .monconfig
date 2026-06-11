@@ -38,3 +38,7 @@ MODE=development
 [auth_dev]
 USERNAME=admin1
 PASSWORD=123456
+
+[self_awake]
+STARTUP_WAKE_ENABLED=true
+STARTUP_WAKE_DELAY_SECONDS=2

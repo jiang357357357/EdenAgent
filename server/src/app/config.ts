@@ -10,6 +10,14 @@ export interface AgentServerConfig {
   workspaceRoot: string
   logLevel: string
   coreBaseUrl: string
+  authDev: {
+    username: string
+    password: string
+  }
+  selfAwake: {
+    startupWakeEnabled: boolean
+    startupWakeDelaySeconds: number
+  }
   hub: {
     enabled: boolean
     address: string
@@ -41,6 +49,18 @@ export function loadAgentServerConfig(): AgentServerConfig {
       host: coreConfig.get("server", "HOST", "127.0.0.1"),
       port: coreConfig.number("server", "PORT", 40011),
     }),
+    authDev: {
+      username: process.env.MON_AGENT_CORE_USERNAME ?? config.get("auth_dev", "USERNAME", "") ?? "",
+      password: process.env.MON_AGENT_CORE_PASSWORD ?? config.get("auth_dev", "PASSWORD", "") ?? "",
+    },
+    selfAwake: {
+      startupWakeEnabled:
+        (process.env.MON_AGENT_STARTUP_SELFAWAKE_ENABLED ??
+          config.get("self_awake", "STARTUP_WAKE_ENABLED", "false")) === "true",
+      startupWakeDelaySeconds:
+        Number(process.env.MON_AGENT_STARTUP_SELFAWAKE_DELAY_SECONDS ?? "") ||
+        config.number("self_awake", "STARTUP_WAKE_DELAY_SECONDS", 2),
+    },
     hub: {
       enabled: (process.env.MON_AGENT_HUB_ENABLED ?? config.get("hub", "ENABLED", "true")) !== "false",
       address: process.env.MON_AGENT_HUB_ADDRESS ?? `tcp://${hubHost}:${hubPort}`,
