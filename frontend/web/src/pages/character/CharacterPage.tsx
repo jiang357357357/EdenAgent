@@ -1,9 +1,11 @@
-import { ArrowLeft, MessageSquare, X } from "lucide-react"
+import { useEffect, useState, type CSSProperties } from "react"
+import { ArrowLeft, MessageCircle, X } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 import { ChatInput } from "../../components/ChatInput"
 import { PermissionRequestCard } from "../../components/PermissionRequestCard"
 import { QuestionRequestCard } from "../../components/QuestionRequestCard"
 import { resolveCoreAssetUrl, type CoreAssistant } from "../../lib/auth"
+import { DEFAULT_PET_SETTINGS, getDesktopPetSettings, listenDesktopPetSettings, type PetSettings } from "../../lib/desktop-window"
 import { resolveMonAgentUrl } from "../../lib/mon_agent_api"
 import { cn } from "../../lib/utils"
 import type { MessageData, PendingPermission, PendingQuestion, PromptAttachment, Session, ToolCall } from "../../types"
@@ -57,7 +59,6 @@ interface CharacterPageProps {
   assistant?: CoreAssistant | null
   assistantError?: string
   onPreviewImage: (src: string, alt?: string) => void
-  onSwitchMode: () => void
 }
 
 export function CharacterPage({
@@ -82,37 +83,78 @@ export function CharacterPage({
   assistant,
   assistantError,
   onPreviewImage,
-  onSwitchMode,
 }: CharacterPageProps) {
+  const [petSettings, setPetSettings] = useState<PetSettings>(DEFAULT_PET_SETTINGS)
+  const [inputCollapsed, setInputCollapsed] = useState(false)
   const character = assistant?.character
   const displayName = assistant?.name || character?.name || "默认助手"
   const characterImage = resolveCoreAssetUrl(character?.default_standing_image_url || character?.avatar_url)
+  const inputEnabled = petSettings.showInput
+  const inputVisible = inputEnabled && !inputCollapsed
+  const inputWidth = Math.max(10, Math.min(100, petSettings.inputWidth))
+  const inputHeight = Math.max(8, Math.min(80, petSettings.inputHeight))
+  const chatTopOffset = 2
+  const characterTopOffset = inputVisible ? chatTopOffset + inputHeight + 4 : 5
+  const collapseButtonTop = inputVisible ? chatTopOffset + inputHeight + 1 : 2
+  const petBackgroundClass = petSettings.transparentWindow ? "!bg-transparent" : "bg-bg"
+  const characterDragStyle = petSettings.characterDraggable ? ({ WebkitAppRegion: "drag" } as CSSProperties) : undefined
+
+  useEffect(() => {
+    let disposed = false
+    let unsubscribe: (() => void) | undefined
+    void getDesktopPetSettings().then((settings) => {
+      if (!disposed) setPetSettings(settings)
+    })
+    void listenDesktopPetSettings((settings) => {
+      if (!disposed) setPetSettings(settings)
+    }).then((cleanup) => {
+      unsubscribe = cleanup
+      if (disposed) cleanup?.()
+    })
+    return () => {
+      disposed = true
+      unsubscribe?.()
+    }
+  }, [])
 
   return (
     <motion.div
       key="character"
       {...characterScreenMotion}
       transition={screenTransition}
-      className="fixed inset-0 z-20 h-[100vh] w-[100vw] overflow-hidden !bg-transparent font-sans text-text"
+      className={cn("fixed inset-0 z-20 h-[100vh] w-[100vw] overflow-hidden font-sans text-text", petBackgroundClass)}
     >
-      <main className="relative mx-auto h-[100vh] w-[100vw] overflow-hidden !bg-transparent">
-        <button
-          type="button"
-          onClick={onSwitchMode}
-          className="fixed right-[3vw] top-[2vh] z-30 flex items-center gap-2 rounded-full border border-orange-300/35 bg-white/85 px-3 py-2 text-[11px] font-medium tracking-[0.08em] text-stone-700 shadow-sm backdrop-blur-md transition-colors hover:border-orange-400/55 hover:text-orange-600"
-          title="切换到聊天模式"
-          aria-label="切换到聊天模式"
+      <main className={cn("relative mx-auto h-[100vh] w-[100vw] overflow-hidden", petBackgroundClass)}>
+        <div
+          className="fixed inset-x-0 top-0 z-30 h-[5vh]"
+          style={{ WebkitAppRegion: "drag" } as CSSProperties}
+          aria-hidden="true"
+        />
+        {inputEnabled ? (
+          <button
+            type="button"
+            onClick={() => setInputCollapsed((collapsed) => !collapsed)}
+            className="fixed left-1/2 z-30 flex h-[4.8vh] w-[4.8vh] -translate-x-1/2 items-center justify-center rounded-full border border-white/25 bg-stone-950/55 text-stone-100 shadow-sm backdrop-blur-md transition-colors hover:bg-stone-900/70"
+            style={{ top: `${collapseButtonTop}vh` }}
+            aria-label={inputCollapsed ? "展开聊天框" : "收起聊天框"}
+            title={inputCollapsed ? "展开聊天框" : "收起聊天框"}
+          >
+            <MessageCircle className="h-[2.3vh] w-[2.3vh]" />
+          </button>
+        ) : null}
+        <section
+          className={cn(
+            "absolute inset-x-0 bottom-0 flex items-end justify-center text-center",
+            petSettings.characterDraggable ? "pointer-events-auto" : "pointer-events-none",
+          )}
+          style={{ ...characterDragStyle, top: `${characterTopOffset}vh` }}
         >
-          <MessageSquare className="h-4 w-4" />
-          <span>聊天模式</span>
-        </button>
-        <section className="pointer-events-none absolute inset-0 flex items-end justify-center text-center">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
             transition={{ ...screenTransition, delay: 0.08 }}
-            className="relative h-[100vh] w-[100vw] overflow-hidden !bg-transparent shadow-none"
+            className={cn("relative h-full w-[100vw] overflow-hidden shadow-none", petBackgroundClass)}
           >
             {characterImage ? (
               <motion.img
@@ -120,7 +162,7 @@ export function CharacterPage({
                 transition={screenTransition}
                 src={characterImage}
                 alt={displayName}
-                className="absolute bottom-0 left-1/2 h-[100vh] w-auto max-w-none -translate-x-1/2 object-contain object-bottom shadow-none drop-shadow-none"
+                className="absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 object-contain object-bottom shadow-none drop-shadow-none"
                 draggable={false}
               />
             ) : (
@@ -323,13 +365,14 @@ export function CharacterPage({
         </AnimatePresence>
 
         <motion.div
-          initial={{ opacity: 0, y: 28, scale: 0.98 }}
+          initial={{ opacity: 0, y: -18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 1 }}
           transition={{ ...screenTransition, delay: 0.14 }}
-          className="fixed inset-x-0 bottom-[2.5vh] z-20 px-[4vw]"
+          className="fixed inset-x-0 z-20 px-[4vw]"
+          style={{ top: `${chatTopOffset}vh` }}
         >
-          <div className="mx-auto w-full max-w-[min(88vw,760px)]">
+          <div className="mx-auto w-full" style={{ maxWidth: `${inputWidth}vw` }}>
             {(activePendingPermissions.length > 0 || activePendingQuestions.length > 0) && (
               <div className="mb-3 grid gap-3">
                 {activePendingPermissions.map((request) => (
@@ -351,23 +394,29 @@ export function CharacterPage({
                 ))}
               </div>
             )}
-            <ChatInput
-              onSend={onSendMessage}
-              disabled={isThinking}
-              overlay
-              onHistory={() => {
-                onSetHistoryView("messages")
-                onSetHistoryOpen(true)
-              }}
-              onStartWindowDrag={onStartWindowDrag}
-              outputActive={isThinking}
-              outputContent={activeReplyMessage?.content ?? ""}
-              outputThinking={activeReplyMessage?.thinking}
-              outputTools={activeReplyMessage?.toolCalls}
-              dialogSegments={dialogSegments}
-              assistantName={displayName}
-              onPreviewImage={(src, alt) => onPreviewImage(src, alt ?? "图片预览")}
-            />
+            {inputVisible ? (
+              <ChatInput
+                onSend={onSendMessage}
+                disabled={isThinking}
+                overlay
+                onHistory={() => {
+                  onSetHistoryView("messages")
+                  onSetHistoryOpen(true)
+                }}
+                onStartWindowDrag={onStartWindowDrag}
+                outputActive={isThinking}
+                outputContent={activeReplyMessage?.content ?? ""}
+                outputThinking={activeReplyMessage?.thinking}
+                outputTools={activeReplyMessage?.toolCalls}
+                dialogSegments={dialogSegments}
+                assistantName={displayName}
+                onPreviewImage={(src, alt) => onPreviewImage(src, alt ?? "图片预览")}
+                overlayCompact
+                hideOverlayActions
+                overlayOpacity={petSettings.inputOpacity}
+                overlayHeight={inputHeight}
+              />
+            ) : null}
           </div>
         </motion.div>
       </main>

@@ -67,9 +67,13 @@ function resolvePublicHost(configured: string) {
 export class HubRegistryClient {
   private socket?: Dealer
   private heartbeatTimer?: Timer
+  private reconnectTimer?: Timer
   private startedAt = nowIso()
   private stopped = false
   private registered = false
+  private reconnecting = false
+  private heartbeatFailures = 0
+  private lastHubMessageAt = Date.now()
   private responseWaiters = new Map<string, HubResponseWaiter>()
 
   constructor(
@@ -83,22 +87,10 @@ export class HubRegistryClient {
       return
     }
 
+    this.stopped = false
     try {
-      this.socket = new Dealer({ routingId: this.config.hub.serviceName })
-      this.socket.connect(this.config.hub.address)
-      this.stopped = false
-      void this.listen()
-      await this.send({
-        type: "HEARTBEAT",
-        source: this.config.hub.serviceName,
-        target: "MonHub",
-        payload: { status: "alive" },
-      })
-      await this.register("startup")
-      this.heartbeatTimer = setInterval(
-        () => void this.heartbeat(),
-        Math.max(5, this.config.hub.heartbeatIntervalSeconds) * 1000,
-      )
+      await this.connectAndRegister("startup")
+      this.startHeartbeatTimer()
       this.logger.info("MonHub 注册客户端已启动", {
         address: this.config.hub.address,
         serviceId: this.config.hub.serviceId,
@@ -107,7 +99,7 @@ export class HubRegistryClient {
       this.logger.warn("MonHub 注册失败，Agent 将继续本地运行", {
         error: error instanceof Error ? error.message : String(error),
       })
-      await this.stop("startup_failed")
+      this.scheduleReconnect("startup_failed")
     }
   }
 
@@ -116,6 +108,10 @@ export class HubRegistryClient {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer)
       this.heartbeatTimer = undefined
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = undefined
     }
     for (const waiter of this.responseWaiters.values()) {
       clearTimeout(waiter.timer)
@@ -141,6 +137,70 @@ export class HubRegistryClient {
       this.registered = false
       this.socket?.close()
       this.socket = undefined
+    }
+  }
+
+  private async connectAndRegister(reason: string) {
+    this.socket?.close()
+    this.socket = new Dealer({ routingId: this.config.hub.serviceName })
+    this.socket.connect(this.config.hub.address)
+    this.registered = false
+    this.heartbeatFailures = 0
+    this.lastHubMessageAt = Date.now()
+    void this.listen(this.socket)
+    await this.send({
+      type: "HEARTBEAT",
+      source: this.config.hub.serviceName,
+      target: "MonHub",
+      payload: { status: "alive" },
+    })
+    await this.register(reason)
+  }
+
+  private startHeartbeatTimer() {
+    if (this.heartbeatTimer) return
+
+    this.heartbeatTimer = setInterval(
+      () => void this.heartbeat(),
+      Math.max(5, this.config.hub.heartbeatIntervalSeconds) * 1000,
+    )
+  }
+
+  private scheduleReconnect(reason: string) {
+    if (this.stopped || this.reconnecting || this.reconnectTimer) return
+
+    this.logger.warn("MonHub 连接将重建", { reason })
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined
+      void this.reconnect(reason)
+    }, 2_000)
+  }
+
+  private async reconnect(reason: string) {
+    if (this.stopped || this.reconnecting) return
+
+    this.reconnecting = true
+    try {
+      await this.connectAndRegister(`reconnect:${reason}`)
+      this.logger.info("MonHub 连接已恢复", {
+        address: this.config.hub.address,
+        serviceId: this.config.hub.serviceId,
+      })
+      this.startHeartbeatTimer()
+    } catch (error) {
+      this.logger.warn("MonHub 重连失败，将继续重试", {
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      this.registered = false
+      this.socket?.close()
+      this.socket = undefined
+    } finally {
+      this.reconnecting = false
+    }
+
+    if (!this.stopped && !this.registered) {
+      this.scheduleReconnect("retry_after_failure")
     }
   }
 
@@ -198,6 +258,12 @@ export class HubRegistryClient {
   }
 
   private async heartbeat() {
+    const silentLimitMs = Math.max(90, this.config.hub.heartbeatIntervalSeconds * 4) * 1000
+    if (Date.now() - this.lastHubMessageAt > silentLimitMs) {
+      this.scheduleReconnect("hub_silent")
+      return
+    }
+
     try {
       await this.send({
         type: "SERVICE_HEARTBEAT",
@@ -209,8 +275,13 @@ export class HubRegistryClient {
           health: 100,
         },
       })
+      this.heartbeatFailures = 0
     } catch (error) {
+      this.heartbeatFailures += 1
       this.logger.warn("MonHub 心跳发送失败", { error: error instanceof Error ? error.message : String(error) })
+      if (this.heartbeatFailures >= 3) {
+        this.scheduleReconnect("heartbeat_failed")
+      }
     }
   }
 
@@ -306,26 +377,32 @@ export class HubRegistryClient {
     waiter.resolve(message)
   }
 
-  private async listen() {
-    const socket = this.socket
+  private async listen(socket: Dealer | undefined = this.socket) {
     if (!socket) return
 
     try {
       for await (const frames of socket) {
-        if (this.stopped) return
+        if (this.stopped || this.socket !== socket) return
         const raw = frames.at(-1)?.toString()
         if (!raw) continue
         const message = JSON.parse(raw) as HubResponse
+        this.lastHubMessageAt = Date.now()
         if (message.type === "HEARTBEAT") continue
         this.notifyResponseWaiter(message)
         if (message.payload?.error_code === "RE_REGISTER_REQUIRED") {
           this.logger.warn("MonHub 要求重新注册 Agent 服务", message.payload)
-          await this.register("hub_requested")
+          try {
+            await this.register("hub_requested")
+          } catch (error) {
+            this.logger.warn("MonHub 要求重注册但提交失败", { error: error instanceof Error ? error.message : String(error) })
+            this.scheduleReconnect("reregister_failed")
+          }
         }
       }
     } catch (error) {
-      if (!this.stopped) {
+      if (!this.stopped && this.socket === socket) {
         this.logger.warn("MonHub 监听已停止", { error: error instanceof Error ? error.message : String(error) })
+        this.scheduleReconnect("listen_stopped")
       }
     }
   }

@@ -1,4 +1,5 @@
 import type { Logger } from "../shared"
+import { toStorageIso } from "../shared/time"
 import type { ApiMessage, ApiSession } from "../types"
 
 export interface CoreCharacter {
@@ -28,12 +29,74 @@ export interface CoreAIEntity {
   vendor_params?: Record<string, unknown>
   default_params?: Record<string, unknown>
   status?: string
+  is_multimodal?: boolean
+}
+
+export interface CoreVisionConfig {
+  id: number
+  user: number
+  vision_name: string
+  vendor: string
+  vision_model: string
+  api_key: string
+  api_endpoint: string
+  status: "active" | "paused" | "error" | string
+  total_requests?: number
+  total_images?: number
+  last_request_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CoreVisionAnalyzeImage {
+  type?: "base64" | "url"
+  source: string
+  media_type?: string
+  ref?: string
+}
+
+export interface CoreVisionAnalyzeInput {
+  config_id?: number
+  images: CoreVisionAnalyzeImage[]
+  prompt: string
+  source?: string
+  related_session_id?: string
+  related_message_id?: string
+  tool_call_id?: string
+  metadata?: Record<string, unknown>
+  temperature?: number
+  max_tokens?: number
+  detail?: string
+  extra_params?: Record<string, unknown>
+}
+
+export interface CoreVisionAnalyzeResult {
+  success: boolean
+  id: number
+  content: string
+  summary: string
+  result_content?: string
+  result_summary?: string
+  model: string
+  usage?: Record<string, unknown>
+  status: string
+  error?: string
+  config?: {
+    id: number
+    name: string
+    vendor: string
+    model: string
+    status: string
+  } | null
+  created_at?: string
+  finished_at?: string | null
 }
 
 export interface CoreRuntimeConfig {
   assistant: CoreAssistant
   character: CoreCharacter
   aiEntity: CoreAIEntity
+  visionConfig?: CoreVisionConfig | null
 }
 
 interface CoreLoginResponse {
@@ -96,9 +159,25 @@ export interface CoreSelfAwakeDiary {
   user: number
   title: string
   content: string
+  summary?: string
+  tags?: string[] | null
+  importance?: string
+  continuity_key?: string
   visible_to_user: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface CoreSelfAwakeDiaryContext {
+  source: string
+  last?: Record<string, unknown> | null
+  recent: Array<Record<string, unknown>>
+  memory: {
+    summary: string
+    open_threads: string[]
+    avoid_repeating: string[]
+    updated_at?: string | null
+  }
 }
 
 export interface CoreSelfAwakeAction {
@@ -139,6 +218,16 @@ export interface CoreSelfAwakeRun {
   actions?: CoreSelfAwakeAction[]
 }
 
+export interface CorePaginatedResult<T> {
+  count: number
+  next?: string | null
+  previous?: string | null
+  page_size: number
+  current_page: number
+  total_pages: number
+  results: T[]
+}
+
 export interface CoreMemo {
   id: number
   user: number
@@ -167,6 +256,7 @@ export interface CoreMemoInput {
   title: string
   content?: string
   kind?: CoreMemo["kind"]
+  status?: CoreMemo["status"]
   priority?: CoreMemo["priority"]
   remind_at?: string | null
   due_at?: string | null
@@ -269,6 +359,38 @@ function unwrapResults<T>(value: T[] | { results?: T[] }): T[] {
   return []
 }
 
+function normalizePaginated<T>(
+  value: T[] | Partial<CorePaginatedResult<T>>,
+  fallbackPage: number,
+  fallbackPageSize: number,
+): CorePaginatedResult<T> {
+  if (Array.isArray(value)) {
+    return {
+      count: value.length,
+      next: null,
+      previous: null,
+      page_size: fallbackPageSize,
+      current_page: fallbackPage,
+      total_pages: 1,
+      results: value,
+    }
+  }
+  const results = Array.isArray(value.results) ? value.results : []
+  const count = Number.isFinite(Number(value.count)) ? Number(value.count) : results.length
+  const pageSize = Number.isFinite(Number(value.page_size)) ? Number(value.page_size) : fallbackPageSize
+  return {
+    count,
+    next: value.next ?? null,
+    previous: value.previous ?? null,
+    page_size: pageSize,
+    current_page: Number.isFinite(Number(value.current_page)) ? Number(value.current_page) : fallbackPage,
+    total_pages: Number.isFinite(Number(value.total_pages))
+      ? Number(value.total_pages)
+      : Math.max(1, Math.ceil(count / Math.max(1, pageSize))),
+    results,
+  }
+}
+
 function toMillis(value: unknown, fallback = Date.now()) {
   if (typeof value === "number" && Number.isFinite(value)) return value
   if (typeof value === "string" && value.trim()) {
@@ -279,7 +401,7 @@ function toMillis(value: unknown, fallback = Date.now()) {
 }
 
 function runIDFromMillis(prefix: string, millis: number) {
-  const stamp = new Date(millis).toISOString().replace(/[-:.TZ]/g, "")
+  const stamp = toStorageIso(millis).replace(/[-:.TZ]/g, "")
   const suffix = Math.random().toString(36).slice(2, 8)
   return `${prefix}-${stamp}-${suffix}`
 }
@@ -423,7 +545,15 @@ export class CoreClient {
       model: aiEntity.ai_model,
     })
 
-    return { assistant, character, aiEntity }
+    const visionConfigs = await this.listVisionConfigs(token).catch((error) => {
+      this.logger?.warn("读取 Core Vision 配置失败，视觉工具将只使用当前对话模型", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return [] as CoreVisionConfig[]
+    })
+    const visionConfig = visionConfigs.find((config) => config.status === "active") ?? visionConfigs[0] ?? null
+
+    return { assistant, character, aiEntity, visionConfig }
   }
 
   async syncAgentSession(
@@ -441,7 +571,7 @@ export class CoreClient {
       title: session.title,
       session_payload: session,
       status: "active",
-      last_message_at: new Date(session.time.updated).toISOString(),
+      last_message_at: toStorageIso(session.time.updated),
     }
 
     const result = await this.request<CoreAgentSessionMap>("/api/agent/sessions/", token, {
@@ -533,7 +663,7 @@ export class CoreClient {
     const finishedAtMs = input.finishedAtMs ?? Date.now()
     const startedAtMs = input.startedAtMs ?? finishedAtMs
     const afterMinutes = safeMinutes(input.decision.next_wake?.after_minutes)
-    const nextWakeAt = new Date(finishedAtMs + afterMinutes * 60 * 1000).toISOString()
+    const nextWakeAt = toStorageIso(finishedAtMs + afterMinutes * 60 * 1000)
     const failed = input.decision.source === "fallback"
     const payload = {
       source_service: input.sourceService ?? "monagent",
@@ -541,8 +671,8 @@ export class CoreClient {
       assistant: input.core?.assistant.id,
       character: input.core?.character.id,
       status: failed ? "failed" : "succeeded",
-      started_at: new Date(startedAtMs).toISOString(),
-      finished_at: new Date(finishedAtMs).toISOString(),
+      started_at: toStorageIso(startedAtMs),
+      finished_at: toStorageIso(finishedAtMs),
       context: input.context ?? null,
       decision: input.decision,
       mood: input.decision.mood,
@@ -581,16 +711,43 @@ export class CoreClient {
   }
 
   async listSelfAwakeRuns(token: string, limit = 30): Promise<CoreSelfAwakeRun[]> {
-    const raw = await this.request<CoreSelfAwakeRun[] | { results?: CoreSelfAwakeRun[] }>(
-      `/api/agent/self-awake/runs/?limit=${encodeURIComponent(String(limit))}`,
+    return (await this.listSelfAwakeRunsPage(token, { page: 1, pageSize: limit })).results
+  }
+
+  async listSelfAwakeRunsPage(
+    token: string,
+    input: { page?: number; pageSize?: number; q?: string } = {},
+  ): Promise<CorePaginatedResult<CoreSelfAwakeRun>> {
+    const page = Math.max(1, Math.round(input.page ?? 1))
+    const pageSize = Math.min(Math.max(Math.round(input.pageSize ?? 30), 1), 100)
+    const search = new URLSearchParams()
+    search.set("page", String(page))
+    search.set("page_size", String(pageSize))
+    if (input.q?.trim()) search.set("q", input.q.trim())
+    const raw = await this.request<CoreSelfAwakeRun[] | Partial<CorePaginatedResult<CoreSelfAwakeRun>>>(
+      `/api/agent/self-awake/runs/?${search.toString()}`,
       token,
     )
-    return unwrapResults(raw)
+    return normalizePaginated(raw, page, pageSize)
+  }
+
+  async getSelfAwakeDiaryContext(token: string, limit = 5): Promise<CoreSelfAwakeDiaryContext> {
+    return this.request<CoreSelfAwakeDiaryContext>(
+      `/api/agent/self-awake/diaries/context/?limit=${encodeURIComponent(String(limit))}`,
+      token,
+    )
   }
 
   async createMemo(token: string, input: CoreMemoInput): Promise<CoreMemo> {
     return this.request<CoreMemo>("/api/memos/", token, {
       method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async updateMemo(token: string, id: number, input: Partial<CoreMemoInput>): Promise<CoreMemo> {
+    return this.request<CoreMemo>(`/api/memos/${encodeURIComponent(String(id))}/`, token, {
+      method: "PATCH",
       body: JSON.stringify(input),
     })
   }
@@ -655,6 +812,21 @@ export class CoreClient {
     return this.request<CoreMemo>(`/api/memos/${encodeURIComponent(String(id))}/mark-triggered/`, token, {
       method: "POST",
       body: JSON.stringify({}),
+    })
+  }
+
+  async listVisionConfigs(token: string): Promise<CoreVisionConfig[]> {
+    const raw = await this.request<CoreVisionConfig[] | { results?: CoreVisionConfig[] }>(
+      "/api/vision/configs/",
+      token,
+    )
+    return unwrapResults(raw)
+  }
+
+  async analyzeVision(token: string, input: CoreVisionAnalyzeInput): Promise<CoreVisionAnalyzeResult> {
+    return this.request<CoreVisionAnalyzeResult>("/api/vision/analyze/", token, {
+      method: "POST",
+      body: JSON.stringify(input),
     })
   }
 

@@ -15,5 +15,15 @@ contextBridge.exposeInMainWorld("monAgentDesktop", {
     ipcRenderer.on("mon-agent-view-mode", handler)
     return () => ipcRenderer.removeListener("mon-agent-view-mode", handler)
   },
+  onPetSettings(callback) {
+    const handler = (_event, settings) => callback(settings)
+    ipcRenderer.on("mon-agent-pet-settings", handler)
+    return () => ipcRenderer.removeListener("mon-agent-pet-settings", handler)
+  },
+  onOpenSettings(callback) {
+    const handler = () => callback()
+    ipcRenderer.on("mon-agent-open-settings", handler)
+    return () => ipcRenderer.removeListener("mon-agent-open-settings", handler)
+  },
   convertFileSrc,
 })

@@ -6,6 +6,7 @@ import { CharacterPage } from "./pages/character"
 import { LoginPage } from "./pages/login"
 import { MemoPage } from "./pages/memo"
 import { SelfAwakePage } from "./pages/self-awake"
+import { SettingsPage } from "./pages/settings"
 import { useSessionRuntime } from "./hooks/useSessionRuntime"
 import {
   clearAuth,
@@ -26,6 +27,7 @@ import {
 } from "./lib/auth"
 import type { MessageData, PromptAttachment } from "./types"
 import {
+  listenDesktopOpenSettings,
   listenDesktopViewMode,
   resizeDesktopWindow,
   setDesktopViewModeState,
@@ -39,12 +41,64 @@ const screenTransition = {
   ease: [0.16, 1, 0.3, 1],
 } as const
 
+type AppPage = "chat" | "selfAwake" | "memo" | "settings"
+
+function initialPageFromLocation(): AppPage {
+  return new URLSearchParams(window.location.search).get("page") === "settings" ? "settings" : "chat"
+}
+
 function wait(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
 
 function waitForNextFrame() {
   return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+}
+
+function textLength(value?: string) {
+  return value?.length ?? 0
+}
+
+function messageScrollSignature(message: MessageData) {
+  const segmentSignature =
+    message.segments
+      ?.map((segment) => {
+        if (segment.type === "text" || segment.type === "runtimeTrace" || segment.type === "thinking") {
+          return `${segment.id}:${segment.type}:${segment.state ?? ""}:${segment.content.length}`
+        }
+        if (segment.type === "tool") {
+          return `${segment.id}:tool:${segment.tool.status}:${textLength(segment.tool.output)}:${textLength(segment.tool.error)}`
+        }
+        if (segment.type === "meta") {
+          return `${segment.id}:meta:${segment.part.type}:${textLength(segment.part.summary)}:${textLength(segment.part.detail)}`
+        }
+        return `${segment.id}:image:${segment.url}`
+      })
+      .join(",") ?? ""
+
+  const toolSignature =
+    message.toolCalls
+      ?.map((tool) => `${tool.id}:${tool.status}:${textLength(tool.output)}:${textLength(tool.error)}`)
+      .join(",") ?? ""
+  const metaSignature =
+    message.metaParts
+      ?.map((part) => `${part.id}:${part.type}:${textLength(part.summary)}:${textLength(part.detail)}`)
+      .join(",") ?? ""
+
+  return [
+    message.id,
+    message.role,
+    textLength(message.content),
+    textLength(message.runtimeTrace),
+    message.runtimeTraceState ?? "",
+    textLength(message.thinking),
+    message.thinkingState ?? "",
+    message.images?.join(",") ?? "",
+    message.isStreaming ? "streaming" : "done",
+    segmentSignature,
+    toolSignature,
+    metaSignature,
+  ].join("|")
 }
 
 export default function App() {
@@ -54,7 +108,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [characterMode, setCharacterMode] = useState(false)
-  const [activePage, setActivePage] = useState<"chat" | "selfAwake" | "memo">("chat")
+  const isSettingsWindow = initialPageFromLocation() === "settings"
+  const [activePage, setActivePage] = useState<AppPage>(() => initialPageFromLocation())
   const [modeContentVisible, setModeContentVisible] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyView, setHistoryView] = useState<"messages" | "sessions">("messages")
@@ -150,6 +205,7 @@ export default function App() {
 
   // Auto-scroll to bottom when messages change
   const activeMessages = activeSession?.messages ?? []
+  const messageScrollKey = activeMessages.map(messageScrollSignature).join("\n")
   const assistantDisplayName = defaultAssistant?.name || defaultAssistant?.character?.name || "助手"
   const lastUserMessageIndex = activeMessages.reduce(
     (lastIndex, message, index) => (message.role === "user" ? index : lastIndex),
@@ -331,13 +387,14 @@ export default function App() {
   useEffect(() => {
     if (!autoScrollEnabled) return
     scrollMessagesToBottom("smooth")
-  }, [activeSession?.messages, autoScrollEnabled, isThinking])
+  }, [messageScrollKey, autoScrollEnabled])
 
   useEffect(() => {
+    if (isSettingsWindow) return
     void resizeDesktopWindow(authStatus === "authenticated" ? "chatWithCharacter" : "login")
     if (authStatus !== "authenticated") return
     void setDesktopWindowAppearance("chatWithCharacter")
-  }, [authStatus])
+  }, [authStatus, isSettingsWindow])
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
@@ -447,8 +504,10 @@ export default function App() {
   }, [authStatus])
 
   useEffect(() => {
+    if (isSettingsWindow) return
     if (authStatus !== "authenticated") return
-    let cleanup: (() => void) | undefined
+    let cleanupViewMode: (() => void) | undefined
+    let cleanupOpenSettings: (() => void) | undefined
     let disposed = false
 
     void listenDesktopViewMode((mode) => {
@@ -458,14 +517,27 @@ export default function App() {
         dispose?.()
         return
       }
-      cleanup = dispose
+      cleanupViewMode = dispose
+    })
+
+    void listenDesktopOpenSettings(() => {
+      void switchCharacterMode(false)
+      setActivePage("settings")
+      setSidebarOpen(false)
+    }).then((dispose) => {
+      if (disposed) {
+        dispose?.()
+        return
+      }
+      cleanupOpenSettings = dispose
     })
 
     return () => {
       disposed = true
-      cleanup?.()
+      cleanupViewMode?.()
+      cleanupOpenSettings?.()
     }
-  }, [authStatus])
+  }, [authStatus, isSettingsWindow])
 
   useEffect(() => {
     return () => {
@@ -638,7 +710,6 @@ export default function App() {
                 assistant={defaultAssistant}
                 assistantError={defaultAssistantError}
                 onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
-                onSwitchMode={() => void switchCharacterMode(false)}
               />
             ) : activePage === "selfAwake" ? (
               <SelfAwakePage
@@ -649,6 +720,11 @@ export default function App() {
               />
             ) : activePage === "memo" ? (
               <MemoPage onBack={() => setActivePage("chat")} />
+            ) : activePage === "settings" ? (
+              <SettingsPage
+                assistant={defaultAssistant}
+                onBack={isSettingsWindow ? undefined : () => setActivePage("chat")}
+              />
             ) : (
               <ChatPage
                 sessions={sessions}

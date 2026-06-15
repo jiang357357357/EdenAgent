@@ -1,5 +1,6 @@
 import type { MessageData, PendingPermission, PendingQuestion, PromptAttachment, Session, ToolCall } from "../types"
 import { getStoredToken } from "./auth"
+import { formatLocalTime } from "./time"
 
 const env = (
   import.meta as unknown as {
@@ -44,6 +45,10 @@ export type ApiSelfAwakeDiary = {
   user: number
   title: string
   content: string
+  summary?: string
+  tags?: string[] | null
+  importance?: string
+  continuity_key?: string
   visible_to_user: boolean
   created_at?: string
   updated_at?: string
@@ -87,6 +92,16 @@ export type ApiSelfAwakeRun = {
   actions?: ApiSelfAwakeAction[]
 }
 
+export type ApiPaginatedResult<T> = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  page_size: number
+  current_page: number
+  total_pages: number
+  results: T[]
+}
+
 export type ApiMemoKind = "note" | "reminder" | "todo"
 export type ApiMemoStatus = "active" | "done" | "archived" | "cancelled"
 export type ApiMemoPriority = "low" | "normal" | "high"
@@ -119,6 +134,7 @@ export type ApiMemoInput = {
   title: string
   content?: string
   kind?: ApiMemoKind
+  status?: ApiMemoStatus
   priority?: ApiMemoPriority
   remind_at?: string | null
   due_at?: string | null
@@ -593,11 +609,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function timeLabel(value?: number) {
-  if (!value) return ""
-  return new Intl.DateTimeFormat("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
+  return formatLocalTime(value)
 }
 
 function stringify(value: unknown) {
@@ -808,7 +820,26 @@ export async function getToolStatus() {
 }
 
 export async function listSelfAwakeRuns(limit = 30) {
-  return request<ApiSelfAwakeRun[]>(`/self-awake/runs?limit=${encodeURIComponent(String(limit))}`)
+  const raw = await request<ApiSelfAwakeRun[] | ApiPaginatedResult<ApiSelfAwakeRun>>(
+    `/self-awake/runs?limit=${encodeURIComponent(String(limit))}`,
+  )
+  return Array.isArray(raw) ? raw : raw.results
+}
+
+export async function listSelfAwakeRunsPage({
+  page = 1,
+  pageSize = 20,
+  q,
+}: {
+  page?: number
+  pageSize?: number
+  q?: string
+} = {}) {
+  const search = new URLSearchParams()
+  search.set("page", String(page))
+  search.set("page_size", String(pageSize))
+  if (q?.trim()) search.set("q", q.trim())
+  return request<ApiPaginatedResult<ApiSelfAwakeRun>>(`/self-awake/runs?${search.toString()}`)
 }
 
 export async function listMemos(params: {
@@ -830,6 +861,13 @@ export async function listMemos(params: {
 export async function createMemo(input: ApiMemoInput) {
   return request<ApiMemo>("/memos", {
     method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export async function updateMemo(id: number, input: Partial<ApiMemoInput>) {
+  return request<ApiMemo>(`/memos/${encodeURIComponent(String(id))}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   })
 }

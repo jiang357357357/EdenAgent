@@ -2,6 +2,7 @@ node_modules/
 dist/
 target/
 .mon-agent/
+.artifacts/
 .env
 *.log
 .DS_Store
@@ -20,5 +21,7 @@ frontend/web/public/characters/
 !frontend/web/src/assets/self-awake/
 !frontend/web/src/assets/self-awake/diary-paper.png
 !frontend/web/src/assets/self-awake/journal-workspace-bg.png
+!frontend/web/src/assets/self-awake/memo-workspace-bg.png
+!frontend/web/src/assets/self-awake/memo-workspace-bg-v2.png
 !frontend/desktop/assets/
 !frontend/desktop/assets/icon.ico

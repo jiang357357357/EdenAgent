@@ -60,16 +60,29 @@ async function prefixOutput(label: string, readable: ReadableStream<Uint8Array> 
   if (pending) writeLine(label, pending, stream)
 }
 
-function killProcessTree(proc: Child | undefined) {
-  if (!proc?.pid) return
-  if (process.platform === "win32") {
-    Bun.spawnSync(["taskkill", "/PID", String(proc.pid), "/T", "/F"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    return
+async function runWithTimeout(cmd: string[], timeoutMs: number) {
+  const child = spawn({
+    cmd,
+    cwd: root,
+    stdout: "ignore",
+    stderr: "ignore",
+  })
+  const timer = setTimeout(() => {
+    child.kill()
+  }, timeoutMs)
+  try {
+    await child.exited
+  } finally {
+    clearTimeout(timer)
   }
+}
+
+async function killProcessTree(proc: Child | undefined) {
+  if (!proc?.pid) return
   proc.kill()
+  if (process.platform === "win32") {
+    await runWithTimeout(["taskkill", "/PID", String(proc.pid), "/T", "/F"], 3000).catch(() => {})
+  }
 }
 
 function start(label: string, cmd: string[]) {
@@ -105,15 +118,15 @@ async function waitFor(url: string, label: string) {
   throw new Error(`${label} 未在 30s 内就绪：${url}`)
 }
 
-function shutdown(code = 0) {
+async function shutdown(code = 0) {
   if (shuttingDown) return
   shuttingDown = true
-  for (const child of [...children].reverse()) killProcessTree(child)
+  for (const child of [...children].reverse()) await killProcessTree(child)
   process.exit(code)
 }
 
-process.on("SIGINT", () => shutdown(0))
-process.on("SIGTERM", () => shutdown(0))
+process.on("SIGINT", () => void shutdown(0))
+process.on("SIGTERM", () => void shutdown(0))
 
 devLog(`启动 server，端口 ${serverPort}`)
 start("server", [bunExe, "run", "dev:server"])
@@ -128,4 +141,4 @@ const desktop = start("desktop", [bunExe, "run", "Script/Project/dev-desktop.ts"
 
 devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
 await desktop.exited
-shutdown(0)
+await shutdown(0)

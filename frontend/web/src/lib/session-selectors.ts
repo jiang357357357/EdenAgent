@@ -23,6 +23,7 @@ import type {
   Session,
   ToolCall,
 } from "../types"
+import { formatLocalTime } from "./time"
 
 function isRuntimeTextPart(part: RuntimePart): part is RuntimeTextPart {
   return part.type === "text" && "text" in part && typeof part.text === "string"
@@ -146,11 +147,7 @@ function mapMetaPart(part: RuntimePart): MetaPartCard | undefined {
 }
 
 function timeLabel(value?: number) {
-  if (!value) return ""
-  return new Intl.DateTimeFormat("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
+  return formatLocalTime(value)
 }
 
 function stringify(value: unknown) {

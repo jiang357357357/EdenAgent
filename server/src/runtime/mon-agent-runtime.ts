@@ -29,6 +29,7 @@ export interface RuntimeModelConfig {
   apiKey?: string
   label: string
   thinkingLevel: ThinkingLevel
+  supportsImages: boolean
   core?: CoreRuntimeConfig
 }
 
@@ -58,6 +59,7 @@ function getEnvRuntimeModel(): RuntimeModelConfig {
     model,
     label: `${provider}/${modelID}`,
     thinkingLevel: normalizeThinkingLevel(process.env.MON_AGENT_THINKING_LEVEL) ?? "off",
+    supportsImages: Array.isArray(model.input) && model.input.includes("image"),
   }
 }
 
@@ -188,7 +190,7 @@ function buildOpenAICompatibleModel(aiEntity: CoreAIEntity, provider: string, ba
     ...(reasoning && api === "openai-completions" && provider === "deepseek"
       ? { compat: { thinkingFormat: "deepseek" as const } }
       : {}),
-    input: ["text", "image"],
+    input: aiEntity.is_multimodal ? ["text", "image"] : ["text"],
     cost: {
       input: 0,
       output: 0,
@@ -231,12 +233,18 @@ export function resolveCoreModel(core: CoreRuntimeConfig): RuntimeModelConfig {
           reasoning: reasoning || baseModel.reasoning,
         }
 
+  const supportsImages =
+    typeof aiEntity.is_multimodal === "boolean"
+      ? aiEntity.is_multimodal
+      : Array.isArray(model.input) && model.input.includes("image")
+
   return {
     source: "core",
     model,
     apiKey: aiEntity.api_key,
     label: `${provider}/${aiEntity.ai_model}`,
     thinkingLevel,
+    supportsImages,
     core,
   }
 }
@@ -308,7 +316,7 @@ function decodeDataUrl(url: string) {
   return { mime, text }
 }
 
-function buildAttachmentContext(files: ReturnType<typeof promptFiles>) {
+function buildAttachmentContext(files: ReturnType<typeof promptFiles>, imagesProvidedToModel = true) {
   if (!files.length) return ""
 
   const maxPerFile = 20_000
@@ -323,7 +331,13 @@ function buildAttachmentContext(files: ReturnType<typeof promptFiles>) {
     const sizeText = typeof file.size === "number" ? `，大小 ${file.size} bytes` : ""
 
     if (mime.startsWith("image/")) {
-      sections.push(`### 附件 ${index + 1}: ${filename}\n类型: ${mime}${sizeText}\n说明: 这是图片附件，已通过视觉通道提供给模型。`)
+      sections.push(
+        `### 附件 ${index + 1}: ${filename}\n类型: ${mime}${sizeText}\n说明: 这是图片附件，${
+          imagesProvidedToModel
+            ? "已通过视觉通道提供给模型。"
+            : "当前对话模型不支持直接看图；如需理解图片内容，请调用 analyze_image。"
+        }`,
+      )
       continue
     }
 
@@ -514,6 +528,10 @@ export class MonAgentRuntime {
         model: runtimeConfig.label,
         modelReasoning: model.reasoning,
         thinkingLevel: runtimeConfig.thinkingLevel,
+        supportsImages: runtimeConfig.supportsImages,
+        visionConfig: runtimeConfig.core?.visionConfig
+          ? `${runtimeConfig.core.visionConfig.vendor}/${runtimeConfig.core.visionConfig.vision_model}`
+          : undefined,
         assistant: runtimeConfig.core?.assistant.name,
         character: runtimeConfig.core?.character.name,
         aiEntity: runtimeConfig.core?.aiEntity.ai_name,
@@ -533,9 +551,11 @@ export class MonAgentRuntime {
         coreToken: authToken,
         permissions: this.options.permissions,
         questions: this.options.questions,
+        currentModelSupportsImages: runtimeConfig.supportsImages,
+        visionConfig: runtimeConfig.core?.visionConfig,
         getMessageID: () => runState.assistantMessageID,
         getCurrentFiles: () => files,
-      })
+      }, "user_chat")
       this.logger.info("本轮 Pi 工具已注册", {
         sessionID,
         count: tools.length,
@@ -547,7 +567,7 @@ export class MonAgentRuntime {
         `已注册 Pi 工具：${tools.length} 个（${tools.map((tool) => tool.name).join("、")}）。`,
       )
       const systemPrompt = this.buildSystemPrompt(runtimeConfig.core)
-      const attachmentContext = buildAttachmentContext(files)
+      const attachmentContext = buildAttachmentContext(files, runtimeConfig.supportsImages)
       const promptTextForModel = buildAgentTaskPrompt({
         source: "user_chat",
         text: promptContent,
@@ -565,6 +585,7 @@ export class MonAgentRuntime {
           baseUrl: "baseUrl" in model ? model.baseUrl : undefined,
           reasoning: model.reasoning,
           thinkingLevel: runtimeConfig.thinkingLevel,
+          supportsImages: runtimeConfig.supportsImages,
           hasApiKey: Boolean(runtimeConfig.apiKey),
         },
         core: runtimeConfig.core
@@ -577,6 +598,16 @@ export class MonAgentRuntime {
               aiEntity: runtimeConfig.core.aiEntity.ai_name,
               vendor: runtimeConfig.core.aiEntity.vendor,
               model: runtimeConfig.core.aiEntity.ai_model,
+              isMultimodal: runtimeConfig.core.aiEntity.is_multimodal,
+              visionConfig: runtimeConfig.core.visionConfig
+                ? {
+                    id: runtimeConfig.core.visionConfig.id,
+                    name: runtimeConfig.core.visionConfig.vision_name,
+                    vendor: runtimeConfig.core.visionConfig.vendor,
+                    model: runtimeConfig.core.visionConfig.vision_model,
+                    status: runtimeConfig.core.visionConfig.status,
+                  }
+                : undefined,
             }
           : undefined,
         systemPrompt,
@@ -650,7 +681,10 @@ export class MonAgentRuntime {
       const content: AgentMessage = {
         role: "user",
         timestamp: userMessage.info.time.created,
-        content: [...toImages(parts), ...(promptTextForModel ? [{ type: "text" as const, text: promptTextForModel }] : [])],
+        content: [
+          ...(runtimeConfig.supportsImages ? toImages(parts) : []),
+          ...(promptTextForModel ? [{ type: "text" as const, text: promptTextForModel }] : []),
+        ],
       }
 
       this.emitRuntimeThinking(sessionID, runState, "正在发送给 Pi Agent，并等待模型回复。")

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react"
 import { Send, Paperclip, X, History, Move, MessageSquare, Keyboard, ChevronLeft, FileText } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
-import ReactMarkdown from "react-markdown"
 import { resolveMonAgentUrl } from "../lib/mon_agent_api"
 import { cn } from "../lib/utils"
+import { MarkdownContent } from "./MarkdownContent"
 import type { PromptAttachment, ToolCall } from "../types"
 
 type DialogSegment = {
@@ -28,6 +28,10 @@ interface ChatInputProps {
   dialogSegments?: DialogSegment[]
   assistantName?: string
   onPreviewImage?: (src: string, alt?: string) => void
+  overlayCompact?: boolean
+  hideOverlayActions?: boolean
+  overlayOpacity?: number
+  overlayHeight?: number
 }
 
 export function ChatInput({
@@ -43,9 +47,14 @@ export function ChatInput({
   dialogSegments,
   assistantName = "助手",
   onPreviewImage,
+  overlayCompact = false,
+  hideOverlayActions = false,
+  overlayOpacity = 76,
+  overlayHeight,
 }: ChatInputProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<PromptAttachment[]>([])
+  const [draggingFiles, setDraggingFiles] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragTimerRef = useRef<number | undefined>(undefined)
@@ -125,6 +134,10 @@ export function ChatInput({
     reader.readAsDataURL(file)
   }
 
+  const addFileAttachments = (files: FileList | File[]) => {
+    for (const file of Array.from(files)) addFileAttachment(file)
+  }
+
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items
     for (const item of items) {
@@ -177,10 +190,30 @@ export function ChatInput({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
-    for (const file of files) {
-      addFileAttachment(file)
-    }
+    addFileAttachments(files)
     e.target.value = ""
+  }
+
+  const hasDraggedFiles = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes("Files")
+
+  const handleDragOver = (event: React.DragEvent) => {
+    if (!hasDraggedFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "copy"
+    setDraggingFiles(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDraggingFiles(false)
+    }
+  }
+
+  const handleDrop = (event: React.DragEvent) => {
+    if (!hasDraggedFiles(event)) return
+    event.preventDefault()
+    setDraggingFiles(false)
+    addFileAttachments(event.dataTransfer.files)
   }
 
   const removeAttachment = (index: number) => {
@@ -191,8 +224,11 @@ export function ChatInput({
     <div
       className={cn(
         "sticky bottom-0 z-10",
-        overlay ? "h-[40vh] bg-transparent p-0" : "bg-gradient-to-t from-bg via-bg/95 to-transparent pt-[1.2vh] pb-[2.8vh]",
+        overlay
+          ? "bg-transparent p-0"
+          : "bg-gradient-to-t from-bg via-bg/95 to-transparent pt-[1.2vh] pb-[2.8vh]",
       )}
+      style={overlay ? { height: `${overlayHeight ?? (overlayCompact ? 24 : 40)}vh` } : undefined}
     >
       <AnimatePresence>
         {attachments.length > 0 && (
@@ -225,10 +261,17 @@ export function ChatInput({
       </AnimatePresence>
 
       <div
+        style={overlay ? { backgroundColor: `rgba(28, 25, 23, ${Math.max(30, Math.min(95, overlayOpacity)) / 100})` } : undefined}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
           "rounded-[2.4vh] transition-colors",
           overlay
-            ? "relative h-full border border-white/15 bg-stone-950/76 shadow-none backdrop-blur-md focus-within:border-orange-300/40"
+            ? cn(
+                "relative h-full border shadow-none backdrop-blur-md focus-within:border-orange-300/40",
+                draggingFiles ? "border-orange-300/70 ring-2 ring-orange-300/30" : "border-white/15",
+              )
             : "flex min-h-[11vh] items-center gap-[1.8vw] border border-border bg-card px-[2.7vw] py-[1.8vh] shadow-sm focus-within:border-accent/40",
         )}
       >
@@ -239,7 +282,7 @@ export function ChatInput({
           className="hidden"
           onChange={handleFileChange}
         />
-        {overlay ? (
+        {overlay && !hideOverlayActions ? (
           <div className="absolute left-[1.8vh] right-[1.8vh] top-[1.4vh] z-10 flex items-center justify-end gap-[0.9vh]">
             {hasDialog && (
               <button
@@ -315,7 +358,7 @@ export function ChatInput({
               </motion.button>
             )}
           </div>
-        ) : (
+        ) : !overlay ? (
           <button
             onClick={handleFilePick}
             className="flex-shrink-0 rounded-[1.2vh] p-[1.4vh] text-text-muted transition-colors hover:bg-bg hover:text-accent"
@@ -324,7 +367,7 @@ export function ChatInput({
           >
             <Paperclip className="h-[2.9vh] w-[2.9vh]" />
           </button>
-        )}
+        ) : null}
 
         {isDialogMode ? (
           <div
@@ -390,20 +433,11 @@ export function ChatInput({
                   </details>
                 )}
                 {currentOutput.text && (
-                  <ReactMarkdown
-                    components={{
-                      img: ({ src = "", alt = "" }) => (
-                        <img
-                          src={resolveMonAgentUrl(src)}
-                          alt={alt}
-                          className="my-2 max-h-32 max-w-full rounded-lg border border-white/10 object-contain"
-                        />
-                      ),
-                      p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                    }}
-                  >
-                    {currentOutput.text}
-                  </ReactMarkdown>
+                  <MarkdownContent
+                    content={currentOutput.text}
+                    imageClassName="my-2 max-h-32 max-w-full rounded-lg border border-white/10 object-contain"
+                    paragraphClassName="mb-3 last:mb-0"
+                  />
                 )}
                 {currentOutput.images && currentOutput.images.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">

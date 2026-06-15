@@ -23,12 +23,13 @@ import journalWorkspaceBackground from "../../assets/self-awake/journal-workspac
 import type { AuthUser, CoreAssistant } from "../../lib/auth"
 import { getErrorMessage } from "../../lib/auth"
 import {
-  listSelfAwakeRuns,
+  listSelfAwakeRunsPage,
   type ApiSelfAwakeAction,
   type ApiSelfAwakeDiary,
   type ApiSelfAwakeRun,
   type ToolStatus,
 } from "../../lib/mon_agent_api"
+import { formatLocalMonthDayTime, formatLocalWeekday } from "../../lib/time"
 
 const screenMotion = {
   initial: { opacity: 0, x: 18, filter: "blur(3px)" },
@@ -94,6 +95,8 @@ const actionLabels: Record<string, string> = {
   set_self_awake_timer: "设置定时器",
 }
 
+const selfAwakePageSize = 20
+
 function toneClass(tone: StatusTone) {
   if (tone === "ok") return "border-emerald-200 bg-emerald-50 text-emerald-700"
   if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-700"
@@ -110,15 +113,8 @@ function treeNodeClass(active: boolean, level: "year" | "month" | "day") {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "未记录"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "未记录"
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date)
+  const formatted = formatLocalMonthDayTime(value)
+  return formatted === "-" ? "未记录" : formatted
 }
 
 function parseDate(value?: string | null) {
@@ -182,7 +178,7 @@ function diaryWeekday(dateKey?: string) {
   if (!dateKey || dateKey === "unknown") return ""
   const date = parseDate(`${dateKey}T00:00:00`)
   if (!date) return ""
-  return new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(date)
+  return formatLocalWeekday(date)
 }
 
 function diaryDateStamp(value?: string | null) {
@@ -202,6 +198,11 @@ function ensureExpanded(list: string[], value?: string) {
 
 function toggleExpanded(list: string[], value: string) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+}
+
+function mergeRuns(existing: ApiSelfAwakeRun[], incoming: ApiSelfAwakeRun[]) {
+  const seen = new Set(existing.map((run) => run.id))
+  return [...existing, ...incoming.filter((run) => !seen.has(run.id))]
 }
 
 function formatMinutes(minutes?: number | null) {
@@ -284,30 +285,43 @@ function SummaryCard({
 export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: SelfAwakePageProps) {
   const [runs, setRuns] = useState<ApiSelfAwakeRun[]>([])
   const [selectedRunId, setSelectedRunId] = useState<number | undefined>()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRuns, setTotalRuns] = useState(0)
   const [activeView, setActiveView] = useState<SelfAwakeView>("overview")
   const [expandedDiaryYears, setExpandedDiaryYears] = useState<string[]>([])
   const [expandedDiaryMonths, setExpandedDiaryMonths] = useState<string[]>([])
   const [expandedDiaryDates, setExpandedDiaryDates] = useState<string[]>([])
   const [diarySearch, setDiarySearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  const searchQuery = diarySearch.trim()
 
-  const loadRuns = useCallback(async () => {
-    setLoading(true)
+  const loadRuns = useCallback(async (page = 1, append = false) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
     setError(undefined)
     try {
-      const data = await listSelfAwakeRuns(40)
-      setRuns(data)
-      setSelectedRunId((current) => {
-        if (current && data.some((run) => run.id === current)) return current
-        return data[0]?.id
+      const pageData = await listSelfAwakeRunsPage({ page, pageSize: selfAwakePageSize, q: searchQuery })
+      setCurrentPage(pageData.current_page)
+      setTotalPages(pageData.total_pages)
+      setTotalRuns(pageData.count)
+      setRuns((currentRuns) => {
+        const nextRuns = append ? mergeRuns(currentRuns, pageData.results) : pageData.results
+        setSelectedRunId((current) => {
+          if (current && nextRuns.some((run) => run.id === current)) return current
+          return nextRuns[0]?.id
+        })
+        return nextRuns
       })
     } catch (loadError) {
       setError(getErrorMessage(loadError, "读取自醒记录失败。"))
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [])
+  }, [searchQuery])
 
   useEffect(() => {
     void loadRuns()
@@ -315,12 +329,13 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
 
   const selectedRun = useMemo(() => runs.find((run) => run.id === selectedRunId) ?? runs[0], [runs, selectedRunId])
   const latestRun = runs[0]
+  const hasMoreRuns = currentPage < totalPages
   const selectedDiary = resolveDiary(selectedRun)
   const selectedAction = resolveAction(selectedRun)
   const searchOnline = toolStatus?.search.status === "online"
   const contextItems = knownContextItems(selectedRun)
   const assistantName = assistant?.name || "默认助手"
-  const normalizedDiarySearch = diarySearch.trim().toLowerCase()
+  const normalizedDiarySearch = searchQuery.toLowerCase()
   const allDiaryEntries = useMemo(
     () =>
       runs
@@ -340,31 +355,7 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
         .sort((left, right) => dateMillis(right.timestamp) - dateMillis(left.timestamp)),
     [runs],
   )
-  const diaryEntries = useMemo(() => {
-    if (!normalizedDiarySearch) return allDiaryEntries
-    return allDiaryEntries.filter(({ run, diary, timestamp, dateKey }) => {
-      const action = resolveAction(run)
-      const searchableText = [
-        diary.title,
-        diary.content,
-        run.current_desire,
-        run.mood,
-        run.next_wake_reason,
-        action?.message,
-        action?.action_type,
-        actionLabels[action?.action_type || ""],
-        assistantName,
-        dateKey,
-        diaryDateTitle(dateKey),
-        diaryWeekday(dateKey),
-        formatDateTime(timestamp),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-      return searchableText.includes(normalizedDiarySearch)
-    })
-  }, [allDiaryEntries, assistantName, normalizedDiarySearch])
+  const diaryEntries = allDiaryEntries
   const diaryGroups = useMemo(() => {
     const groups = new Map<string, DiaryEntry[]>()
     for (const entry of diaryEntries) {
@@ -492,7 +483,10 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setActiveView(item.key)}
+                onClick={() => {
+                  setActiveView(item.key)
+                  if (item.key === "overview" && diarySearch) setDiarySearch("")
+                }}
                 className={`flex items-center gap-[0.45vw] rounded-full px-[1vw] py-[0.7vh] text-[1.55vh] transition-colors ${
                   activeView === item.key ? "bg-accent text-white shadow-sm" : "text-text-muted hover:bg-bg hover:text-accent"
                 }`}
@@ -534,7 +528,7 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
             />
             <SummaryCard
               icon={Bell}
-              label="是否打扰"
+              label="通知用户"
               value={latestRun?.should_interrupt_user ? "需要提醒" : "保持安静"}
               tone={latestRun?.should_interrupt_user ? "warn" : "ok"}
             />
@@ -551,7 +545,9 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
             <div className="flex h-[7.2vh] items-center justify-between border-b border-border px-[1.4vw]">
               <div>
                 <div className="font-serif text-[2.55vh] text-text">自醒记录</div>
-                <div className="text-[1.45vh] text-text-muted">{loading ? "正在读取" : `${runs.length} 次记录`}</div>
+                <div className="text-[1.45vh] text-text-muted">
+                  {loading ? "正在读取" : totalRuns ? `已加载 ${runs.length} / ${totalRuns} 次` : `${runs.length} 次记录`}
+                </div>
               </div>
               {error ? <AlertCircle className="h-[2.4vh] w-[2.4vh] text-red-500" /> : null}
             </div>
@@ -605,6 +601,17 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
                       </button>
                     )
                   })}
+                  {!loading && !error && hasMoreRuns ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadRuns(currentPage + 1, true)}
+                      disabled={loadingMore}
+                      className="flex w-full items-center justify-center gap-[0.55vw] rounded-[1vh] border border-dashed border-border bg-bg px-[1vw] py-[1.1vh] text-[1.55vh] text-text-muted transition-colors hover:border-accent/35 hover:text-accent disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <RefreshCw className={`h-[1.75vh] w-[1.75vh] ${loadingMore ? "animate-spin" : ""}`} />
+                      {loadingMore ? "正在加载" : "加载更多"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -711,8 +718,10 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
                   {loading
                     ? "正在读取"
                     : normalizedDiarySearch
-                      ? `筛选 ${diaryEntries.length} / ${allDiaryEntries.length} 篇`
-                      : `${diaryYears.length} 年 · ${diaryGroups.length} 天 · ${diaryEntries.length} 篇`}
+                      ? `匹配 ${totalRuns} 篇 · 已加载 ${diaryEntries.length} 篇`
+                      : totalRuns
+                        ? `${diaryYears.length} 年 · ${diaryGroups.length} 天 · ${diaryEntries.length} / ${totalRuns} 篇`
+                        : `${diaryYears.length} 年 · ${diaryGroups.length} 天 · ${diaryEntries.length} 篇`}
                 </div>
               </div>
               <BookOpenText className="h-[2.5vh] w-[2.5vh] text-accent" />
@@ -859,7 +868,7 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
                                                       <div className="truncate font-serif text-[1.92vh] text-text">{diary.title || "一次自醒"}</div>
                                                       <div className="mt-[0.45vh] text-[1.28vh] text-text-muted">{formatDateTime(timestamp)}</div>
                                                       <div className="mt-[0.65vh] line-clamp-2 text-[1.46vh] leading-relaxed text-text-muted">
-                                                        {trimText(diary.content, "没有内容。")}
+                                                        {trimText(diary.summary || diary.content, "没有内容。")}
                                                       </div>
                                                     </button>
                                                   )
@@ -879,6 +888,17 @@ export function SelfAwakePage({ currentUser, assistant, toolStatus, onBack }: Se
                       </div>
                     )
                   })}
+                  {!loading && !error && hasMoreRuns ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadRuns(currentPage + 1, true)}
+                      disabled={loadingMore}
+                      className="flex w-full items-center justify-center gap-[0.55vw] rounded-[1vh] border border-dashed border-[#eadfcf]/80 bg-[#fffdf8]/72 px-[1vw] py-[1.1vh] text-[1.55vh] text-text-muted transition-colors hover:border-accent/35 hover:text-accent disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <RefreshCw className={`h-[1.75vh] w-[1.75vh] ${loadingMore ? "animate-spin" : ""}`} />
+                      {loadingMore ? "正在加载" : "加载更多"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

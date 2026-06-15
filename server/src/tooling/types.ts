@@ -1,5 +1,5 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core"
-import type { CoreClient } from "../core"
+import type { CoreClient, CoreVisionConfig } from "../core"
 import type { PermissionBroker, QuestionBroker } from "../interaction"
 
 export interface ToolRuntimeContext {
@@ -8,6 +8,8 @@ export interface ToolRuntimeContext {
   coreToken?: string | null
   permissions?: PermissionBroker
   questions?: QuestionBroker
+  currentModelSupportsImages?: boolean
+  visionConfig?: CoreVisionConfig | null
   getMessageID?: () => string | undefined
   getCurrentFiles?: () => Array<{ url: string; filename?: string; mime: string; size?: number }>
 }

@@ -49,24 +49,26 @@ export function Sidebar({
                 <span className="flex h-[7.5vh] w-[4.2vw] items-center justify-center rounded-[0.8vh] border border-accent bg-card text-[2.2vh] text-accent">M</span>
                 MonAgent
             </div>
-          <button 
-            onClick={() => setIsOpen(false)}
-            className="rounded-[0.9vh] p-[1.25vh] text-text-muted hover:bg-card"
-          >
-            <Menu className="h-[3vh] w-[3vh]" />
-          </button>
+          <div className="flex items-center gap-[0.45vw]">
+            <button
+              onClick={onNew}
+              className="rounded-[0.9vh] p-[1.25vh] text-accent transition-colors hover:bg-card"
+              aria-label="新会话"
+              title="新会话"
+            >
+              <Plus className="h-[3vh] w-[3vh]" />
+            </button>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="rounded-[0.9vh] p-[1.25vh] text-text-muted transition-colors hover:bg-card"
+              aria-label="收起侧栏"
+              title="收起侧栏"
+            >
+              <Menu className="h-[3vh] w-[3vh]" />
+            </button>
+          </div>
         </div>
         
-        <div className="mb-[2.4vh] border-b border-border px-[2vw] pb-[3vh]">
-          <button 
-            onClick={onNew}
-            className="flex w-full items-center justify-center gap-[0.8vw] rounded-full border border-accent-dim px-[1vw] py-[1.8vh] font-sans text-[1.9vh] uppercase tracking-[0.15em] text-accent shadow-sm transition-colors hover:border-accent hover:bg-accent/5"
-          >
-            <Plus className="h-[2.6vh] w-[2.6vh]" />
-            新会话
-          </button>
-        </div>
-
         {/* Session List */}
         <div className="flex-1 space-y-[3vh] overflow-y-auto px-[2vw] py-[1vh]">
            <div>

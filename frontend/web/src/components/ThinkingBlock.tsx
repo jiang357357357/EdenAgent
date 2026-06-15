@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Sparkles, ChevronDown, ChevronRight } from "lucide-react"
-import ReactMarkdown from "react-markdown"
+import { MarkdownContent } from "./MarkdownContent"
 import { useTypewriterText } from "../hooks/useTypewriterText"
 
 interface ThinkingBlockProps {
@@ -34,19 +34,23 @@ export function ThinkingBlock({
   const detailTitle = title === "运行过程" ? "正在执行" : "正在推理"
 
   return (
-    <div className="my-2 max-w-3xl">
+    <div className="my-[0.85vh] w-full max-w-3xl min-w-0">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] font-sans text-text-muted hover:text-text transition-colors py-1 select-none"
+        className="flex w-full min-w-0 items-center gap-[0.8vh] py-[0.45vh] text-left font-sans text-[1.42vh] text-text-muted transition-colors hover:text-text select-none"
       >
-        <Sparkles className={`w-3.5 h-3.5 text-accent ${isStreaming ? "animate-pulse" : ""}`} />
-        <span>{displayTitle}</span>
+        <Sparkles className={`h-[1.65vh] w-[1.65vh] flex-shrink-0 text-accent ${isStreaming ? "animate-pulse" : ""}`} />
+        <span className="flex-shrink-0 whitespace-nowrap tracking-[0.08em]">{displayTitle}</span>
         {!expanded && preview && (
-          <span className="max-w-[22rem] truncate text-[11px] normal-case tracking-normal text-text-muted/70">
+          <span className="min-w-0 flex-1 truncate text-[1.42vh] normal-case tracking-normal text-text-muted/70">
             {preview}
           </span>
         )}
-        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {expanded ? (
+          <ChevronDown className="h-[1.65vh] w-[1.65vh] flex-shrink-0" />
+        ) : (
+          <ChevronRight className="h-[1.65vh] w-[1.65vh] flex-shrink-0" />
+        )}
       </button>
 
       <AnimatePresence initial={false}>
@@ -57,12 +61,12 @@ export function ThinkingBlock({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="pl-4 py-2 mt-1 border-l border-accent/20">
+            <div className="mt-[0.45vh] border-l border-accent/20 py-[0.85vh] pl-[1.6vh]">
               {isStreaming && (
-                <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-accent/80">{detailTitle}</div>
+                <div className="mb-[0.85vh] text-[1.22vh] uppercase tracking-[0.12em] text-accent/80">{detailTitle}</div>
               )}
-              <div className="prose prose-sm text-text-muted leading-relaxed max-w-none text-sm font-sans">
-                <ReactMarkdown>{visibleContent}</ReactMarkdown>
+              <div className="prose max-w-none font-sans text-[1.58vh] leading-[1.62] text-text-muted">
+                <MarkdownContent content={visibleContent} />
               </div>
             </div>
           </motion.div>

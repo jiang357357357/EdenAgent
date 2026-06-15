@@ -29,6 +29,7 @@ function envModel(): RuntimeModelConfig {
     label: `${provider}/${modelID}`,
     apiKey: getEnvApiKey(provider),
     thinkingLevel: "off",
+    supportsImages: Array.isArray(model.input) && model.input.includes("image"),
   }
 }
 
@@ -115,13 +116,90 @@ function usageSummary(usage: unknown) {
   if (!usage || typeof usage !== "object") return "-"
   const data = usage as Record<string, unknown>
   const cost = data.cost && typeof data.cost === "object" ? (data.cost as Record<string, unknown>) : undefined
+  const cacheRead = numericUsageField(data, ["cacheRead"])
+  const cacheWrite = numericUsageField(data, ["cacheWrite"])
   const parts = [
     data.input !== undefined ? `输入 ${data.input}` : "",
     data.output !== undefined ? `输出 ${data.output}` : "",
+    cacheRead ? `缓存读 ${cacheRead}` : "",
+    cacheWrite ? `缓存写 ${cacheWrite}` : "",
     data.totalTokens !== undefined ? `总计 ${data.totalTokens}` : "",
     cost?.total !== undefined ? `费用 ${cost.total}` : "",
   ].filter(Boolean)
   return parts.length ? parts.join(" / ") : "-"
+}
+
+function numericUsageField(data: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = data[key]
+    if (typeof value === "number" && Number.isFinite(value)) return value
+  }
+  return 0
+}
+
+function aggregateUsage(messages: AgentMessage[]) {
+  const usages = messages
+    .filter(isAssistantMessage)
+    .map((message) =>
+      "usage" in message && message.usage && typeof message.usage === "object"
+        ? (message.usage as unknown as Record<string, unknown>)
+        : undefined,
+    )
+    .filter((usage): usage is Record<string, unknown> => Boolean(usage))
+
+  let input = 0
+  let output = 0
+  let cacheRead = 0
+  let cacheWrite = 0
+  let total = 0
+  let costTotal = 0
+  let hasCost = false
+
+  for (const usage of usages) {
+    input += numericUsageField(usage, ["input", "inputTokens", "promptTokens"])
+    output += numericUsageField(usage, ["output", "outputTokens", "completionTokens"])
+    cacheRead += numericUsageField(usage, ["cacheRead"])
+    cacheWrite += numericUsageField(usage, ["cacheWrite"])
+    total += numericUsageField(usage, ["totalTokens", "total", "tokens"])
+    const cost = usage.cost && typeof usage.cost === "object" ? (usage.cost as Record<string, unknown>) : undefined
+    const costValue = cost?.total
+    if (typeof costValue === "number" && Number.isFinite(costValue)) {
+      costTotal += costValue
+      hasCost = true
+    }
+  }
+
+  const knownTotal = input + output + cacheRead + cacheWrite
+  if (!total && knownTotal) total = knownTotal
+  const other = Math.max(0, total - knownTotal)
+
+  return {
+    calls: usages.length,
+    input,
+    output,
+    cacheRead,
+    cacheWrite,
+    other,
+    total,
+    costTotal: hasCost ? costTotal : undefined,
+  }
+}
+
+function printSelfAwakeTokenUsage(messages: AgentMessage[]) {
+  const usage = aggregateUsage(messages)
+  printKeyValuePanel(
+    [
+      ["本次模型调用", usage.calls || "-"],
+      ["本次全部 Token", usage.total || "-"],
+      ["未缓存输入 Token", usage.input || "-"],
+      ["输出 Token", usage.output || "-"],
+      ["缓存读 Token", usage.cacheRead || "-"],
+      ["缓存写 Token", usage.cacheWrite || "-"],
+      ["其它 Token", usage.other || "-"],
+      ["费用", usage.costTotal === undefined ? "-" : usage.costTotal],
+    ],
+    { title: "MonAgent 自醒 Token 用量", level: "info" },
+  )
 }
 
 function summarizeDiary(value: unknown) {
@@ -159,7 +237,7 @@ function summarizeSelfAwakeContext(context: Record<string, unknown> | undefined)
   const lastState = data.last_state && typeof data.last_state === "object" ? (data.last_state as Record<string, unknown>) : {}
   const modules = Array.isArray(data.module_status) ? data.module_status : []
   return [
-    ["当前时间", data.current_time],
+    ["当前时间", data.current_time_local ?? data.current_time],
     ["用户活动", data.user_activity],
     ["模块数量", modules.length],
     ["上次自醒", lastState.last_run_at],
@@ -192,7 +270,7 @@ function printSelfAwakeDecision(decision: SelfAwakeDecision, model: string, dura
       ["想做", decision.current_desire],
       ["观察事实", observations.length ? observations.join("\n") : "-"],
       ["动作", decision.action.type],
-      ["打扰用户", decision.should_interrupt_user ? "是" : "否"],
+      ["通知用户", decision.should_interrupt_user ? "需要" : "不需要"],
       ["下次唤醒", `${decision.next_wake.after_minutes} 分钟后`],
       ["原因", decision.next_wake.reason],
       ["日记标题", decision.diary.title],
@@ -224,9 +302,6 @@ function printSelfAwakeModelReturn(
 
 const selfAwakeAllowedTools = new Set([
   "loaded_tools",
-  "read",
-  "ls",
-  "grep",
   "web_search",
   "web_fetch",
   "analyze_image",
@@ -236,9 +311,36 @@ const selfAwakeAllowedTools = new Set([
   "list_due_memos",
   "dispatch_due_memos",
   "get_next_memo_wake",
+  "complete_memo",
+  "snooze_memo",
   "mark_memo_triggered",
   "set_self_awake_timer",
 ])
+
+const selfAwakeFileTools = new Set(["read", "ls", "grep"])
+
+function hasMeaningfulArray(value: unknown) {
+  return Array.isArray(value) && value.some((item) => String(item ?? "").trim())
+}
+
+function selfAwakeCanUseFileTool(context: Record<string, unknown> | undefined, toolName: string, args: unknown) {
+  if (!selfAwakeFileTools.has(toolName)) return false
+
+  const data = context ?? {}
+  if (data.debug_target || data.debugTarget) return true
+  if (hasMeaningfulArray(data.recent_incidents) || hasMeaningfulArray(data.recent_logs)) return true
+  const policy = data.policy && typeof data.policy === "object" ? (data.policy as Record<string, unknown>) : {}
+  if (policy.allow_workspace_file_tools === true) return true
+
+  if (typeof args === "object" && args) {
+    const record = args as Record<string, unknown>
+    const pathValue = typeof record.path === "string" ? record.path : ""
+    const patternValue = typeof record.pattern === "string" ? record.pattern : ""
+    if (pathValue && pathValue !== "." && pathValue !== "./" && patternValue) return true
+  }
+
+  return false
+}
 
 function toolPattern(toolName: string, args: unknown) {
   if (typeof args === "object" && args) {
@@ -321,13 +423,19 @@ async function runSelfAwakeAgent(input: {
 
   const workspaceRoot = options?.workspaceRoot ?? process.cwd()
   const sessionID = createID("selfawake")
-  const tools = createMonAgentTools(workspaceRoot, {
-    sessionID,
-    coreClient: options?.coreClient,
-    coreToken: options?.coreToken,
-    getCurrentFiles: () => [],
-  })
-  const systemPrompt = buildAgentSystemPrompt({ character })
+  const tools = createMonAgentTools(
+    workspaceRoot,
+    {
+      sessionID,
+      coreClient: options?.coreClient,
+      coreToken: options?.coreToken,
+      currentModelSupportsImages: runtimeConfig.supportsImages,
+      visionConfig: runtimeConfig.core?.visionConfig,
+      getCurrentFiles: () => [],
+    },
+    "self_awake",
+  )
+  const systemPrompt = buildAgentSystemPrompt({ character, source: "self_awake" })
   const userPrompt = buildAgentTaskPrompt({
     source: "self_awake",
     context: request.context,
@@ -370,6 +478,20 @@ async function runSelfAwakeAgent(input: {
     getApiKey: (provider) => apiKey ?? getEnvApiKey(provider),
     beforeToolCall: async ({ toolCall, args }) => {
       const pattern = toolPattern(toolCall.name, args)
+      if (selfAwakeCanUseFileTool(request.context, toolCall.name, args)) {
+        logger?.info("自醒 Agent 文件工具已按上下文放行", { sessionID, tool: toolCall.name, pattern })
+        return undefined
+      }
+
+      if (selfAwakeFileTools.has(toolCall.name)) {
+        logger?.warn("自醒 Agent 文件工具已拦截", { sessionID, tool: toolCall.name, pattern })
+        return {
+          block: true,
+          reason:
+            "当前自醒上下文已提供工作区与工作日记摘要，后台自醒不能无目的浏览文件。只有存在 debug_target、recent_incidents 或明确错误日志时才可读取具体文件。",
+        }
+      }
+
       if (selfAwakeAllowedTools.has(toolCall.name)) {
         logger?.info("自醒 Agent 工具已允许", { sessionID, tool: toolCall.name, pattern })
         return undefined
@@ -429,7 +551,7 @@ function sanitizeDecision(raw: Partial<SelfAwakeDecision>): SelfAwakeDecision {
   ])
   return {
     mood: String(raw.mood || "安静观察"),
-    current_desire: String(raw.current_desire || "想先观察当前状态，不急着打扰用户。"),
+    current_desire: String(raw.current_desire || "想先观察当前状态，不急着通知用户。"),
     observations: Array.isArray(raw.observations)
       ? raw.observations.map((item) => String(item).trim()).filter(Boolean).slice(0, 8)
       : [],
@@ -449,7 +571,7 @@ function sanitizeDecision(raw: Partial<SelfAwakeDecision>): SelfAwakeDecision {
       title: String(raw.diary?.title || "一次后台自醒"),
       content: String(
         raw.diary?.content ||
-          "我完成了一次后台自醒。当前没有必须打扰用户的事项，因此选择记录状态并安排下一次醒来。",
+          "我完成了一次后台自醒。当前没有必须通知用户的事项，因此选择记录状态并安排下一次醒来。",
       ),
     },
     source: raw.source === "fallback" ? "fallback" : "agent",
@@ -480,7 +602,7 @@ function fallbackDecision(request: SelfAwakeRequest, reason: string, fallbackNam
     },
     diary: {
       title: "一次保守的自醒",
-      content: `${name}尝试进行后台自醒，但模型判断暂不可用。当前观察：${activityText} 因此我选择不打扰用户，只记录这次状态。`,
+      content: `${name}尝试进行后台自醒，但模型判断暂不可用。当前观察：${activityText} 因此我选择不通知用户，只记录这次状态。`,
     },
     source: "fallback",
     error: reason,
@@ -555,10 +677,11 @@ export async function runSelfAwake(
       model: runtimeConfig.label,
       action: decision.action.type,
       nextWake: decision.next_wake.after_minutes,
-      shouldInterruptUser: decision.should_interrupt_user,
+      shouldNotifyUser: decision.should_interrupt_user,
       durationMs: Date.now() - startedAt,
     })
     printSelfAwakeDecision(decision, runtimeConfig.label, Date.now() - startedAt)
+    printSelfAwakeTokenUsage(agentResult.messages)
     return decision
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
@@ -567,7 +690,7 @@ export async function runSelfAwake(
     logger?.info("自醒 fallback 已生成", {
       action: decision.action.type,
       nextWake: decision.next_wake.after_minutes,
-      shouldInterruptUser: decision.should_interrupt_user,
+      shouldNotifyUser: decision.should_interrupt_user,
       durationMs: Date.now() - startedAt,
     })
     printSelfAwakeDecision(decision, "fallback", Date.now() - startedAt)

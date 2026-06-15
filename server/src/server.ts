@@ -7,6 +7,7 @@ import { HubRegistryClient } from "./hub"
 import { proxyToVite } from "./http/dev-proxy"
 import { eventStreamResponse, jsonResponse, notFoundResponse, readJsonBody, stripApiPrefix } from "./http/response"
 import { isAgentApiRoute } from "./http/routes"
+import { formatLocalDateTime, localTimeZoneLabel, localUtcOffsetLabel, toStorageIso } from "./shared/time"
 import { runSelfAwake, type SelfAwakeRequest } from "./self-awake"
 import type { PermissionReply, PromptPart } from "./types"
 
@@ -19,47 +20,46 @@ async function ensureRuntimeSession(request: Request, sessionID: string) {
   return sessionHydrator.ensure(requireCoreToken(request), sessionID)
 }
 
-function formatLocalDateTime(date: Date) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date)
-}
-
 function enrichSelfAwakeContext(context: Record<string, unknown> = {}) {
   const rawCurrentTime = typeof context.current_time === "string" ? context.current_time : ""
   const parsedCurrentTime = rawCurrentTime ? new Date(rawCurrentTime) : undefined
   const currentDate =
     parsedCurrentTime && Number.isFinite(parsedCurrentTime.getTime()) ? parsedCurrentTime : new Date()
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local"
-  const offsetMinutes = -currentDate.getTimezoneOffset()
-  const offsetHours = Math.trunc(offsetMinutes / 60)
-  const offsetRemainder = Math.abs(offsetMinutes % 60)
-  const offsetLabel = `UTC${offsetMinutes >= 0 ? "+" : "-"}${String(Math.abs(offsetHours)).padStart(2, "0")}:${String(offsetRemainder).padStart(2, "0")}`
 
   return {
     ...context,
-    current_time: currentDate.toISOString(),
-    current_time_local: formatLocalDateTime(currentDate),
-    current_timezone: timezone,
-    current_timezone_offset: offsetLabel,
+    current_time: toStorageIso(currentDate),
+    current_time_local: formatLocalDateTime(currentDate, { seconds: true, weekday: true }),
+    current_timezone: localTimeZoneLabel(),
+    current_timezone_offset: localUtcOffsetLabel(currentDate),
     time_display_rule:
       "面向用户的日记正文、标题和动作说明统一使用 current_time_local 对应的本地时间；不要直接写 UTC 或 ISO 时间。",
   }
 }
 
-function buildStartupSelfAwakeContext() {
+function buildStartupSelfAwakeContext(lastRun?: Awaited<ReturnType<typeof coreClient.listSelfAwakeRuns>>[number]) {
+  const lastState = lastRun
+    ? {
+        last_run_at: lastRun.finished_at ?? lastRun.started_at ?? lastRun.created_at ?? "",
+        next_wake_at: lastRun.next_wake_at ?? "",
+        next_wake_reason: lastRun.next_wake_reason ?? "",
+        source_service: lastRun.source_service,
+        status: lastRun.status,
+      }
+    : undefined
+
   return enrichSelfAwakeContext({
     trigger: "agent_startup",
     source_service: "monagent",
     user_activity: "MonAgent 服务刚刚启动，测试模式下由 Agent 主动执行一次自醒。",
+    ...(lastState ? { last_state: lastState } : {}),
   })
+}
+
+function hasFutureSelfAwakePlan(run: Awaited<ReturnType<typeof coreClient.listSelfAwakeRuns>>[number] | undefined) {
+  if (!run || run.status !== "succeeded" || !run.next_wake_at) return false
+  const nextWakeAt = new Date(run.next_wake_at)
+  return Number.isFinite(nextWakeAt.getTime()) && nextWakeAt.getTime() > Date.now()
 }
 
 async function runStartupSelfAwake() {
@@ -88,7 +88,23 @@ async function runStartupSelfAwake() {
       clientId: "monagent-startup-self-awake",
       clientType: "monagent",
     })
-    const context = buildStartupSelfAwakeContext()
+    const lastRun = (await coreClient.listSelfAwakeRuns(token, 1).catch((error) => {
+      logger.warn("读取最近自醒记录失败，启动自醒继续执行", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return []
+    }))[0]
+
+    if (hasFutureSelfAwakePlan(lastRun)) {
+      logger.info("Agent 启动自醒已跳过，已有未来自醒计划", {
+        lastRunID: lastRun.id,
+        nextWakeAt: lastRun.next_wake_at,
+        reason: lastRun.next_wake_reason,
+      })
+      return
+    }
+
+    const context = buildStartupSelfAwakeContext(lastRun)
     const decision = await runSelfAwake({ context }, logger, {
       coreToken: token,
       coreClient,
@@ -215,6 +231,17 @@ async function handleApi(request: Request, url: URL) {
 
   if (request.method === "GET" && url.pathname === "/self-awake/runs") {
     const token = requireCoreToken(request)
+    const pageParam = url.searchParams.get("page")
+    const pageSizeParam = url.searchParams.get("page_size")
+    if (pageParam || pageSizeParam) {
+      return jsonResponse(
+        await coreClient.listSelfAwakeRunsPage(token, {
+          page: Number(pageParam ?? 1),
+          pageSize: Number(pageSizeParam ?? url.searchParams.get("limit") ?? 30),
+          q: url.searchParams.get("q") ?? undefined,
+        }),
+      )
+    }
     const limit = Number(url.searchParams.get("limit") ?? 30)
     return jsonResponse(await coreClient.listSelfAwakeRuns(token, limit))
   }
@@ -251,6 +278,24 @@ async function handleApi(request: Request, url: URL) {
       }),
       201,
     )
+  }
+
+  const memoMatch = url.pathname.match(/^\/memos\/(\d+)$/)
+  if (memoMatch && request.method === "PATCH") {
+    const token = requireCoreToken(request)
+    const memoID = Number(memoMatch[1])
+    const body = await readJsonBody<{
+      title?: string
+      content?: string
+      kind?: "note" | "reminder" | "todo"
+      status?: "active" | "done" | "archived" | "cancelled"
+      priority?: "low" | "normal" | "high"
+      remind_at?: string | null
+      due_at?: string | null
+      repeat_rule?: string
+      metadata?: Record<string, unknown>
+    }>(request)
+    return jsonResponse(await coreClient.updateMemo(token, memoID, body))
   }
 
   if (request.method === "GET" && url.pathname === "/memos/next-wake") {

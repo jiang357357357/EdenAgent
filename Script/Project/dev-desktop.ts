@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, rm } from "node:fs/promises"
+import { rm } from "node:fs/promises"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { spawn } from "bun"
 import { loadMonConfig } from "./monconfig"
@@ -11,10 +11,6 @@ const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.fl
 const bunExe = process.execPath
 
 await rm(quitFlag, { force: true }).catch(() => {})
-
-function sleepSync(ms: number) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-}
 
 async function waitForVite() {
   console.log("\n  等待 Vite 就绪后启动桌面应用...\n")
@@ -28,19 +24,32 @@ async function waitForVite() {
   throw new Error("Vite 未在 60s 内就绪")
 }
 
-function killProcessTree(proc: ReturnType<typeof spawn> | undefined) {
-  if (!proc?.pid) return
-  if (process.platform === "win32") {
-    Bun.spawnSync(["taskkill", "/PID", String(proc.pid), "/T", "/F"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    })
-    return
+async function runWithTimeout(cmd: string[], timeoutMs: number) {
+  const child = spawn({
+    cmd,
+    cwd: root,
+    stdout: "ignore",
+    stderr: "ignore",
+  })
+  const timer = setTimeout(() => {
+    child.kill()
+  }, timeoutMs)
+  try {
+    await child.exited
+  } finally {
+    clearTimeout(timer)
   }
-  proc.kill()
 }
 
-function requestDesktopQuitSync() {
+async function killProcessTree(proc: ReturnType<typeof spawn> | undefined) {
+  if (!proc?.pid) return
+  proc.kill()
+  if (process.platform === "win32") {
+    await runWithTimeout(["taskkill", "/PID", String(proc.pid), "/T", "/F"], 3000).catch(() => {})
+  }
+}
+
+function requestDesktopQuit() {
   mkdirSync(path.dirname(quitFlag), { recursive: true })
   writeFileSync(quitFlag, String(Date.now()))
 
@@ -48,58 +57,6 @@ function requestDesktopQuitSync() {
     desktopProc?.kill()
     return
   }
-
-  const escapedRoot = root.replaceAll("'", "''")
-  const script = `
-$root = '${escapedRoot}'
-$targets = Get-CimInstance Win32_Process | Where-Object {
-  ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*") -and (
-    $_.Name -eq "electron.exe" -or
-    $_.Name -eq "mon-agent-desktop.exe" -or
-    $_.CommandLine -like "*frontend*desktop*src*main.cjs*" -or
-    $_.CommandLine -like "*--cwd frontend/desktop dev*" -or
-    $_.CommandLine -like "*--cwd frontend*desktop dev*"
-  )
-} | Select-Object -ExpandProperty ProcessId -Unique
-
-foreach ($id in $targets) {
-  taskkill /PID $id /T | Out-Null
-}
-`
-
-  Bun.spawnSync(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
-    stdout: "ignore",
-    stderr: "ignore",
-  })
-}
-
-function killDesktopProjectProcesses() {
-  if (process.platform !== "win32") return
-
-  const escapedRoot = root.replaceAll("'", "''")
-  const script = `
-$root = '${escapedRoot}'
-$current = $PID
-$targets = Get-CimInstance Win32_Process | Where-Object {
-  $_.ProcessId -ne $current -and (
-    ($_.Name -eq "electron.exe" -and ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*")) -or
-    ($_.Name -eq "mon-agent-desktop.exe" -and ($_.ExecutablePath -like "$root*" -or $_.CommandLine -like "*$root*")) -or
-    ($_.CommandLine -like "*--cwd frontend/desktop dev*") -or
-    ($_.CommandLine -like "*--cwd frontend*desktop dev*") -or
-    ($_.CommandLine -like "*frontend*desktop*src*main.cjs*") -or
-    ($_.CommandLine -like "*frontend/desktop/src/main.cjs*")
-  )
-} | Select-Object -ExpandProperty ProcessId -Unique
-
-foreach ($id in $targets) {
-  taskkill /PID $id /T /F | Out-Null
-}
-`
-
-  Bun.spawnSync(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
-    stdout: "ignore",
-    stderr: "ignore",
-  })
 }
 
 let cleaned = false
@@ -116,31 +73,23 @@ async function relay(readable: ReadableStream<Uint8Array> | null, target: NodeJS
   }
 }
 
-function cleanupSync() {
+async function cleanup() {
   if (cleaned) return
   cleaned = true
-  requestDesktopQuitSync()
-  sleepSync(2500)
-  killProcessTree(desktopProc)
-  sleepSync(400)
-  killDesktopProjectProcesses()
+  requestDesktopQuit()
+  await Bun.sleep(2500)
+  await killProcessTree(desktopProc)
   rmSync(quitFlag, { force: true })
 }
 
 process.on("SIGINT", () => {
-  cleanupSync()
-  process.exit()
+  void cleanup().finally(() => process.exit())
 })
 process.on("SIGTERM", () => {
-  cleanupSync()
-  process.exit()
-})
-process.on("exit", () => {
-  killDesktopProjectProcesses()
+  void cleanup().finally(() => process.exit())
 })
 
 await waitForVite()
-killDesktopProjectProcesses()
 
 desktopProc = spawn({
   cmd: [bunExe, "run", "--cwd", "frontend/desktop", "dev"],
@@ -156,4 +105,4 @@ void relay(desktopProc.stdout, process.stdout)
 void relay(desktopProc.stderr, process.stderr)
 
 await desktopProc.exited
-cleanupSync()
+await cleanup()
