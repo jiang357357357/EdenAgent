@@ -767,7 +767,7 @@ function createPromptParts(content: string, attachments: Array<PromptAttachment 
 }
 
 export async function sendPrompt(sessionID: string, content: string, attachments: Array<PromptAttachment | string>) {
-  await request(`/session/${encodeURIComponent(sessionID)}/prompt_async`, {
+  await request(`/session/${encodeURIComponent(sessionID)}/prompt`, {
     method: "POST",
     body: JSON.stringify({
       parts: createPromptParts(content, attachments),
@@ -776,7 +776,7 @@ export async function sendPrompt(sessionID: string, content: string, attachments
 }
 
 export async function sendPromptAsync(sessionID: string, content: string, attachments: Array<PromptAttachment | string>) {
-  await request(`/session/${encodeURIComponent(sessionID)}/prompt_async`, {
+  await request(`/session/${encodeURIComponent(sessionID)}/prompt`, {
     method: "POST",
     body: JSON.stringify({
       parts: createPromptParts(content, attachments),
@@ -891,7 +891,7 @@ export async function subscribeEvents(handlers: SubscribeHandlers | ((event: Api
     return () => {}
   }
   const normalized: SubscribeHandlers = typeof handlers === "function" ? { onEvent: handlers } : handlers
-  const source = new EventSource(`${baseUrl}/global/event`)
+  const source = new EventSource(`${baseUrl}/events`)
 
   source.onopen = () => {
     normalized.onOpen?.()

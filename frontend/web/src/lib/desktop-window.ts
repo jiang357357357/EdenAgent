@@ -8,7 +8,7 @@ const WINDOW_SIZES = {
     height: 540,
   },
   character: {
-    aspectRatio: 9 / 16,
+    aspectRatio: 7 / 16,
     heightRatio: 0.5,
   },
 } as const;
@@ -49,7 +49,7 @@ export const DEFAULT_PET_SETTINGS: PetSettings = {
   dock: 'center',
   inputMode: 'compact',
   inputWidth: 78,
-  inputHeight: 24,
+  inputHeight: 20,
   windowX: null,
   windowY: null,
 };
@@ -116,6 +116,18 @@ export async function closeDesktopWindow() {
     await bridge.invoke('close_current_window');
   } catch {
     window.close();
+  }
+}
+
+export async function openDesktopPetWindow() {
+  const bridge = getDesktopBridge();
+  if (!bridge) return false;
+
+  try {
+    await bridge.invoke('open_pet_window');
+    return true;
+  } catch {
+    return false;
   }
 }
 

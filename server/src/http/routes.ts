@@ -1,6 +1,6 @@
 export function isAgentApiRoute(pathname: string) {
   return (
-    pathname === "/global/event" ||
+    pathname === "/events" ||
     pathname === "/session" ||
     pathname.startsWith("/session/") ||
     pathname === "/permission" ||

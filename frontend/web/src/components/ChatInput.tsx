@@ -228,7 +228,7 @@ export function ChatInput({
           ? "bg-transparent p-0"
           : "bg-gradient-to-t from-bg via-bg/95 to-transparent pt-[1.2vh] pb-[2.8vh]",
       )}
-      style={overlay ? { height: `${overlayHeight ?? (overlayCompact ? 24 : 40)}vh` } : undefined}
+      style={overlay ? { height: `${overlayHeight ?? (overlayCompact ? 20 : 40)}vh` } : undefined}
     >
       <AnimatePresence>
         {attachments.length > 0 && (
@@ -372,11 +372,10 @@ export function ChatInput({
         {isDialogMode ? (
           <div
             onClick={advanceOutput}
-            className="absolute inset-0 box-border h-full w-full cursor-pointer overflow-y-auto overflow-x-hidden px-[2.4vh] pb-[2.4vh] pt-[8.4vh] text-left text-[2.05vh] leading-relaxed text-stone-100 [overflow-wrap:anywhere] [&::-webkit-scrollbar]:hidden"
+            className="absolute inset-0 box-border h-full w-full cursor-pointer overflow-y-auto overflow-x-hidden px-[2.2vh] py-[2.2vh] text-left text-[1.72vh] leading-relaxed text-stone-100 [overflow-wrap:anywhere] [&::-webkit-scrollbar]:hidden"
           >
             {currentOutput ? (
               <div>
-                <div className="mb-3 text-[11px] tracking-[0.18em] text-orange-200/80">{currentOutput.speaker}</div>
                 {currentOutput.runtimeTrace && (
                   <details
                     className="mb-3 rounded-lg border border-teal-200/15 bg-teal-300/10 px-3 py-2"
@@ -474,9 +473,9 @@ export function ChatInput({
             rows={overlay ? 10 : 1}
             style={overlay ? { height: "100%", overflow: "hidden", scrollbarWidth: "none" } : undefined}
             className={cn(
-              "resize-none overflow-x-hidden overflow-y-hidden bg-transparent outline-none leading-relaxed",
+              "resize-none overflow-x-hidden overflow-y-hidden bg-transparent outline-none leading-relaxed select-text",
               overlay
-                ? "absolute inset-0 box-border h-full max-h-none min-h-0 w-full overflow-hidden px-[2.4vh] pb-[2.4vh] pt-[8.4vh] text-stone-100 placeholder:text-stone-400 [&::-webkit-scrollbar]:hidden"
+                ? "absolute inset-0 box-border h-full max-h-none min-h-0 w-full overflow-hidden px-[2.2vh] py-[2.2vh] text-stone-100 placeholder:text-stone-400 [&::-webkit-scrollbar]:hidden"
                 : "min-h-[5vh] max-h-[24vh] min-w-0 flex-1 py-[0.8vh] text-[2.45vh] text-text placeholder:text-text-muted",
             )}
           />

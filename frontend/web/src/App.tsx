@@ -28,9 +28,8 @@ import {
 import type { MessageData, PromptAttachment } from "./types"
 import {
   listenDesktopOpenSettings,
-  listenDesktopViewMode,
+  openDesktopPetWindow,
   resizeDesktopWindow,
-  setDesktopViewModeState,
   setDesktopWindowAppearance,
   startDesktopWindowDrag,
 } from "./lib/desktop-window"
@@ -41,18 +40,12 @@ const screenTransition = {
   ease: [0.16, 1, 0.3, 1],
 } as const
 
-type AppPage = "chat" | "selfAwake" | "memo" | "settings"
+type AppPage = "chat" | "selfAwake" | "memo" | "settings" | "pet"
 
 function initialPageFromLocation(): AppPage {
-  return new URLSearchParams(window.location.search).get("page") === "settings" ? "settings" : "chat"
-}
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-}
-
-function waitForNextFrame() {
-  return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+  const page = new URLSearchParams(window.location.search).get("page")
+  if (page === "settings" || page === "pet") return page
+  return "chat"
 }
 
 function textLength(value?: string) {
@@ -107,8 +100,9 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [characterMode, setCharacterMode] = useState(false)
-  const isSettingsWindow = initialPageFromLocation() === "settings"
+  const initialPage = initialPageFromLocation()
+  const isSettingsWindow = initialPage === "settings"
+  const isPetWindow = initialPage === "pet"
   const [activePage, setActivePage] = useState<AppPage>(() => initialPageFromLocation())
   const [modeContentVisible, setModeContentVisible] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -158,12 +152,10 @@ export default function App() {
     resetSessionRuntime()
     setDefaultAssistant(null)
     setDefaultAssistantError(undefined)
-    setCharacterMode(false)
     setActivePage("chat")
     setHistoryOpen(false)
     setHistoryView("messages")
     document.documentElement.classList.remove("character-transparent")
-    void setDesktopViewModeState("chatWithCharacter")
   }
 
   function returnToLogin(message?: string) {
@@ -390,11 +382,11 @@ export default function App() {
   }, [messageScrollKey, autoScrollEnabled])
 
   useEffect(() => {
-    if (isSettingsWindow) return
+    if (isSettingsWindow || isPetWindow) return
     void resizeDesktopWindow(authStatus === "authenticated" ? "chatWithCharacter" : "login")
     if (authStatus !== "authenticated") return
     void setDesktopWindowAppearance("chatWithCharacter")
-  }, [authStatus, isSettingsWindow])
+  }, [authStatus, isPetWindow, isSettingsWindow])
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
@@ -504,24 +496,12 @@ export default function App() {
   }, [authStatus])
 
   useEffect(() => {
-    if (isSettingsWindow) return
+    if (isSettingsWindow || isPetWindow) return
     if (authStatus !== "authenticated") return
-    let cleanupViewMode: (() => void) | undefined
     let cleanupOpenSettings: (() => void) | undefined
     let disposed = false
 
-    void listenDesktopViewMode((mode) => {
-      void switchCharacterMode(mode === "character")
-    }).then((dispose) => {
-      if (disposed) {
-        dispose?.()
-        return
-      }
-      cleanupViewMode = dispose
-    })
-
     void listenDesktopOpenSettings(() => {
-      void switchCharacterMode(false)
       setActivePage("settings")
       setSidebarOpen(false)
     }).then((dispose) => {
@@ -534,10 +514,9 @@ export default function App() {
 
     return () => {
       disposed = true
-      cleanupViewMode?.()
       cleanupOpenSettings?.()
     }
-  }, [authStatus, isSettingsWindow])
+  }, [authStatus, isPetWindow, isSettingsWindow])
 
   useEffect(() => {
     return () => {
@@ -627,37 +606,11 @@ export default function App() {
     await dismissQuestion(requestID)
   }
 
-  async function switchCharacterMode(enabled: boolean) {
-    if (enabled === characterMode) return
-
-    const mode = enabled ? "character" : "chatWithCharacter"
-    const token = modeSwitchTokenRef.current + 1
-    modeSwitchTokenRef.current = token
-    if (modeResizeTimerRef.current) {
-      window.clearTimeout(modeResizeTimerRef.current)
-      modeResizeTimerRef.current = undefined
+  async function handleOpenPetWindow() {
+    const opened = await openDesktopPetWindow()
+    if (!opened) {
+      setActivePage("pet")
     }
-
-    setHistoryOpen(false)
-    setHistoryView("messages")
-    setSidebarOpen(false)
-    setActivePage("chat")
-    setModeContentVisible(false)
-
-    await wait(180)
-    if (modeSwitchTokenRef.current !== token) return
-
-    document.documentElement.classList.toggle("character-transparent", enabled)
-    void setDesktopViewModeState(mode)
-    await setDesktopWindowAppearance(mode)
-    await resizeDesktopWindow(mode)
-
-    if (modeSwitchTokenRef.current !== token) return
-    setCharacterMode(enabled)
-    await waitForNextFrame()
-
-    if (modeSwitchTokenRef.current !== token) return
-    setModeContentVisible(true)
   }
 
   if (authStatus === "checking") {
@@ -687,7 +640,7 @@ export default function App() {
       >
         <LayoutGroup id="mon-agent-mode-switch">
           <AnimatePresence mode="wait" initial={false}>
-            {characterMode ? (
+            {isPetWindow || activePage === "pet" ? (
               <CharacterPage
                 isThinking={isThinking}
                 activeSession={activeSession}
@@ -751,7 +704,6 @@ export default function App() {
                 onQuestionReject={handleQuestionReject}
                 onPreviewImage={(src, alt) => setPreviewImage({ src, alt: alt ?? "图片预览" })}
                 onLogout={handleLogout}
-                onSwitchMode={() => void switchCharacterMode(true)}
                 onOpenSelfAwake={() => {
                   setSidebarOpen(false)
                   setActivePage("selfAwake")

@@ -1,8 +1,0 @@
-{
-  "name": "Opencode ChatUI",
-  "description": "A modern, lightweight AI chat interface supporting reasoning blocks and tool calls.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

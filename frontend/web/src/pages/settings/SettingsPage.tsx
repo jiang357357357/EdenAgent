@@ -367,8 +367,8 @@ export function SettingsPage({ assistant, onBack }: SettingsPageProps) {
               icon={PanelBottom}
               label="聊天框高度"
               value={inputHeight}
-              min={8}
-              max={80}
+              min={12}
+              max={32}
               unit="%"
               onChange={(value) => patchSettings({ inputHeight: value })}
             />

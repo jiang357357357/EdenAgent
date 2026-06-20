@@ -1,5 +1,5 @@
 {
-  "name": "opencode-web",
+  "name": "mon-agent-web",
   "private": true,
   "type": "module",
   "scripts": {

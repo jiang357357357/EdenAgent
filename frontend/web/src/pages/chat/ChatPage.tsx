@@ -1,4 +1,4 @@
-import { Lock, Menu, MessageSquare, NotebookPen, Unlock, User } from "lucide-react"
+import { Lock, Menu, MessageSquare, NotebookPen, Unlock } from "lucide-react"
 import { motion } from "motion/react"
 import { CharacterPanel } from "../../components/CharacterPanel"
 import { ChatInput } from "../../components/ChatInput"
@@ -46,7 +46,6 @@ interface ChatPageProps {
   onQuestionReject: (requestID: string) => Promise<void>
   onPreviewImage: (src: string, alt?: string) => void
   onLogout: () => Promise<void> | void
-  onSwitchMode: () => void
   onOpenSelfAwake: () => void
   onOpenMemo: () => void
 }
@@ -76,7 +75,6 @@ export function ChatPage({
   onQuestionReject,
   onPreviewImage,
   onLogout,
-  onSwitchMode,
   onOpenSelfAwake,
   onOpenMemo,
 }: ChatPageProps) {
@@ -152,16 +150,6 @@ export function ChatPage({
             >
               {autoScrollEnabled ? <Lock className="h-[2.45vh] w-[2.45vh]" /> : <Unlock className="h-[2.45vh] w-[2.45vh]" />}
               <span className="hidden sm:inline">{autoScrollEnabled ? "自动滚动" : "已关闭"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onSwitchMode}
-              className="flex items-center gap-[0.6vw] rounded-full border border-border bg-card px-[1.6vw] py-[1.35vh] text-[1.75vh] tracking-[0.12em] text-text-muted shadow-sm transition-colors hover:border-accent/40 hover:text-accent"
-              title="切换到桌宠模式"
-              aria-label="切换到桌宠模式"
-            >
-              <User className="h-[2.45vh] w-[2.45vh]" />
-              <span className="hidden sm:inline">桌宠模式</span>
             </button>
           </div>
         </header>
@@ -243,23 +231,26 @@ export function ChatPage({
           </div>
         </div>
 
+        {(activePendingPermissions.length > 0 || activePendingQuestions.length > 0) && (
+          <div className="pointer-events-none fixed bottom-[15vh] left-[3vw] z-30 w-[min(58vw,760px)] max-h-[44vh] overflow-y-auto">
+            <div className="pointer-events-auto grid gap-[2vh]">
+              {activePendingPermissions.map((request) => (
+                <PermissionRequestCard key={request.id} request={request} onReply={onPermissionReply} />
+              ))}
+              {activePendingQuestions.map((request) => (
+                <QuestionRequestCard
+                  key={request.id}
+                  request={request}
+                  onReply={onQuestionReply}
+                  onReject={onQuestionReject}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="px-[3vw]">
           <div className="mx-auto w-[calc(100%_-_5vw)] max-w-[52vw]">
-            {(activePendingPermissions.length > 0 || activePendingQuestions.length > 0) && (
-              <div className="mb-[2vh] grid gap-[2vh]">
-                {activePendingPermissions.map((request) => (
-                  <PermissionRequestCard key={request.id} request={request} onReply={onPermissionReply} />
-                ))}
-                {activePendingQuestions.map((request) => (
-                  <QuestionRequestCard
-                    key={request.id}
-                    request={request}
-                    onReply={onQuestionReply}
-                    onReject={onQuestionReject}
-                  />
-                ))}
-              </div>
-            )}
             <ChatInput onSend={onSendMessage} disabled={isThinking} assistantName={assistantName} />
           </div>
         </div>

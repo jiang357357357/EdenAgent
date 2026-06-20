@@ -138,7 +138,7 @@ async function handleApi(request: Request, url: URL) {
     return jsonResponse(true)
   }
 
-  if (request.method === "GET" && url.pathname === "/global/event") {
+  if (request.method === "GET" && url.pathname === "/events") {
     logger.info("事件流已打开", { path: url.pathname })
     return eventStreamResponse(events.stream(request.signal))
   }
@@ -187,7 +187,7 @@ async function handleApi(request: Request, url: URL) {
     return jsonResponse(true)
   }
 
-  const promptMatch = url.pathname.match(/^\/session\/([^/]+)\/prompt_async$/)
+  const promptMatch = url.pathname.match(/^\/session\/([^/]+)\/prompt$/)
   if (promptMatch && request.method === "POST") {
     const sessionID = decodeURIComponent(promptMatch[1] ?? "")
     const body = await readJsonBody<{ parts?: PromptPart[] }>(request)

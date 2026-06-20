@@ -100,33 +100,12 @@ function readAIParam(aiEntity: CoreAIEntity, keys: string[]) {
   return undefined
 }
 
-function isDeepSeekReasoningModel(modelID: string) {
-  const lowered = modelID.trim().toLowerCase()
-  return lowered.startsWith("deepseek-v4-pro") || lowered.startsWith("deepseek-reasoner")
-}
-
-function resolveCoreThinkingLevel(aiEntity: CoreAIEntity, provider: string): ThinkingLevel {
+function resolveCoreThinkingLevel(aiEntity: CoreAIEntity): ThinkingLevel {
   const configuredLevel = normalizeThinkingLevel(
-    readAIParam(aiEntity, ["thinking_level", "thinkingLevel", "reasoning_effort", "reasoningEffort"]),
+    readAIParam(aiEntity, ["thinking_level", "thinkingLevel"]),
   )
   if (configuredLevel) return configuredLevel
 
-  const configuredEnabled = normalizeThinkingLevel(
-    readAIParam(aiEntity, [
-      "reasoning",
-      "enable_reasoning",
-      "enableReasoning",
-      "thinking",
-      "enable_thinking",
-      "enableThinking",
-    ]),
-  )
-  if (configuredEnabled) {
-    if (configuredEnabled === "off") return "off"
-    return isDeepSeekReasoningModel(aiEntity.ai_model) ? "high" : configuredEnabled
-  }
-
-  if (provider === "deepseek" && isDeepSeekReasoningModel(aiEntity.ai_model)) return "high"
   return "off"
 }
 
@@ -178,7 +157,7 @@ function buildOpenAICompatibleModel(aiEntity: CoreAIEntity, provider: string, ba
     endpointLooksAnthropic(aiEntity.api_endpoint) || provider === "anthropic"
       ? "anthropic-messages"
       : "openai-completions"
-  const thinkingLevel = resolveCoreThinkingLevel(aiEntity, provider)
+  const thinkingLevel = resolveCoreThinkingLevel(aiEntity)
   const reasoning = thinkingLevel !== "off"
   return {
     id: aiEntity.ai_model,
@@ -207,7 +186,7 @@ export function resolveCoreModel(core: CoreRuntimeConfig): RuntimeModelConfig {
   const provider = normalizeVendor(aiEntity.vendor)
   const baseUrl = trimEndpointToBase(aiEntity.api_endpoint)
   const known = findKnownModel(provider, aiEntity.ai_model)
-  const thinkingLevel = resolveCoreThinkingLevel(aiEntity, provider)
+  const thinkingLevel = resolveCoreThinkingLevel(aiEntity)
   const reasoning = thinkingLevel !== "off"
   const forceCompatible =
     endpointLooksOpenAICompletions(aiEntity.api_endpoint) || endpointLooksAnthropic(aiEntity.api_endpoint)

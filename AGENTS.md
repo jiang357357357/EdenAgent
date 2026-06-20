@@ -19,7 +19,7 @@
 
 ## 改造方向
 
-1. 以 Pi 的 `Agent`/事件循环作为核心，不再维护旧 opencode server/core/sdk/plugin/script 包。
+1. 以 Pi 的 `Agent`/事件循环作为核心，不再维护旧版 agent server/core/sdk/plugin/script 包。
 2. 对外保留前端需要的会话、消息、事件、权限接口形状，逐步收敛命名。
 3. 工具系统先保留本地 `read`、`ls`、`grep`、`write`、`shell`，再按 Mon 需要扩展。
 4. 写文件和执行命令必须走权限请求；只读工具可以直接运行。

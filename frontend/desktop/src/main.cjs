@@ -24,11 +24,12 @@ const DEFAULT_PET_SETTINGS = {
   dock: "center",
   inputMode: "compact",
   inputWidth: 78,
-  inputHeight: 24,
+  inputHeight: 20,
   windowX: null,
   windowY: null,
 }
 let mainWindow = null
+let petWindow = null
 let settingsWindow = null
 let tray = null
 let isQuitting = false
@@ -202,7 +203,7 @@ function normalizePetSettings(input = {}) {
     dock: ["left", "center", "right"].includes(input.dock) ? input.dock : DEFAULT_PET_SETTINGS.dock,
     inputMode: ["compact", "panel", "hidden"].includes(input.inputMode) ? input.inputMode : DEFAULT_PET_SETTINGS.inputMode,
     inputWidth: clampNumber(input.inputWidth, DEFAULT_PET_SETTINGS.inputWidth, 10, 100),
-    inputHeight: clampNumber(input.inputHeight, DEFAULT_PET_SETTINGS.inputHeight, 8, 80),
+    inputHeight: clampNumber(input.inputHeight, DEFAULT_PET_SETTINGS.inputHeight, 12, 32),
     windowX: Number.isFinite(windowX) ? windowX : null,
     windowY: Number.isFinite(windowY) ? windowY : null,
   }
@@ -223,8 +224,8 @@ function writePetSettings(settings) {
 }
 
 function petWindowBounds() {
-  if (!mainWindow) return undefined
-  const currentBounds = mainWindow.getBounds()
+  if (!petWindow) return undefined
+  const currentBounds = petWindow.getBounds()
   const display = screen.getDisplayMatching(currentBounds)
   const workArea = display.workArea
   const scale = petSettings.petScale / 100
@@ -232,7 +233,7 @@ function petWindowBounds() {
   const inputRatio = petSettings.showInput ? petSettings.inputHeight / 100 : 0
   const layoutGapRatio = petSettings.showInput ? 0.06 : 0
   const height = Math.round(characterHeight / Math.max(0.12, 1 - inputRatio - layoutGapRatio))
-  const width = Math.round(height * (9 / 16))
+  const width = Math.round(height * (7 / 16))
   const margin = 16
   const previousHeight = currentBounds.height > 1 ? currentBounds.height : height
   const fallbackX =
@@ -249,26 +250,24 @@ function petWindowBounds() {
 }
 
 function applyPetWindowAttributes() {
-  if (!mainWindow) return
-  if (currentViewMode !== "character") return
+  if (!petWindow) return
 
-  mainWindow.setAlwaysOnTop(petSettings.alwaysOnTop)
-  mainWindow.setIgnoreMouseEvents(petSettings.clickThrough, { forward: true })
-  mainWindow.setOpacity(1)
-  mainWindow.setBackgroundColor(petSettings.transparentWindow ? "#00000000" : "#f5f5f4")
-  mainWindow.setHasShadow(!petSettings.transparentWindow)
+  petWindow.setAlwaysOnTop(petSettings.alwaysOnTop)
+  petWindow.setIgnoreMouseEvents(petSettings.clickThrough, { forward: true })
+  petWindow.setOpacity(1)
+  petWindow.setBackgroundColor(petSettings.transparentWindow ? "#00000000" : "#f5f5f4")
+  petWindow.setHasShadow(!petSettings.transparentWindow)
 }
 
 function applyPetWindowBounds() {
-  if (!mainWindow) return
-  if (currentViewMode !== "character") return
+  if (!petWindow) return
 
   const bounds = petWindowBounds()
   if (bounds) {
-    mainWindow.setMinimumSize(1, 1)
-    mainWindow.setMaximumSize(100000, 100000)
+    petWindow.setMinimumSize(1, 1)
+    petWindow.setMaximumSize(100000, 100000)
     applyingPetBounds = true
-    mainWindow.setBounds(bounds, true)
+    petWindow.setBounds(bounds, true)
     petSettings = normalizePetSettings({ ...petSettings, windowX: bounds.x, windowY: bounds.y })
     writePetSettings(petSettings)
     setTimeout(() => {
@@ -283,12 +282,12 @@ function applyPetWindowSettings() {
 }
 
 function savePetWindowPosition() {
-  if (!mainWindow || currentViewMode !== "character" || applyingPetBounds) return
+  if (!petWindow || applyingPetBounds) return
   if (savePetPositionTimer) clearTimeout(savePetPositionTimer)
   savePetPositionTimer = setTimeout(() => {
     savePetPositionTimer = null
-    if (!mainWindow || currentViewMode !== "character" || applyingPetBounds) return
-    const bounds = mainWindow.getBounds()
+    if (!petWindow || applyingPetBounds) return
+    const bounds = petWindow.getBounds()
     petSettings = normalizePetSettings({ ...petSettings, windowX: bounds.x, windowY: bounds.y })
     writePetSettings(petSettings)
     broadcastPetSettings()
@@ -297,6 +296,7 @@ function savePetWindowPosition() {
 
 function broadcastPetSettings() {
   mainWindow?.webContents.send("mon-agent-pet-settings", petSettings)
+  petWindow?.webContents.send("mon-agent-pet-settings", petSettings)
   settingsWindow?.webContents.send("mon-agent-pet-settings", petSettings)
 }
 
@@ -319,15 +319,15 @@ function updatePetSettings(input) {
   return petSettings
 }
 
-function setWindowSize(request = {}) {
-  if (!mainWindow) return true
+function setWindowSize(request = {}, targetWindow = mainWindow) {
+  if (!targetWindow) return true
   if (request.mode === "character" || request.pet === true) {
     const bounds = petWindowBounds()
     if (bounds) {
-      mainWindow.setMinimumSize(1, 1)
-      mainWindow.setMaximumSize(100000, 100000)
+      petWindow.setMinimumSize(1, 1)
+      petWindow.setMaximumSize(100000, 100000)
       applyingPetBounds = true
-      mainWindow.setBounds(bounds, true)
+      petWindow.setBounds(bounds, true)
       petSettings = normalizePetSettings({ ...petSettings, windowX: bounds.x, windowY: bounds.y })
       writePetSettings(petSettings)
       setTimeout(() => {
@@ -336,7 +336,7 @@ function setWindowSize(request = {}) {
     }
     return true
   }
-  const display = screen.getDisplayMatching(mainWindow.getBounds())
+  const display = screen.getDisplayMatching(targetWindow.getBounds())
   const workArea = display.workAreaSize
   let width = typeof request.width === "number" ? request.width : undefined
   let height = typeof request.height === "number" ? request.height : undefined
@@ -356,27 +356,27 @@ function setWindowSize(request = {}) {
   }
   width = clamp(width, request.minWidth, request.maxWidth)
 
-  mainWindow.setMinimumSize(Math.max(1, Math.round(request.minWidth ?? 1)), Math.max(1, Math.round(request.minHeight ?? 1)))
-  mainWindow.setMaximumSize(
+  targetWindow.setMinimumSize(Math.max(1, Math.round(request.minWidth ?? 1)), Math.max(1, Math.round(request.minHeight ?? 1)))
+  targetWindow.setMaximumSize(
     Math.max(1, Math.round(request.maxWidth ?? 100000)),
     Math.max(1, Math.round(request.maxHeight ?? 100000)),
   )
-  mainWindow.setSize(Math.round(width), Math.round(height), true)
-  if (request.center !== false) mainWindow.center()
+  targetWindow.setSize(Math.round(width), Math.round(height), true)
+  if (request.center !== false) targetWindow.center()
   return true
 }
 
-function setWindowAppearance(mode) {
-  if (!mainWindow) return true
+function setWindowAppearance(mode, targetWindow = mainWindow) {
+  if (!targetWindow) return true
   const character = mode === "character"
   if (character) {
     applyPetWindowSettings()
   } else {
-    mainWindow.setAlwaysOnTop(false)
-    mainWindow.setIgnoreMouseEvents(false)
-    mainWindow.setOpacity(1)
-    mainWindow.setBackgroundColor("#f5f5f4")
-    mainWindow.setHasShadow(true)
+    targetWindow.setAlwaysOnTop(false)
+    targetWindow.setIgnoreMouseEvents(false)
+    targetWindow.setOpacity(1)
+    targetWindow.setBackgroundColor("#f5f5f4")
+    targetWindow.setHasShadow(true)
   }
   return true
 }
@@ -418,11 +418,11 @@ function createWindow() {
     minHeight: 1,
     center: true,
     show: false,
-    frame: false,
-    titleBarStyle: "hidden",
+    frame: true,
+    titleBarStyle: "default",
     autoHideMenuBar: true,
-    transparent: true,
-    backgroundColor: "#00000000",
+    transparent: false,
+    backgroundColor: "#f5f5f4",
     icon: fs.existsSync(icon) ? icon : undefined,
     webPreferences: {
       preload,
@@ -444,6 +444,55 @@ function createWindow() {
   })
   mainWindow.on("move", savePetWindowPosition)
   loadWebApp(mainWindow)
+}
+
+async function createPetWindow() {
+  if (petWindow && !petWindow.isDestroyed()) {
+    if (petWindow.isMinimized()) petWindow.restore()
+    petWindow.show()
+    petWindow.focus()
+    applyPetWindowSettings()
+    return
+  }
+
+  const preload = path.join(__dirname, "preload.cjs")
+  const icon = path.join(__dirname, "..", "assets", "icon.ico")
+  const bounds = petWindowBounds() ?? { width: 280, height: 640 }
+  petWindow = new BrowserWindow({
+    title: `${APP_WINDOW_TITLE} 桌宠`,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    minWidth: 1,
+    minHeight: 1,
+    show: false,
+    frame: false,
+    titleBarStyle: "hidden",
+    autoHideMenuBar: true,
+    transparent: true,
+    backgroundColor: "#00000000",
+    icon: fs.existsSync(icon) ? icon : undefined,
+    webPreferences: {
+      preload,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webSecurity: false,
+    },
+  })
+
+  petWindow.once("ready-to-show", () => {
+    petWindow?.show()
+    applyPetWindowSettings()
+  })
+  petWindow.on("closed", () => {
+    petWindow = null
+    updateTray()
+  })
+  petWindow.on("move", savePetWindowPosition)
+  loadWebApp(petWindow, "pet")
+  updateTray()
 }
 
 async function createSettingsWindow() {
@@ -492,6 +541,15 @@ function hasQuitFlag() {
   return fs.existsSync(quitFlag)
 }
 
+function writeQuitFlag() {
+  try {
+    fs.mkdirSync(path.dirname(quitFlag), { recursive: true })
+    fs.writeFileSync(quitFlag, String(Date.now()), "utf8")
+  } catch (error) {
+    console.warn("[MonAgent][Desktop] 写入退出标记失败", error)
+  }
+}
+
 function watchQuitFlag() {
   setInterval(() => {
     if (!hasQuitFlag()) return
@@ -523,15 +581,22 @@ function createFallbackTrayIcon() {
 
 function updateTray() {
   if (!tray) return
-  const nextMode = currentViewMode === "character" ? "切换到聊天模式" : "切换到桌宠模式"
+  const petVisible = Boolean(petWindow && !petWindow.isDestroyed() && petWindow.isVisible())
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "显示窗口", click: () => mainWindow?.show() },
-      { label: "隐藏到托盘", click: () => mainWindow?.hide() },
+      { label: "显示主窗口", click: () => mainWindow?.show() },
+      { label: "隐藏主窗口", click: () => mainWindow?.hide() },
       { type: "separator" },
       {
-        label: nextMode,
-        click: () => sendViewMode(currentViewMode === "character" ? "chatWithCharacter" : "character"),
+        label: petVisible ? "隐藏桌宠" : "显示桌宠",
+        click: () => {
+          if (petVisible) {
+            petWindow?.hide()
+            updateTray()
+          } else {
+            void createPetWindow()
+          }
+        },
       },
       {
         label: "设置",
@@ -544,6 +609,7 @@ function updateTray() {
         label: "退出",
         click: () => {
           isQuitting = true
+          writeQuitFlag()
           app.quit()
         },
       },
@@ -593,9 +659,12 @@ ipcMain.handle("mon-agent:invoke", async (_event, command, args = {}) => {
     case "core_logout":
       return coreRequest("/api/users/logout/", { method: "POST", headers: authHeader(args.token) })
     case "set_window_size":
-      return setWindowSize(args.request ?? {})
+      return setWindowSize(args.request ?? {}, BrowserWindow.fromWebContents(_event.sender) ?? mainWindow)
     case "set_window_appearance":
-      return setWindowAppearance(args.mode)
+      return setWindowAppearance(args.mode, BrowserWindow.fromWebContents(_event.sender) ?? mainWindow)
+    case "open_pet_window":
+      await createPetWindow()
+      return true
     case "set_view_mode_state":
       currentViewMode = args.mode === "character" ? "character" : "chatWithCharacter"
       updateTray()

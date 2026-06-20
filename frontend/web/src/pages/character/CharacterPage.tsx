@@ -92,12 +92,14 @@ export function CharacterPage({
   const inputEnabled = petSettings.showInput
   const inputVisible = inputEnabled && !inputCollapsed
   const inputWidth = Math.max(10, Math.min(100, petSettings.inputWidth))
-  const inputHeight = Math.max(8, Math.min(80, petSettings.inputHeight))
-  const chatTopOffset = 2
-  const characterTopOffset = inputVisible ? chatTopOffset + inputHeight + 4 : 5
-  const collapseButtonTop = inputVisible ? chatTopOffset + inputHeight + 1 : 2
+  const chatTopOffset = 4
+  const chatAreaHeight = 26
+  const characterTopOffset = 34
+  const characterHeight = 64
+  const chatToggleTop = characterTopOffset + 1
   const petBackgroundClass = petSettings.transparentWindow ? "!bg-transparent" : "bg-bg"
-  const characterDragStyle = petSettings.characterDraggable ? ({ WebkitAppRegion: "drag" } as CSSProperties) : undefined
+  const windowDragStyle = petSettings.characterDraggable ? ({ WebkitAppRegion: "drag" } as CSSProperties) : undefined
+  const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties
 
   useEffect(() => {
     let disposed = false
@@ -122,7 +124,8 @@ export function CharacterPage({
       key="character"
       {...characterScreenMotion}
       transition={screenTransition}
-      className={cn("fixed inset-0 z-20 h-[100vh] w-[100vw] overflow-hidden font-sans text-text", petBackgroundClass)}
+      className={cn("fixed inset-0 z-20 h-[100vh] w-[100vw] select-none overflow-hidden font-sans text-text", petBackgroundClass)}
+      style={windowDragStyle}
     >
       <main className={cn("relative mx-auto h-[100vh] w-[100vw] overflow-hidden", petBackgroundClass)}>
         <div
@@ -134,8 +137,8 @@ export function CharacterPage({
           <button
             type="button"
             onClick={() => setInputCollapsed((collapsed) => !collapsed)}
-            className="fixed left-1/2 z-30 flex h-[4.8vh] w-[4.8vh] -translate-x-1/2 items-center justify-center rounded-full border border-white/25 bg-stone-950/55 text-stone-100 shadow-sm backdrop-blur-md transition-colors hover:bg-stone-900/70"
-            style={{ top: `${collapseButtonTop}vh` }}
+            className="fixed left-[1.4vh] z-30 flex h-[4.4vh] w-[4.4vh] items-center justify-center rounded-full border border-white/25 bg-stone-950/55 text-stone-100 shadow-sm backdrop-blur-md transition-colors hover:bg-stone-900/70"
+            style={{ ...noDragStyle, top: `${chatToggleTop}vh` }}
             aria-label={inputCollapsed ? "展开聊天框" : "收起聊天框"}
             title={inputCollapsed ? "展开聊天框" : "收起聊天框"}
           >
@@ -144,10 +147,10 @@ export function CharacterPage({
         ) : null}
         <section
           className={cn(
-            "absolute inset-x-0 bottom-0 flex items-end justify-center text-center",
+            "absolute inset-x-0 flex items-end justify-center text-center",
             petSettings.characterDraggable ? "pointer-events-auto" : "pointer-events-none",
           )}
-          style={{ ...characterDragStyle, top: `${characterTopOffset}vh` }}
+          style={{ top: `${characterTopOffset}vh`, height: `${characterHeight}vh` }}
         >
           <motion.div
             initial={{ opacity: 0, y: 18 }}
@@ -189,6 +192,7 @@ export function CharacterPage({
               exit={{ opacity: 0, y: 16 }}
               transition={screenTransition}
               className="fixed inset-0 z-40 flex flex-col bg-stone-950/90 text-stone-100 shadow-none backdrop-blur-xl"
+              style={noDragStyle}
             >
               <header className="flex items-center justify-between border-b border-white/10 px-4 py-4">
                 <div className="flex min-w-0 items-center gap-2">
@@ -370,7 +374,7 @@ export function CharacterPage({
           exit={{ opacity: 0, y: -12, scale: 1 }}
           transition={{ ...screenTransition, delay: 0.14 }}
           className="fixed inset-x-0 z-20 px-[4vw]"
-          style={{ top: `${chatTopOffset}vh` }}
+          style={{ ...noDragStyle, top: `${chatTopOffset}vh` }}
         >
           <div className="mx-auto w-full" style={{ maxWidth: `${inputWidth}vw` }}>
             {(activePendingPermissions.length > 0 || activePendingQuestions.length > 0) && (
@@ -414,7 +418,7 @@ export function CharacterPage({
                 overlayCompact
                 hideOverlayActions
                 overlayOpacity={petSettings.inputOpacity}
-                overlayHeight={inputHeight}
+                overlayHeight={chatAreaHeight}
               />
             ) : null}
           </div>
