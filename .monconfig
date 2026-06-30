@@ -15,6 +15,22 @@ WEB_PORT=40091
 BASE_URL=http://127.0.0.1:40092
 WEB_URL=http://127.0.0.1:40091
 
+[process]
+NAME=MonAgent
+PROCESS_TAG=monagent-main
+SERVER_PM2_NAME=MonAgent-Server
+WEB_PM2_NAME=MonAgent-Web
+SCRIPT_AGENT_SERVER_LINUX_START=Script/Process/linux/server/start_process.sh
+SCRIPT_AGENT_SERVER_LINUX_STOP=Script/Process/linux/server/stop_process.sh
+SCRIPT_AGENT_SERVER_LINUX_STATUS=Script/Process/linux/server/status_process.sh
+SCRIPT_AGENT_SERVER_LINUX_RESTART=Script/Process/linux/server/restart_process.sh
+SCRIPT_AGENT_WEB_LINUX_START=Script/Process/linux/web/start_process.sh
+SCRIPT_AGENT_WEB_LINUX_STOP=Script/Process/linux/web/stop_process.sh
+SCRIPT_AGENT_WEB_LINUX_STATUS=Script/Process/linux/web/status_process.sh
+SCRIPT_AGENT_WEB_LINUX_RESTART=Script/Process/linux/web/restart_process.sh
+SCRIPT_CMD_LINUX_START=Script/Cmd/linux/start.sh
+SCRIPT_CMD_WIN_START=Script/Cmd/Win/Start.ps1
+
 [desktop]
 TITLE=MonAgent — AI 个人助手
 QUIT_FLAG=.artifacts/desktop-quit.flag
