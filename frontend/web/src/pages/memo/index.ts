@@ -1,1 +1,0 @@
-export { MemoPage } from "./MemoPage"

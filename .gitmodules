@@ -1,0 +1,4 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/jiang357357357/opencode-assistant-frontend.git
+	branch = main
