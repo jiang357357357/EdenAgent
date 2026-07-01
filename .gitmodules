@@ -2,3 +2,7 @@
 	path = frontend
 	url = https://github.com/jiang357357357/opencode-assistant-frontend.git
 	branch = main
+[submodule "Server"]
+	path = Server
+	url = https://github.com/jiang357357357/opencode-assistant-server.git
+	branch = main
