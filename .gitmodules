@@ -6,3 +6,7 @@
 	path = Server
 	url = https://github.com/jiang357357357/MonAgentServer.git
 	branch = main
+[submodule "AgentCore"]
+	path = AgentCore
+	url = https://github.com/jiang357357357/MonAgentCore.git
+	branch = main
