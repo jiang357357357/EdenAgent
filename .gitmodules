@@ -1,8 +1,8 @@
 [submodule "frontend"]
 	path = frontend
-	url = https://github.com/jiang357357357/opencode-assistant-frontend.git
+	url = https://github.com/jiang357357357/MonAgentFrontend.git
 	branch = main
 [submodule "Server"]
 	path = Server
-	url = https://github.com/jiang357357357/opencode-assistant-server.git
+	url = https://github.com/jiang357357357/MonAgentServer.git
 	branch = main
