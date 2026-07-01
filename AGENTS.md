@@ -4,7 +4,8 @@
 
 ## 当前结构
 
-- `server`：基于 `@earendil-works/pi-agent-core` 的本地智能体服务。
+- `Server`：Python 本地智能体服务，通过兄弟子仓库 `AgentCore` 调用 Python AgentCore。
+- `AgentCore`：从 Pi Agent Core 迁移来的 Python 核心封装。
 - `frontend/web`：MonAgent Web 前端，继续使用兼容旧接口形状的本地 API 封装。
 - `frontend/desktop`：Tauri 桌面壳，用于承载 Web 前端。
 - `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具。
@@ -12,7 +13,7 @@
 
 ## 默认运行链路
 
-1. `bun run dev:server` 启动 `server/src/server.ts`。
+1. `bun run dev:server` 通过 `Script/Project/dev-server.ts` 启动 `python -m mon_agent_server`。
 2. 服务端读取 `.monconfig`，默认监听 `0.0.0.0:40092`，并向 Hub 注册局域网可访问地址。
 3. Web 前端开发代理走 `/api`，生产默认连接 `http://localhost:40092`。
 4. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
@@ -26,8 +27,8 @@
 
 ## 技术栈
 
-- Bun 1.3+ / TypeScript
-- `@earendil-works/pi-agent-core`
-- `@earendil-works/pi-ai`
+- Python 3.11+ / 标准库 HTTP 服务
+- `mon_agent_core`（来自 `AgentCore` 子仓库）
+- Bun 1.3+ / TypeScript（用于开发编排、Web 前端和桌面壳）
 - React / Vite
 - Tauri

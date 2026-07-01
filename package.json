@@ -7,18 +7,17 @@
   "packageManager": "bun@1.3.13",
   "scripts": {
     "dev": "bun run Script/Project/dev.ts",
-    "dev:server": "bun --watch server/src/server.ts",
+    "dev:server": "bun run Script/Project/dev-server.ts",
     "dev:web": "bun run --cwd frontend/web dev",
     "dev:desktop": "bun run --cwd frontend/desktop dev",
     "lint": "oxlint",
-    "typecheck": "bun run --cwd server typecheck && bun run --cwd frontend/web typecheck",
+    "typecheck": "bun run Script/Project/check-server.ts && bun run --cwd frontend/web typecheck",
     "postinstall": "node -e \"console.log('MonAgent uses the Pi runtime; no legacy node-pty patch is required.')\"",
     "prepare": "husky",
     "test": "echo 'do not run tests from root' && exit 1"
   },
   "workspaces": {
     "packages": [
-      "server",
       "frontend/*"
     ],
     "catalog": {

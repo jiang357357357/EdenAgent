@@ -52,6 +52,17 @@ ensure_bun() {
   return 1
 }
 
+ensure_python() {
+  local python_bin="${MON_AGENT_PYTHON:-python3}"
+  if command -v "$python_bin" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[x] python not found: $python_bin"
+  echo "    Install Python 3.11+ or set MON_AGENT_PYTHON."
+  return 1
+}
+
 pm2_cmd() {
   local lock_file="${MON_PM2_CLI_LOCK_FILE:-/tmp/mon-pm2-cli.lock}"
   local lock_timeout="${MON_PM2_CLI_LOCK_TIMEOUT:-60}"
