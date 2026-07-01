@@ -8,12 +8,12 @@
 - `AgentCore`：从 Pi Agent Core 迁移来的 Python 核心封装。
 - `frontend/web`：MonAgent Web 前端，继续使用兼容旧接口形状的本地 API 封装。
 - `frontend/desktop`：Tauri 桌面壳，用于承载 Web 前端。
-- `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具。
+- `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具；Server 启动/检查脚本使用 Python。
 - `Script/cmd`：面向命令行或后续封装入口的脚本目录。
 
 ## 默认运行链路
 
-1. `bun run dev:server` 通过 `Script/Project/dev-server.ts` 启动 `python -m mon_agent_server`。
+1. `bun run dev:server` 通过 `Script/Project/dev_server.py` 启动 `python -m mon_agent_server`。
 2. 服务端读取 `.monconfig`，默认监听 `0.0.0.0:40092`，并向 Hub 注册局域网可访问地址。
 3. Web 前端开发代理走 `/api`，生产默认连接 `http://localhost:40092`。
 4. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
@@ -22,13 +22,13 @@
 
 1. 以 Pi 的 `Agent`/事件循环作为核心，不再维护旧版 agent server/core/sdk/plugin/script 包。
 2. 对外保留前端需要的会话、消息、事件、权限接口形状，逐步收敛命名。
-3. 工具系统先保留本地 `read`、`ls`、`grep`、`write`、`shell`，再按 Mon 需要扩展。
+3. 工具系统保留本地 `read`、`ls`、`grep`、`find`、`write`、`edit`、`bash`，并提供 Web、图片、交互、备忘录和自醒工具。
 4. 写文件和执行命令必须走权限请求；只读工具可以直接运行。
 
 ## 技术栈
 
 - Python 3.11+ / 标准库 HTTP 服务
 - `mon_agent_core`（来自 `AgentCore` 子仓库）
-- Bun 1.3+ / TypeScript（用于开发编排、Web 前端和桌面壳）
+- Bun 1.3+ / TypeScript（用于 Web 前端和桌面壳）
 - React / Vite
 - Tauri
