@@ -136,6 +136,20 @@ pm2_app_status() {
   '
 }
 
+pm2_app_pid() {
+  local app_name="$1"
+  export PM2_APP_NAME="$app_name"
+  pm2_cmd jlist | node -e '
+    const fs = require("fs");
+    const name = process.env.PM2_APP_NAME;
+    const apps = JSON.parse(fs.readFileSync(0, "utf8") || "[]");
+    const app = apps.find((item) => item.name === name);
+    if (!app) process.exit(0);
+    const pid = app.pid || app.pm2_env?.pm_pid || "";
+    if (pid) process.stdout.write(String(pid));
+  '
+}
+
 pm2_process_summary() {
   local app_names_text
   app_names_text="$(printf '%s\n' "$@")"
@@ -183,6 +197,145 @@ wait_for_http() {
     fi
     sleep "$delay"
   done
+
+  return 1
+}
+
+tcp_listen_pids() {
+  local port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -tiTCP:"$port" -sTCP:LISTEN -P -n 2>/dev/null | sort -nu
+    return 0
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "( sport = :$port )" 2>/dev/null \
+      | grep -oE 'pid=[0-9]+' \
+      | cut -d= -f2 \
+      | sort -nu
+    return 0
+  fi
+
+  if command -v fuser >/dev/null 2>&1; then
+    fuser "${port}/tcp" 2>/dev/null \
+      | tr ' ' '\n' \
+      | awk '/^[0-9]+$/ { print }' \
+      | sort -nu
+    return 0
+  fi
+
+  return 0
+}
+
+process_cmdline() {
+  local pid="$1"
+  if [[ -r "/proc/$pid/cmdline" ]]; then
+    tr '\0' ' ' <"/proc/$pid/cmdline" | sed 's/[[:space:]]*$//'
+    return 0
+  fi
+  ps -p "$pid" -o command= 2>/dev/null || true
+}
+
+pid_is_alive() {
+  local pid="$1"
+  [[ -n "$pid" && "$pid" =~ ^[0-9]+$ && -d "/proc/$pid" ]]
+}
+
+pid_parent() {
+  local pid="$1"
+  awk '/^PPid:/ { print $2; exit }' "/proc/$pid/status" 2>/dev/null || true
+}
+
+pid_is_in_tree() {
+  local pid="$1"
+  local root_pid="$2"
+  local current="$pid"
+
+  [[ -n "$root_pid" && "$root_pid" =~ ^[0-9]+$ ]] || return 1
+  while pid_is_alive "$current"; do
+    if [[ "$current" == "$root_pid" ]]; then
+      return 0
+    fi
+    current="$(pid_parent "$current")"
+    if [[ -z "$current" || "$current" == "0" || ! "$current" =~ ^[0-9]+$ ]]; then
+      break
+    fi
+  done
+
+  return 1
+}
+
+wait_pid_exit() {
+  local pid="$1"
+  local attempts="${2:-25}"
+  local delay="${3:-0.2}"
+
+  for ((index = 0; index < attempts; index += 1)); do
+    if ! pid_is_alive "$pid"; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+
+  return 1
+}
+
+release_tcp_port() {
+  local port="$1"
+  local label="${2:-service}"
+  local pids
+  mapfile -t pids < <(tcp_listen_pids "$port")
+
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "[i] Port $port is occupied; releasing before starting $label..."
+  for pid in "${pids[@]}"; do
+    if [[ -z "$pid" || ! "$pid" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+    if [[ "$pid" == "$$" ]]; then
+      continue
+    fi
+    local cmdline
+    cmdline="$(process_cmdline "$pid")"
+    echo "    - PID $pid${cmdline:+: $cmdline}"
+    kill "$pid" 2>/dev/null || true
+  done
+
+  for pid in "${pids[@]}"; do
+    if [[ -z "$pid" || ! "$pid" =~ ^[0-9]+$ || "$pid" == "$$" ]]; then
+      continue
+    fi
+    if wait_pid_exit "$pid" 25 0.2; then
+      continue
+    fi
+    echo "    - PID $pid did not exit after SIGTERM; sending SIGKILL"
+    kill -9 "$pid" 2>/dev/null || true
+  done
+
+  mapfile -t pids < <(tcp_listen_pids "$port")
+  if [[ "${#pids[@]}" -gt 0 ]]; then
+    echo "[x] Port $port is still occupied after cleanup: ${pids[*]}"
+    return 1
+  fi
+
+  echo "[i] Port $port released."
+}
+
+port_owned_by_pid_tree() {
+  local port="$1"
+  local root_pid="$2"
+  local pid
+
+  [[ -n "$root_pid" && "$root_pid" =~ ^[0-9]+$ ]] || return 1
+  while IFS= read -r pid; do
+    if pid_is_in_tree "$pid" "$root_pid"; then
+      return 0
+    fi
+  done < <(tcp_listen_pids "$port")
 
   return 1
 }

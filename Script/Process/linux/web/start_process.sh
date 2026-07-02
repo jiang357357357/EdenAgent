@@ -23,10 +23,17 @@ echo
 
 status="$(pm2_app_status "$PM2_APP_NAME")"
 if [[ "$status" == "online" ]]; then
-  echo "[PROCESS_NAME:$PM2_APP_NAME]"
-  echo "[SERVER_STATUS:ALREADY_RUNNING]"
-  exit 0
+  app_pid="$(pm2_app_pid "$PM2_APP_NAME")"
+  if http_ready "http://127.0.0.1:$WEB_PORT/" && port_owned_by_pid_tree "$WEB_PORT" "$app_pid"; then
+    echo "[PROCESS_NAME:$PM2_APP_NAME]"
+    echo "[SERVER_STATUS:ALREADY_RUNNING]"
+    exit 0
+  fi
+  echo "[i] PM2 app is online, but port $WEB_PORT is not owned by $PM2_APP_NAME; restarting."
+  run_pm2_quiet stop "$PM2_APP_NAME" || true
 fi
+
+release_tcp_port "$WEB_PORT" "$PM2_APP_NAME"
 
 if [[ "$status" == "missing" ]]; then
   run_pm2_quiet start "$ECOSYSTEM_FILE" --only "$PM2_APP_NAME"
