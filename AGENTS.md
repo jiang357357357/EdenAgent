@@ -9,15 +9,14 @@
 - `frontend/web`：MonAgent Web 前端，继续使用兼容旧接口形状的本地 API 封装。
 - `frontend/desktop`：Electron 桌面壳，用于承载 Web 前端。
 - `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具；Server 启动/检查脚本使用 Python。
-- `Script/Cmd`：面向命令行或服务启动器的前台入口，已拆分 Server/Web/Desktop/All。
+- `Script/Cmd`：面向命令行或服务启动器的前台入口，拆分 Server/Desktop/All；Desktop 会先启动 Web 再打开桌面壳。
 
 ## 默认运行链路
 
 1. `Script/Cmd/Linux/StartServer.sh` 或 `npm run dev:server` 启动 Python 后端，默认监听 `0.0.0.0:40092`。
-2. `Script/Cmd/Linux/StartWeb.sh` 或 `npm run dev:web` 启动 Web 前端，默认监听 `40091`。
-3. `Script/Cmd/Linux/StartDesktop.sh` 启动桌面壳，要求 Web 已经就绪。
-4. `Script/Cmd/Linux/StartAll.sh` 或 `npm run dev` 仅用于开发期一键启动 Server/Web/Desktop。
-5. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
+2. `Script/Cmd/Linux/StartDesktop.sh` 启动客户端：先启动 Web 前端，再打开桌面壳。
+3. `Script/Cmd/Linux/StartAll.sh` 或 `npm run dev` 仅用于开发期一键启动 Server/Web/Desktop。
+4. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
 
 ## 改造方向
 

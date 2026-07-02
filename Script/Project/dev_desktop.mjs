@@ -19,9 +19,29 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function waitForVite() {
-  console.log("\n  等待 Vite 就绪后启动桌面应用...\n")
+async function isWebReady() {
+  try {
+    const res = await fetch(`http://127.0.0.1:${webPort}`)
+    return res.ok || res.status === 304
+  } catch {
+    return false
+  }
+}
+
+async function waitForVite(webProc) {
+  console.log("\n  等待 Web 前端就绪后启动桌面应用...\n")
+  let exited = false
+  let exitCode = null
+  if (webProc) {
+    webProc.on("exit", (code) => {
+      exited = true
+      exitCode = code
+    })
+  }
   for (let i = 0; i < 60; i += 1) {
+    if (exited) {
+      throw new Error(`Web 前端启动进程已退出，退出码：${exitCode}`)
+    }
     try {
       const res = await fetch(`http://127.0.0.1:${webPort}`)
       if (res.ok || res.status === 304) return
@@ -69,6 +89,7 @@ function requestDesktopQuit() {
 }
 
 let cleaned = false
+let webProc
 let desktopProc
 
 function relay(readable, target) {
@@ -82,6 +103,7 @@ async function cleanup() {
   requestDesktopQuit()
   await sleep(2500)
   await killProcessTree(desktopProc)
+  await killProcessTree(webProc)
   rmSync(quitFlag, { force: true })
 }
 
@@ -92,7 +114,22 @@ process.on("SIGTERM", () => {
   void cleanup().finally(() => process.exit())
 })
 
-await waitForVite()
+if (await isWebReady()) {
+  console.log(`\n  Web 前端已就绪：http://127.0.0.1:${webPort}\n`)
+} else {
+  console.log(`\n  启动 Web 前端：http://127.0.0.1:${webPort}\n`)
+  webProc = spawn(npmCommand(), ["run", "dev:web"], {
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
+    detached: process.platform !== "win32",
+    windowsHide: true,
+  })
+  relay(webProc.stdout, process.stdout)
+  relay(webProc.stderr, process.stderr)
+  await waitForVite(webProc)
+}
 
 desktopProc = spawn(npmCommand(), ["--prefix", "frontend/desktop", "run", "dev"], {
   cwd: root,
