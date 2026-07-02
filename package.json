@@ -7,11 +7,11 @@
   "packageManager": "npm@10.9.7",
   "scripts": {
     "dev": "node Script/Project/dev.mjs",
-    "dev:server": "python3 Script/Project/dev_server.py",
+    "dev:server": "uv run --project Server python -m mon_agent_server",
     "dev:web": "npm --prefix frontend/web run dev",
     "dev:desktop": "node Script/Project/dev_desktop.mjs",
     "lint": "oxlint",
-    "typecheck": "python3 Script/Project/check_server.py && npm --prefix frontend/web run typecheck",
+    "typecheck": "uv run --project Server python Script/Project/check_server.py && npm --prefix frontend/web run typecheck",
     "postinstall": "node -e \"console.log('MonAgent uses the Pi runtime; no legacy node-pty patch is required.')\"",
     "prepare": "husky",
     "test": "echo 'do not run tests from root' && exit 1"

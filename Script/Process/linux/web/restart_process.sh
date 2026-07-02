@@ -10,7 +10,7 @@ PM2_APP_NAME="$WEB_PM2_NAME"
 ECOSYSTEM_FILE="$SCRIPT_DIR/ecosystem.config.cjs"
 
 ensure_pm2
-ensure_bun
+ensure_node
 
 echo "================================================"
 echo "MonAgent Web PM2 restart"

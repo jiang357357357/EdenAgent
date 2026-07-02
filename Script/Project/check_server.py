@@ -1,18 +1,38 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 
-def run(root: Path, python: str, env: dict[str, str], args: list[str]) -> int:
-    return subprocess.run([python, *args], cwd=root, env=env).returncode
+def python_command(root: Path) -> list[str]:
+    explicit = os.environ.get("MON_AGENT_PYTHON") or os.environ.get("PYTHON")
+    if explicit:
+        return [explicit]
+
+    if os.name == "nt":
+        venv_python = root / "Server" / ".venv" / "Scripts" / "python.exe"
+    else:
+        venv_python = root / "Server" / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        return [str(venv_python)]
+
+    uv = shutil.which("uv")
+    if uv:
+        return [uv, "run", "--project", str(root / "Server"), "python"]
+
+    return [sys.executable]
+
+
+def run(root: Path, python: list[str], env: dict[str, str], args: list[str]) -> int:
+    return subprocess.run([*python, *args], cwd=root, env=env).returncode
 
 
 def main() -> int:
     root = Path.cwd()
-    python = os.environ.get("MON_AGENT_PYTHON") or os.environ.get("PYTHON") or sys.executable
+    python = python_command(root)
     env = os.environ.copy()
     paths = [root / "Server" / "src", root / "AgentCore" / "src"]
     existing = env.get("PYTHONPATH")

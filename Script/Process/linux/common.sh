@@ -5,6 +5,8 @@ set -euo pipefail
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$COMMON_DIR/../../.." && pwd)"
 CONFIG_FILE="$PROJECT_ROOT/.monconfig"
+SERVER_ROOT="$PROJECT_ROOT/Server"
+SERVER_VENV_PYTHON="$SERVER_ROOT/.venv/bin/python"
 
 read_monconfig_value() {
   local section="$1"
@@ -53,13 +55,25 @@ ensure_node() {
 }
 
 ensure_python() {
-  local python_bin="${MON_AGENT_PYTHON:-python3}"
-  if command -v "$python_bin" >/dev/null 2>&1; then
+  if [[ -n "${MON_AGENT_PYTHON:-}" ]] && command -v "$MON_AGENT_PYTHON" >/dev/null 2>&1; then
     return 0
   fi
 
-  echo "[x] python not found: $python_bin"
-  echo "    Install Python 3.11+ or set MON_AGENT_PYTHON."
+  if [[ -x "$SERVER_VENV_PYTHON" ]]; then
+    return 0
+  fi
+
+  if command -v uv >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[x] Agent Server Python env not found"
+  echo "    Install: bash Server/Script/EnvTools/linux/install_env.sh"
+  echo "    Or install uv / python3, or set MON_AGENT_PYTHON."
   return 1
 }
 

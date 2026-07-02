@@ -5,14 +5,18 @@ param(
 $ErrorActionPreference = "Stop"
 
 $agentRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
+$serverRoot = Join-Path $agentRoot.Path "Server"
+$venvPython = Join-Path $serverRoot ".venv\Scripts\python.exe"
 $pythonBin = if ($Python) {
   $Python
 } elseif ($env:MON_AGENT_PYTHON) {
   $env:MON_AGENT_PYTHON
 } elseif ($env:PYTHON) {
   $env:PYTHON
+} elseif (Test-Path $venvPython) {
+  $venvPython
 } else {
-  "python"
+  $null
 }
 
 $paths = @(
@@ -25,5 +29,11 @@ if ($env:PYTHONPATH) {
 $env:PYTHONPATH = [string]::Join([IO.Path]::PathSeparator, $paths)
 
 Set-Location -LiteralPath $agentRoot.Path
-& $pythonBin -m mon_agent_server
+if ($pythonBin) {
+  & $pythonBin -m mon_agent_server
+} elseif (Get-Command "uv" -ErrorAction SilentlyContinue) {
+  & uv run --project $serverRoot python -m mon_agent_server
+} else {
+  & python -m mon_agent_server
+}
 exit $LASTEXITCODE

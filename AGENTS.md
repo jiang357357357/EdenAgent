@@ -7,7 +7,7 @@
 - `Server`：Python 本地智能体服务，通过兄弟子仓库 `AgentCore` 调用 Python AgentCore。
 - `AgentCore`：从 Pi Agent Core 迁移来的 Python 核心封装。
 - `frontend/web`：MonAgent Web 前端，继续使用兼容旧接口形状的本地 API 封装。
-- `frontend/desktop`：Tauri 桌面壳，用于承载 Web 前端。
+- `frontend/desktop`：Electron 桌面壳，用于承载 Web 前端。
 - `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具；Server 启动/检查脚本使用 Python。
 - `Script/Cmd`：面向命令行或服务启动器的前台入口，已拆分 Server/Web/Desktop/All。
 
@@ -28,8 +28,8 @@
 
 ## 技术栈
 
-- Python 3.11+ / 标准库 HTTP 服务
+- Python 3.12+ / uv / 标准库 HTTP 服务
 - `mon_agent_core`（来自 `AgentCore` 子仓库）
 - Node.js 22+ / npm / TypeScript（用于 Web 前端和桌面壳）
 - React / Vite
-- Tauri
+- Electron

@@ -7,7 +7,7 @@
 
 入口拆分：
 
-- `StartServer`: 只启动 Python 后端，不依赖 Bun。
+- `StartServer`: 只启动 Python 后端，优先使用 `Server/.venv` 或 `uv run`。
 - `StartWeb`: 只启动 Web 前端，依赖 Node.js/npm/Vite。
 - `StartDesktop`: 只启动桌面壳，要求 Web 已可访问。
 - `StartAll`: 开发期一键启动 Server/Web/Desktop。
