@@ -18,8 +18,8 @@ WEB_URL=http://127.0.0.1:40091
 [process]
 NAME=MonAgent
 PROCESS_TAG=monagent-main
-SERVER_PM2_NAME=MonAgent-Server
-WEB_PM2_NAME=MonAgent-Web
+SERVER_PM2_NAME=agent-api
+WEB_PM2_NAME=agent-web
 SCRIPT_AGENT_SERVER_LINUX_START=Script/Process/linux/server/start_process.sh
 SCRIPT_AGENT_SERVER_LINUX_STOP=Script/Process/linux/server/stop_process.sh
 SCRIPT_AGENT_SERVER_LINUX_STATUS=Script/Process/linux/server/status_process.sh

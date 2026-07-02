@@ -30,14 +30,14 @@ SERVER_PORT="${SERVER_PORT:-40092}"
 WEB_PORT="${MON_AGENT_WEB_PORT:-$(read_monconfig_value server WEB_PORT)}"
 WEB_PORT="${WEB_PORT:-40091}"
 SERVER_PM2_NAME="${MON_AGENT_SERVER_PM2_NAME:-$(read_monconfig_value process SERVER_PM2_NAME)}"
-SERVER_PM2_NAME="${SERVER_PM2_NAME:-MonAgent-Server}"
+SERVER_PM2_NAME="${SERVER_PM2_NAME:-agent-api}"
+WEB_PM2_NAME="${MON_AGENT_WEB_PM2_NAME:-$(read_monconfig_value process WEB_PM2_NAME)}"
+WEB_PM2_NAME="${WEB_PM2_NAME:-agent-web}"
 SERVER_LOG_FILE="${MON_AGENT_SERVER_LOG_FILE:-$(read_monconfig_value log FILE)}"
 SERVER_LOG_FILE="${SERVER_LOG_FILE:-Data/Logs/Text/MonAgent/MonAgent.log}"
 if [[ "$SERVER_LOG_FILE" != /* ]]; then
   SERVER_LOG_FILE="$PROJECT_ROOT/$SERVER_LOG_FILE"
 fi
-WEB_PM2_NAME="${MON_AGENT_WEB_PM2_NAME:-$(read_monconfig_value process WEB_PM2_NAME)}"
-WEB_PM2_NAME="${WEB_PM2_NAME:-MonAgent-Web}"
 
 ensure_pm2() {
   if command -v pm2 >/dev/null 2>&1; then

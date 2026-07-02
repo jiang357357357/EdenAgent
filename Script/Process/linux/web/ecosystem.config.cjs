@@ -1,7 +1,7 @@
 const path = require("path");
 
 const projectRoot = path.resolve(__dirname, "../../../..");
-const appName = process.env.MON_AGENT_WEB_PM2_NAME || "MonAgent-Web";
+const appName = process.env.MON_AGENT_WEB_PM2_NAME || "agent-web";
 const processTag = process.env.MON_PROCESS_TAG || "monagent-main";
 const serverPort = process.env.MON_AGENT_PORT || "40092";
 const webPort = process.env.MON_AGENT_WEB_PORT || "40091";

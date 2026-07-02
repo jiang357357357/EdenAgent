@@ -7,6 +7,6 @@
 
 入口拆分：
 
-- `StartServer`: 只启动 Python 后端，优先使用 `Server/.venv` 或 `uv run`。
+- `StartServer`: 清理后端端口占用后，前台启动 Python 后端，优先使用 `Server/.venv` 或 `uv run`。
 - `StartDesktop`: 启动客户端，先启动 Web 前端，再打开桌面壳。
 - `StartAll`: 开发期一键启动 Server/Web/Desktop。
