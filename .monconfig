@@ -28,7 +28,7 @@ SCRIPT_AGENT_WEB_LINUX_START=Script/Process/linux/web/start_process.sh
 SCRIPT_AGENT_WEB_LINUX_STOP=Script/Process/linux/web/stop_process.sh
 SCRIPT_AGENT_WEB_LINUX_STATUS=Script/Process/linux/web/status_process.sh
 SCRIPT_AGENT_WEB_LINUX_RESTART=Script/Process/linux/web/restart_process.sh
-SCRIPT_CMD_LINUX_START=Script/Cmd/linux/start.sh
+SCRIPT_CMD_LINUX_START=Script/Cmd/Linux/start.sh
 SCRIPT_CMD_WIN_START=Script/Cmd/Win/Start.ps1
 
 [desktop]
