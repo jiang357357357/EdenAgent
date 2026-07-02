@@ -27,6 +27,7 @@
     }
   },
   "devDependencies": {
+    "@tsconfig/bun": "1.0.9",
     "husky": "9.1.7",
     "oxlint": "1.60.0",
     "prettier": "3.6.2"
