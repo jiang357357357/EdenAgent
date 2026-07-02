@@ -28,8 +28,15 @@ SCRIPT_AGENT_WEB_LINUX_START=Script/Process/linux/web/start_process.sh
 SCRIPT_AGENT_WEB_LINUX_STOP=Script/Process/linux/web/stop_process.sh
 SCRIPT_AGENT_WEB_LINUX_STATUS=Script/Process/linux/web/status_process.sh
 SCRIPT_AGENT_WEB_LINUX_RESTART=Script/Process/linux/web/restart_process.sh
-SCRIPT_CMD_LINUX_START=Script/Cmd/Linux/start.sh
+SCRIPT_CMD_LINUX_START=Script/Cmd/Linux/StartAll.sh
+SCRIPT_CMD_SERVER_LINUX_START=Script/Cmd/Linux/StartServer.sh
+SCRIPT_CMD_WEB_LINUX_START=Script/Cmd/Linux/StartWeb.sh
+SCRIPT_CMD_DESKTOP_LINUX_START=Script/Cmd/Linux/StartDesktop.sh
 SCRIPT_CMD_WIN_START=Script/Cmd/Win/Start.ps1
+SCRIPT_CMD_ALL_WIN_START=Script/Cmd/Win/StartAll.ps1
+SCRIPT_CMD_SERVER_WIN_START=Script/Cmd/Win/StartServer.ps1
+SCRIPT_CMD_WEB_WIN_START=Script/Cmd/Win/StartWeb.ps1
+SCRIPT_CMD_DESKTOP_WIN_START=Script/Cmd/Win/StartDesktop.ps1
 
 [desktop]
 TITLE=MonAgent — AI 个人助手
