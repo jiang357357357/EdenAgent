@@ -1,19 +1,17 @@
-import { spawn } from "bun"
+import net from "node:net"
+import { spawn } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
+import { loadMonConfig } from "./monconfig.mjs"
 
 const root = process.cwd()
-const { loadMonConfig } = await import("./monconfig")
 const config = loadMonConfig(root)
 const serverPort = config.number("server", "PORT", 40092)
 const webPort = config.number("server", "WEB_PORT", 40091)
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
-const bunExe = process.execPath
 
 rmSync(quitFlag, { force: true })
 
-type Child = ReturnType<typeof spawn>
-
-const children: Child[] = []
+const children = []
 let shuttingDown = false
 
 const ansi = {
@@ -24,108 +22,112 @@ const ansi = {
   desktop: "\x1b[32m",
 }
 
-function labelText(label: string) {
-  const color =
-    label === "server" ? ansi.server :
-    label === "web" ? ansi.web :
-    label === "desktop" ? ansi.desktop :
-    ansi.dev
+function npmCommand() {
+  return process.platform === "win32" ? "npm.cmd" : "npm"
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function labelText(label) {
+  const color = label === "server" ? ansi.server : label === "web" ? ansi.web : label === "desktop" ? ansi.desktop : ansi.dev
   return `${color}[${label}]${ansi.reset}`
 }
 
-function devLog(message: string) {
+function devLog(message) {
   console.log(`${labelText("dev")} ${message}`)
 }
 
-function writeLine(label: string, line: string, stream: "stdout" | "stderr") {
+function writeLine(label, line, stream) {
   if (!line) return
   const target = stream === "stderr" ? process.stderr : process.stdout
   target.write(`${labelText(label)} ${line}\n`)
 }
 
-async function prefixOutput(label: string, readable: ReadableStream<Uint8Array> | null, stream: "stdout" | "stderr") {
+function prefixOutput(label, readable, stream) {
   if (!readable) return
-
-  const decoder = new TextDecoder()
-  const reader = readable.getReader()
   let pending = ""
-
-  while (true) {
-    const { value, done } = await reader.read()
-    if (done) break
-
-    pending += decoder.decode(value, { stream: true })
+  readable.setEncoding("utf8")
+  readable.on("data", (chunk) => {
+    pending += chunk
     const lines = pending.split(/\r?\n/)
     pending = lines.pop() ?? ""
     for (const line of lines) writeLine(label, line, stream)
-  }
-
-  pending += decoder.decode()
-  if (pending) writeLine(label, pending, stream)
-}
-
-async function runWithTimeout(cmd: string[], timeoutMs: number) {
-  const child = spawn({
-    cmd,
-    cwd: root,
-    stdout: "ignore",
-    stderr: "ignore",
   })
-  const timer = setTimeout(() => {
-    child.kill()
-  }, timeoutMs)
-  try {
-    await child.exited
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function runCapture(cmd: string[], timeoutMs = 3000) {
-  const child = spawn({
-    cmd,
-    cwd: root,
-    stdout: "pipe",
-    stderr: "pipe",
+  readable.on("end", () => {
+    if (pending) writeLine(label, pending, stream)
   })
-  const timer = setTimeout(() => {
-    child.kill()
-  }, timeoutMs)
-  try {
-    const [stdout, stderr] = await Promise.all([
-      child.stdout ? new Response(child.stdout).text() : "",
-      child.stderr ? new Response(child.stderr).text() : "",
-    ])
-    const exitCode = await child.exited
-    return { stdout, stderr, exitCode }
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
-async function killProcessTree(proc: Child | undefined) {
+function runWithTimeout(cmd, timeoutMs) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd[0], cmd.slice(1), { cwd: root, stdio: "ignore", windowsHide: true })
+    const timer = setTimeout(() => child.kill(), timeoutMs)
+    child.on("exit", () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    child.on("error", () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+}
+
+function runCapture(cmd, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd[0], cmd.slice(1), { cwd: root, stdout: "pipe", stderr: "pipe", windowsHide: true })
+    let stdout = ""
+    let stderr = ""
+    const timer = setTimeout(() => child.kill(), timeoutMs)
+    child.stdout?.setEncoding("utf8")
+    child.stderr?.setEncoding("utf8")
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk
+    })
+    child.on("exit", (exitCode) => {
+      clearTimeout(timer)
+      resolve({ stdout, stderr, exitCode })
+    })
+    child.on("error", () => {
+      clearTimeout(timer)
+      resolve({ stdout, stderr, exitCode: 1 })
+    })
+  })
+}
+
+async function killProcessTree(proc) {
   if (!proc?.pid) return
-  proc.kill()
   if (process.platform === "win32") {
     await runWithTimeout(["taskkill", "/PID", String(proc.pid), "/T", "/F"], 3000).catch(() => {})
+    return
+  }
+  try {
+    process.kill(-proc.pid, "SIGTERM")
+  } catch {
+    proc.kill("SIGTERM")
   }
 }
 
-async function killPidTree(pid: number) {
+async function killPidTree(pid) {
   if (!Number.isFinite(pid) || pid <= 0) return
   if (process.platform === "win32") {
     await runWithTimeout(["taskkill", "/PID", String(pid), "/T", "/F"], 3000).catch(() => {})
     return
   }
   try {
-    process.kill(pid)
+    process.kill(pid, "SIGTERM")
   } catch {}
 }
 
-async function portPids(port: number) {
+async function portPids(port) {
   if (process.platform !== "win32") return []
   const result = await runCapture(["netstat", "-ano"], 5000).catch(() => ({ stdout: "", stderr: "", exitCode: 1 }))
-  const pids = new Set<number>()
+  const pids = new Set()
   const pattern = new RegExp(`(?:0\\.0\\.0\\.0|127\\.0\\.0\\.1|\\[?::\\]?):${port}\\s+.*\\s+LISTENING\\s+(\\d+)`, "i")
   for (const line of result.stdout.split(/\r?\n/)) {
     const match = line.match(pattern)
@@ -135,7 +137,7 @@ async function portPids(port: number) {
   return [...pids]
 }
 
-async function processCommandLine(pid: number) {
+async function processCommandLine(pid) {
   if (process.platform !== "win32") return ""
   const script = `Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" | Select-Object -ExpandProperty CommandLine`
   const result = await runCapture(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], 5000).catch(() => ({
@@ -146,7 +148,7 @@ async function processCommandLine(pid: number) {
   return result.stdout.trim()
 }
 
-async function releaseOwnedPort(port: number, label: string) {
+async function releaseOwnedPort(port, label) {
   const pids = await portPids(port)
   if (!pids.length) return
 
@@ -158,43 +160,44 @@ async function releaseOwnedPort(port: number, label: string) {
 
   for (let index = 0; index < 20; index += 1) {
     if (!(await portPids(port)).length) return
-    await Bun.sleep(250)
+    await sleep(250)
   }
 }
 
-function start(label: string, cmd: string[]) {
-  const child = spawn({
-    cmd,
+function start(label, cmd) {
+  const child = spawn(cmd[0], cmd.slice(1), {
     cwd: root,
     stdout: "pipe",
     stderr: "pipe",
     env: process.env,
+    detached: process.platform !== "win32",
+    windowsHide: true,
   })
   children.push(child)
 
-  void prefixOutput(label, child.stdout, "stdout")
-  void prefixOutput(label, child.stderr, "stderr")
-  void child.exited.then((code) => {
+  prefixOutput(label, child.stdout, "stdout")
+  prefixOutput(label, child.stderr, "stderr")
+  child.on("exit", (code) => {
     if (!shuttingDown && code !== 0) {
       process.stderr.write(`${labelText("dev")} ${label} exited with code ${code}\n`)
-      shutdown(code)
+      shutdown(code || 1)
     }
   })
 
   return child
 }
 
-async function waitFor(url: string, label: string, child?: Child) {
+async function waitFor(url, label, child) {
   let exited = false
-  let exitCode: number | null = null
+  let exitCode = null
   if (child) {
-    void child.exited.then((code) => {
+    child.on("exit", (code) => {
       exited = true
       exitCode = code
     })
   }
 
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 60; i += 1) {
     if (exited) {
       throw new Error(`${label} 启动进程已退出，退出码：${exitCode}`)
     }
@@ -202,29 +205,24 @@ async function waitFor(url: string, label: string, child?: Child) {
       const res = await fetch(url)
       if (res.ok || res.status === 304) return
     } catch {}
-    await Bun.sleep(500)
+    await sleep(500)
   }
   throw new Error(`${label} 未在 30s 内就绪：${url}`)
 }
 
-function assertPortFree(port: number, label: string) {
-  try {
-    const probe = Bun.listen({
-      hostname: "127.0.0.1",
-      port,
-      socket: {
-        data() {},
-      },
+function assertPortFree(port, label) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer()
+    probe.once("error", () => reject(new Error(`${label} 端口 ${port} 已被占用，请先退出旧的 MonAgent 进程或释放该端口。`)))
+    probe.listen(port, "127.0.0.1", () => {
+      probe.close(() => resolve())
     })
-    probe.stop(true)
-  } catch {
-    throw new Error(`${label} 端口 ${port} 已被占用，请先退出旧的 MonAgent 进程或释放该端口。`)
-  }
+  })
 }
 
-async function ensurePortFree(port: number, label: string) {
+async function ensurePortFree(port, label) {
   await releaseOwnedPort(port, label)
-  assertPortFree(port, label)
+  await assertPortFree(port, label)
 }
 
 async function shutdown(code = 0) {
@@ -250,19 +248,18 @@ try {
   await ensurePortFree(webPort, "web")
 
   devLog(`启动 server，端口 ${serverPort}`)
-  const server = start("server", [bunExe, "run", "dev:server"])
+  const server = start("server", [npmCommand(), "run", "dev:server"])
   await waitFor(`http://127.0.0.1:${serverPort}/api/tools/status`, "server", server)
 
   devLog(`启动 web，端口 ${webPort}`)
-  const web = start("web", [bunExe, "run", "dev:web"])
+  const web = start("web", [npmCommand(), "run", "dev:web"])
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
-  const desktop = start("desktop", [bunExe, "run", "Script/Project/dev-desktop.ts"])
+  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"])
 
   devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
-  await desktop.exited
-  await shutdown(0)
+  desktop.on("exit", () => void shutdown(0))
 } catch (error) {
   process.stderr.write(`${labelText("dev")} ${error instanceof Error ? error.message : String(error)}\n`)
   await shutdown(1)

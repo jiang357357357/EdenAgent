@@ -13,10 +13,10 @@
 
 ## 默认运行链路
 
-1. `Script/Cmd/Linux/StartServer.sh` 或 `bun run dev:server` 启动 Python 后端，默认监听 `0.0.0.0:40092`。
-2. `Script/Cmd/Linux/StartWeb.sh` 或 `bun run dev:web` 启动 Web 前端，默认监听 `40091`。
+1. `Script/Cmd/Linux/StartServer.sh` 或 `npm run dev:server` 启动 Python 后端，默认监听 `0.0.0.0:40092`。
+2. `Script/Cmd/Linux/StartWeb.sh` 或 `npm run dev:web` 启动 Web 前端，默认监听 `40091`。
 3. `Script/Cmd/Linux/StartDesktop.sh` 启动桌面壳，要求 Web 已经就绪。
-4. `Script/Cmd/Linux/StartAll.sh` 或 `bun run dev` 仅用于开发期一键启动 Server/Web/Desktop。
+4. `Script/Cmd/Linux/StartAll.sh` 或 `npm run dev` 仅用于开发期一键启动 Server/Web/Desktop。
 5. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
 
 ## 改造方向
@@ -30,6 +30,6 @@
 
 - Python 3.11+ / 标准库 HTTP 服务
 - `mon_agent_core`（来自 `AgentCore` 子仓库）
-- Bun 1.3+ / TypeScript（用于 Web 前端和桌面壳）
+- Node.js 22+ / npm / TypeScript（用于 Web 前端和桌面壳）
 - React / Vite
 - Tauri

@@ -4,30 +4,22 @@
   "description": "Mon Pi-powered local agent",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.13",
+  "packageManager": "npm@10.9.7",
   "scripts": {
-    "dev": "bun run Script/Project/dev.ts",
+    "dev": "node Script/Project/dev.mjs",
     "dev:server": "python3 Script/Project/dev_server.py",
-    "dev:web": "bun run --cwd frontend/web dev",
-    "dev:desktop": "bun run --cwd frontend/desktop dev",
+    "dev:web": "npm --prefix frontend/web run dev",
+    "dev:desktop": "node Script/Project/dev_desktop.mjs",
     "lint": "oxlint",
-    "typecheck": "python3 Script/Project/check_server.py && bun run --cwd frontend/web typecheck",
+    "typecheck": "python3 Script/Project/check_server.py && npm --prefix frontend/web run typecheck",
     "postinstall": "node -e \"console.log('MonAgent uses the Pi runtime; no legacy node-pty patch is required.')\"",
     "prepare": "husky",
     "test": "echo 'do not run tests from root' && exit 1"
   },
-  "workspaces": {
-    "packages": [
-      "frontend/*"
-    ],
-    "catalog": {
-      "@tsconfig/bun": "1.0.9",
-      "@types/bun": "1.3.12",
-      "typescript": "5.8.2"
-    }
-  },
+  "workspaces": [
+    "frontend/*"
+  ],
   "devDependencies": {
-    "@tsconfig/bun": "1.0.9",
     "husky": "9.1.7",
     "oxlint": "1.60.0",
     "prettier": "3.6.2"
@@ -40,8 +32,5 @@
   "prettier": {
     "semi": false,
     "printWidth": 120
-  },
-  "trustedDependencies": [
-    "esbuild"
-  ]
+  }
 }

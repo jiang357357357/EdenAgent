@@ -151,10 +151,10 @@ Effect.loop(30秒间隔) {
 | 类别 | 检查内容 | 工具 | 示例 |
 |------|----------|------|------|
 | **git** | 未提交变更、未推送提交 | `git status`, `git log` | "有 3 个文件改了还没提交" |
-| **deps** | 依赖安全漏洞、过期 | `bun outdated` / `npm audit` | "lodash@4.17.20 有 CVE-2024" |
+| **deps** | 依赖安全漏洞、过期 | `npm outdated` / `npm audit` | "lodash@4.17.20 有 CVE-2024" |
 | **disk** | 磁盘空间 | 系统命令 | "C盘只剩 5GB 了笨蛋前辈" |
-| **lint** | 代码 lint / 类型错误 | `tsc --noEmit`, `bun lint` | "有 12 个类型错误没修" |
-| **build** | 构建是否通过 | `bun run build` | "构建失败，可能是昨天改的..." |
+| **lint** | 代码 lint / 类型错误 | `tsc --noEmit`, `npm run lint` | "有 12 个类型错误没修" |
+| **build** | 构建是否通过 | `npm run build` | "构建失败，可能是昨天改的..." |
 | **error_log** | 最近错误日志 | 读 logs 文件 | "昨晚 3 点有个 unhandled 错误" |
 
 ### 5.2 检查策略（LLM 自主决定）
@@ -173,7 +173,7 @@ SYSTEM: 你可以自由选择检查什么。优先检查：
 
 如果是第一次自检，LLM 没有历史参考，给一个默认推荐：
 - git status（基本）
-- 如果有 package.json → npm/bun outdated
+- 如果有 package.json → npm outdated
 - 磁盘空间
 
 ## 六、与现有引擎的集成

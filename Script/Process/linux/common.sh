@@ -42,13 +42,13 @@ ensure_pm2() {
   return 1
 }
 
-ensure_bun() {
-  if command -v bun >/dev/null 2>&1; then
+ensure_node() {
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     return 0
   fi
 
-  echo "[x] bun not found"
-  echo "    Install Bun before starting MonAgent"
+  echo "[x] node/npm not found"
+  echo "    Install Node.js 22+ before starting MonAgent Web."
   return 1
 }
 

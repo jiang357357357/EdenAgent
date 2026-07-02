@@ -1,24 +1,13 @@
 import path from "node:path"
 import { existsSync, readFileSync } from "node:fs"
 
-export type MonConfigData = Record<string, Record<string, string>>
-
-export interface MonConfig {
-  data: MonConfigData
-  workspaceRoot: string
-  files: string[]
-  get(section: string, key: string, fallback?: string): string | undefined
-  number(section: string, key: string, fallback: number): number
-  path(section: string, key: string, fallback: string): string
-}
-
 const MAX_DEPTH = 10
 
-function findFiles(start: string) {
-  const files: string[] = []
+function findFiles(start) {
+  const files = []
   let current = path.resolve(start)
 
-  for (let depth = 0; depth < MAX_DEPTH; depth++) {
+  for (let depth = 0; depth < MAX_DEPTH; depth += 1) {
     const file = path.join(current, ".monconfig")
     if (existsSync(file)) files.push(file)
 
@@ -30,8 +19,8 @@ function findFiles(start: string) {
   return files
 }
 
-function parse(file: string): MonConfigData {
-  const data: MonConfigData = {}
+function parse(file) {
+  const data = {}
   let section = "default"
 
   for (const rawLine of readFileSync(file, "utf8").split(/\r?\n/)) {
@@ -57,9 +46,9 @@ function parse(file: string): MonConfigData {
   return data
 }
 
-export function loadMonConfig(start = process.cwd()): MonConfig {
+export function loadMonConfig(start = process.cwd()) {
   const files = findFiles(start)
-  const data: MonConfigData = {}
+  const data = {}
 
   for (const file of files.slice().reverse()) {
     const parsed = parse(file)
@@ -69,8 +58,7 @@ export function loadMonConfig(start = process.cwd()): MonConfig {
   }
 
   const workspaceRoot = files[0] ? path.dirname(files[0]) : path.resolve(start)
-
-  const config: MonConfig = {
+  const config = {
     data,
     workspaceRoot,
     files,
