@@ -1,6 +1,6 @@
 import net from "node:net"
 import { spawn } from "node:child_process"
-import { existsSync, rmSync } from "node:fs"
+import { existsSync, readFileSync, rmSync } from "node:fs"
 import { loadMonConfig } from "./monconfig.mjs"
 
 const root = process.cwd()
@@ -120,25 +120,76 @@ async function killPidTree(pid) {
     return
   }
   try {
-    process.kill(pid, "SIGTERM")
-  } catch {}
+    process.kill(-pid, "SIGTERM")
+  } catch {
+    try {
+      process.kill(pid, "SIGTERM")
+    } catch {}
+  }
 }
 
 async function portPids(port) {
-  if (process.platform !== "win32") return []
-  const result = await runCapture(["netstat", "-ano"], 5000).catch(() => ({ stdout: "", stderr: "", exitCode: 1 }))
   const pids = new Set()
-  const pattern = new RegExp(`(?:0\\.0\\.0\\.0|127\\.0\\.0\\.1|\\[?::\\]?):${port}\\s+.*\\s+LISTENING\\s+(\\d+)`, "i")
-  for (const line of result.stdout.split(/\r?\n/)) {
-    const match = line.match(pattern)
-    const pid = match ? Number(match[1]) : NaN
+
+  if (process.platform === "win32") {
+    const result = await runCapture(["netstat", "-ano"], 5000).catch(() => ({ stdout: "", stderr: "", exitCode: 1 }))
+    const pattern = new RegExp(`(?:0\\.0\\.0\\.0|127\\.0\\.0\\.1|\\[?::\\]?):${port}\\s+.*\\s+LISTENING\\s+(\\d+)`, "i")
+    for (const line of result.stdout.split(/\r?\n/)) {
+      const match = line.match(pattern)
+      const pid = match ? Number(match[1]) : NaN
+      if (Number.isFinite(pid)) pids.add(pid)
+    }
+    return [...pids]
+  }
+
+  const lsof = await runCapture(["lsof", `-tiTCP:${port}`, "-sTCP:LISTEN", "-P", "-n"], 5000).catch(() => ({
+    stdout: "",
+    stderr: "",
+    exitCode: 1,
+  }))
+  for (const line of lsof.stdout.split(/\r?\n/)) {
+    const pid = Number(line.trim())
+    if (Number.isFinite(pid)) pids.add(pid)
+  }
+  if (pids.size) return [...pids]
+
+  const ss = await runCapture(["ss", "-ltnp", `( sport = :${port} )`], 5000).catch(() => ({
+    stdout: "",
+    stderr: "",
+    exitCode: 1,
+  }))
+  for (const match of ss.stdout.matchAll(/pid=(\d+)/g)) {
+    const pid = Number(match[1])
+    if (Number.isFinite(pid)) pids.add(pid)
+  }
+  if (pids.size) return [...pids]
+
+  const fuser = await runCapture(["fuser", `${port}/tcp`], 5000).catch(() => ({
+    stdout: "",
+    stderr: "",
+    exitCode: 1,
+  }))
+  for (const token of `${fuser.stdout}\n${fuser.stderr}`.split(/\s+/)) {
+    const pid = Number(token.trim())
     if (Number.isFinite(pid)) pids.add(pid)
   }
   return [...pids]
 }
 
 async function processCommandLine(pid) {
-  if (process.platform !== "win32") return ""
+  if (process.platform !== "win32") {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ").trim()
+    } catch {
+      const result = await runCapture(["ps", "-p", String(pid), "-o", "command="], 3000).catch(() => ({
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+      }))
+      return result.stdout.trim()
+    }
+  }
+
   const script = `Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" | Select-Object -ExpandProperty CommandLine`
   const result = await runCapture(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], 5000).catch(() => ({
     stdout: "",
