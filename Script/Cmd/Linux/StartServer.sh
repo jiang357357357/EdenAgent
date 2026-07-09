@@ -17,6 +17,8 @@ if command -v pm2 >/dev/null 2>&1; then
   fi
 fi
 release_tcp_port "$SERVER_PORT" "MonAgent foreground server"
+begin_start_log_dir
+echo "[i] Log directory: $MON_LOG_START_DIR"
 
 export PYTHONPATH="$PROJECT_ROOT/Server/src:$PROJECT_ROOT/AgentCore/src${PYTHONPATH:+:$PYTHONPATH}"
 if [[ -n "${MON_AGENT_PYTHON:-}" ]]; then

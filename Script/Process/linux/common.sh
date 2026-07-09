@@ -7,6 +7,10 @@ PROJECT_ROOT="$(cd "$COMMON_DIR/../../.." && pwd)"
 CONFIG_FILE="$PROJECT_ROOT/.monconfig"
 SERVER_ROOT="$PROJECT_ROOT/Server"
 SERVER_VENV_PYTHON="$SERVER_ROOT/.venv/bin/python"
+LOG_ROOT="$PROJECT_ROOT/Data/Logs"
+CURRENT_START_FILE="$LOG_ROOT/current_start.txt"
+START_COUNTER_FILE="$LOG_ROOT/startup_counter.txt"
+KEEP_START_COUNT="${MON_KEEP_START_COUNT:-10}"
 
 read_monconfig_value() {
   local section="$1"
@@ -33,11 +37,154 @@ SERVER_PM2_NAME="${MON_AGENT_SERVER_PM2_NAME:-$(read_monconfig_value process SER
 SERVER_PM2_NAME="${SERVER_PM2_NAME:-agent-api}"
 WEB_PM2_NAME="${MON_AGENT_WEB_PM2_NAME:-$(read_monconfig_value process WEB_PM2_NAME)}"
 WEB_PM2_NAME="${WEB_PM2_NAME:-agent-web}"
-SERVER_LOG_FILE="${MON_AGENT_SERVER_LOG_FILE:-$(read_monconfig_value log FILE)}"
-SERVER_LOG_FILE="${SERVER_LOG_FILE:-Data/Logs/Text/MonAgent/MonAgent.log}"
-if [[ "$SERVER_LOG_FILE" != /* ]]; then
-  SERVER_LOG_FILE="$PROJECT_ROOT/$SERVER_LOG_FILE"
-fi
+
+parse_start_index() {
+  local name
+  name="$(basename "$1")"
+  if [[ "$name" =~ ^start_([0-9]+)$ ]]; then
+    printf '%s\n' "$((10#${BASH_REMATCH[1]}))"
+  else
+    printf '%s\n' "-1"
+  fi
+}
+
+latest_start_index() {
+  local latest=0
+  local dir index
+  shopt -s nullglob
+  for dir in "$LOG_ROOT"/start_*; do
+    [[ -d "$dir" ]] || continue
+    index="$(parse_start_index "$dir")"
+    if [[ "$index" =~ ^[0-9]+$ && "$index" -gt "$latest" ]]; then
+      latest="$index"
+    fi
+  done
+  shopt -u nullglob
+  printf '%s\n' "$latest"
+}
+
+read_start_counter() {
+  if [[ -f "$START_COUNTER_FILE" ]]; then
+    cat "$START_COUNTER_FILE" 2>/dev/null || printf '0\n'
+  else
+    printf '0\n'
+  fi
+}
+
+current_start_log_dir() {
+  local current candidate
+  current=""
+  if [[ -f "$CURRENT_START_FILE" ]]; then
+    current="$(cat "$CURRENT_START_FILE" 2>/dev/null || true)"
+  fi
+  if [[ -n "$current" ]]; then
+    candidate="$current"
+    if [[ "$candidate" != /* ]]; then
+      candidate="$LOG_ROOT/$candidate"
+    fi
+    if [[ -d "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+prune_old_start_dirs() {
+  shopt -s nullglob
+  mapfile -t dirs < <(printf '%s\n' "$LOG_ROOT"/start_* | sort)
+  shopt -u nullglob
+  local remove_count=$(( ${#dirs[@]} - KEEP_START_COUNT ))
+  if [[ "$remove_count" -le 0 ]]; then
+    return 0
+  fi
+  local i
+  for ((i = 0; i < remove_count; i++)); do
+    rm -rf "${dirs[$i]}"
+  done
+}
+
+begin_start_log_dir() {
+  mkdir -p "$LOG_ROOT"
+  local counter latest next index start_dir
+  counter="$(read_start_counter)"
+  [[ "$counter" =~ ^[0-9]+$ ]] || counter=0
+  latest="$(latest_start_index)"
+  next=$(( counter > latest ? counter + 1 : latest + 1 ))
+
+  for ((index = next; index < next + 1000; index++)); do
+    start_dir="$LOG_ROOT/start_$(printf '%06d' "$index")"
+    if mkdir "$start_dir" 2>/dev/null; then
+      mkdir -p "$start_dir/Process" "$start_dir/Text/MonAgent" "$start_dir/Render"
+      printf '%s\n' "$index" > "$START_COUNTER_FILE"
+      basename "$start_dir" > "$CURRENT_START_FILE"
+      export MON_LOG_START_DIR="$start_dir"
+      publish_active_log_env
+      prune_old_start_dirs
+      return 0
+    fi
+  done
+
+  echo "[x] Unable to create a new MonAgent start log directory" >&2
+  return 1
+}
+
+use_current_or_begin_start_log_dir() {
+  local current
+  if current="$(current_start_log_dir)"; then
+    mkdir -p "$current/Process" "$current/Text/MonAgent" "$current/Render"
+    export MON_LOG_START_DIR="$current"
+    publish_active_log_env
+    return 0
+  fi
+  begin_start_log_dir
+}
+
+active_start_log_dir() {
+  if [[ -n "${MON_LOG_START_DIR:-}" ]]; then
+    printf '%s\n' "$MON_LOG_START_DIR"
+    return 0
+  fi
+  current_start_log_dir
+}
+
+publish_active_log_env() {
+  local active_dir
+  active_dir="$(active_start_log_dir 2>/dev/null || true)"
+  if [[ -z "$active_dir" ]]; then
+    return 0
+  fi
+  export MON_AGENT_SERVER_LOG_FILE="$active_dir/Text/MonAgent/MonAgent.log"
+  export MON_AGENT_SERVER_PLAIN_LOG_FILE="$active_dir/Text/MonAgent/MonAgent_plain.log"
+  export MON_AGENT_RENDER_LOG_DIR="$active_dir/Render"
+  export MON_AGENT_RENDER_LOG_FILE="$active_dir/Render/render.log"
+  export MON_AGENT_RENDER_PLAIN_LOG_FILE="$active_dir/Render/render_plain.log"
+  export MON_AGENT_RENDER_PANELS_FILE="$active_dir/Render/panels.json"
+  SERVER_LOG_FILE="$MON_AGENT_SERVER_LOG_FILE"
+  SERVER_PLAIN_LOG_FILE="$MON_AGENT_SERVER_PLAIN_LOG_FILE"
+}
+
+resolve_agent_log_file() {
+  local env_value="$1"
+  local relative_path="$2"
+  local active_dir
+  if [[ -n "$env_value" ]]; then
+    if [[ "$env_value" == /* ]]; then
+      printf '%s\n' "$env_value"
+    else
+      printf '%s\n' "$PROJECT_ROOT/$env_value"
+    fi
+    return 0
+  fi
+  if active_dir="$(active_start_log_dir)"; then
+    printf '%s\n' "$active_dir/$relative_path"
+  else
+    printf '%s\n' "$PROJECT_ROOT/Data/Logs/$relative_path"
+  fi
+}
+
+SERVER_LOG_FILE="$(resolve_agent_log_file "${MON_AGENT_SERVER_LOG_FILE:-}" "Text/MonAgent/MonAgent.log")"
+SERVER_PLAIN_LOG_FILE="$(resolve_agent_log_file "${MON_AGENT_SERVER_PLAIN_LOG_FILE:-}" "Text/MonAgent/MonAgent_plain.log")"
 
 ensure_pm2() {
   if command -v pm2 >/dev/null 2>&1; then
@@ -158,18 +305,39 @@ pm2_process_summary() {
     const fs = require("fs");
     const names = (process.env.PM2_APP_NAMES || "").split(/\n/).map((item) => item.trim()).filter(Boolean);
     const apps = JSON.parse(fs.readFileSync(0, "utf8") || "[]");
-    for (const name of names) {
+    const rows = names.map((name) => {
       const app = apps.find((item) => item.name === name);
-      if (!app) {
-        console.log(`${name}: missing`);
-        continue;
-      }
+      if (!app) return { id: "-", name, status: "missing", pid: "-", cpu: "-", mem: "-" };
       const env = app.pm2_env || {};
       const monit = app.monit || {};
       const mem = monit.memory ? `${(monit.memory / 1024 / 1024).toFixed(1)}MB` : "-";
       const cpu = Number.isFinite(monit.cpu) ? `${monit.cpu}%` : "-";
-      console.log(`${name}: ${env.status || "unknown"} pid=${app.pid || env.pm_pid || "-"} cpu=${cpu} mem=${mem}`);
-    }
+      return {
+        id: String(app.pm_id ?? env.pm_id ?? "-"),
+        name,
+        status: env.status || "unknown",
+        pid: String(app.pid || env.pm_pid || "-"),
+        cpu,
+        mem,
+      };
+    });
+    const fields = [["id", "id"], ["name", "name"], ["status", "status"], ["pid", "pid"], ["cpu", "cpu"], ["mem", "mem"]];
+    const widths = {
+      field: Math.max("field".length, ...fields.map(([, label]) => label.length)),
+      value: Math.max("value".length, ...rows.flatMap((row) => fields.map(([key]) => String(row[key]).length))),
+    };
+    const border = (left, middle, right) =>
+      left + ["field", "value"].map((key) => "─".repeat(widths[key] + 2)).join(middle) + right;
+    const line = (field, value) =>
+      `│ ${String(field).padEnd(widths.field)} │ ${String(value).padEnd(widths.value)} │`;
+    console.log(border("┌", "┬", "┐"));
+    console.log(line("field", "value"));
+    console.log(border("├", "┼", "┤"));
+    rows.forEach((row, index) => {
+      if (index > 0) console.log(border("├", "┼", "┤"));
+      fields.forEach(([key, label]) => console.log(line(label, row[key])));
+    });
+    console.log(border("└", "┴", "┘"));
   '
 }
 
@@ -345,5 +513,16 @@ export MON_AGENT_PORT="$SERVER_PORT"
 export MON_AGENT_WEB_PORT="$WEB_PORT"
 export MON_AGENT_SERVER_PM2_NAME="$SERVER_PM2_NAME"
 export MON_AGENT_WEB_PM2_NAME="$WEB_PM2_NAME"
+export MON_AGENT_SERVER_LOG_FILE="$SERVER_LOG_FILE"
+export MON_AGENT_SERVER_PLAIN_LOG_FILE="$SERVER_PLAIN_LOG_FILE"
+if [[ -z "${MON_LOG_START_DIR:-}" ]]; then
+  if current="$(current_start_log_dir 2>/dev/null)"; then
+    export MON_LOG_START_DIR="$current"
+  fi
+fi
+publish_active_log_env
+export PYTHONUNBUFFERED=1
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
 export NO_COLOR=1
 export FORCE_COLOR=0

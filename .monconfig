@@ -52,6 +52,17 @@ QUIT_FLAG=.artifacts/desktop-quit.flag
 LEVEL=DEBUG
 FILE=Data/Logs/Text/MonAgent/MonAgent.log
 PLAIN_FILE=Data/Logs/Text/MonAgent/MonAgent_plain.log
+DISPLAY_ENABLED=true
+RENDER_DIR=Data/Logs/Render
+RENDER_FILE=Data/Logs/Render/render.log
+RENDER_PLAIN_FILE=Data/Logs/Render/render_plain.log
+RENDER_PANELS=Data/Logs/Render/panels.json
+CONSOLE_ENABLED=true
+FILE_ENABLED=true
+COLOR_ENABLED=true
+DUAL_FILE_ENABLED=true
+MAX_BYTES=10485760
+BACKUP_COUNT=5
 
 [hub]
 ENABLED=true
@@ -69,6 +80,15 @@ MODE=development
 [auth_dev]
 USERNAME=admin1
 PASSWORD=123456
+
+[environment]
+TIMEZONE=Asia/Shanghai
+LOCALE=zh-CN
+COUNTRY=中国
+REGION=上海市
+CITY=上海
+LATITUDE=31.2304
+LONGITUDE=121.4737
 
 [self_awake]
 STARTUP_WAKE_ENABLED=true

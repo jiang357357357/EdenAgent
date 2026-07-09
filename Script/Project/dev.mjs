@@ -130,14 +130,18 @@ async function killPidTree(pid) {
 
 async function portPids(port) {
   const pids = new Set()
+  const addPid = (value) => {
+    const text = String(value ?? "").trim()
+    if (!/^[1-9]\d*$/.test(text)) return
+    pids.add(Number(text))
+  }
 
   if (process.platform === "win32") {
     const result = await runCapture(["netstat", "-ano"], 5000).catch(() => ({ stdout: "", stderr: "", exitCode: 1 }))
     const pattern = new RegExp(`(?:0\\.0\\.0\\.0|127\\.0\\.0\\.1|\\[?::\\]?):${port}\\s+.*\\s+LISTENING\\s+(\\d+)`, "i")
     for (const line of result.stdout.split(/\r?\n/)) {
       const match = line.match(pattern)
-      const pid = match ? Number(match[1]) : NaN
-      if (Number.isFinite(pid)) pids.add(pid)
+      addPid(match?.[1])
     }
     return [...pids]
   }
@@ -148,8 +152,7 @@ async function portPids(port) {
     exitCode: 1,
   }))
   for (const line of lsof.stdout.split(/\r?\n/)) {
-    const pid = Number(line.trim())
-    if (Number.isFinite(pid)) pids.add(pid)
+    addPid(line)
   }
   if (pids.size) return [...pids]
 
@@ -159,8 +162,7 @@ async function portPids(port) {
     exitCode: 1,
   }))
   for (const match of ss.stdout.matchAll(/pid=(\d+)/g)) {
-    const pid = Number(match[1])
-    if (Number.isFinite(pid)) pids.add(pid)
+    addPid(match[1])
   }
   if (pids.size) return [...pids]
 
@@ -170,8 +172,7 @@ async function portPids(port) {
     exitCode: 1,
   }))
   for (const token of `${fuser.stdout}\n${fuser.stderr}`.split(/\s+/)) {
-    const pid = Number(token.trim())
-    if (Number.isFinite(pid)) pids.add(pid)
+    addPid(token)
   }
   return [...pids]
 }
@@ -215,12 +216,20 @@ async function releaseOwnedPort(port, label) {
   }
 }
 
-function start(label, cmd) {
+function childEnv(extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv }
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined || value === null) delete env[key]
+  }
+  return env
+}
+
+function start(label, cmd, extraEnv = {}) {
   const child = spawn(cmd[0], cmd.slice(1), {
     cwd: root,
     stdout: "pipe",
     stderr: "pipe",
-    env: process.env,
+    env: childEnv(extraEnv),
     detached: process.platform !== "win32",
     windowsHide: true,
   })
@@ -307,7 +316,7 @@ try {
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
-  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"])
+  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"], { ELECTRON_RUN_AS_NODE: undefined })
 
   devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
   desktop.on("exit", () => void shutdown(0))

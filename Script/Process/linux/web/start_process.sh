@@ -36,8 +36,12 @@ fi
 release_tcp_port "$WEB_PORT" "$PM2_APP_NAME"
 
 if [[ "$status" == "missing" ]]; then
+  use_current_or_begin_start_log_dir
+  echo "Log directory: $MON_LOG_START_DIR"
   run_pm2_quiet start "$ECOSYSTEM_FILE" --only "$PM2_APP_NAME"
 else
+  use_current_or_begin_start_log_dir
+  echo "Log directory: $MON_LOG_START_DIR"
   run_pm2_quiet restart "$PM2_APP_NAME" --update-env
 fi
 
