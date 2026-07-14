@@ -1,12 +1,12 @@
 [submodule "frontend"]
 	path = frontend
-	url = https://github.com/jiang357357357/MonAgentFrontend.git
+	url = ../MonAgentFrontend.git
 	branch = main
 [submodule "Server"]
 	path = Server
-	url = https://github.com/jiang357357357/MonAgentServer.git
+	url = ../MonAgentServer.git
 	branch = main
 [submodule "AgentCore"]
 	path = AgentCore
-	url = https://github.com/jiang357357357/MonAgentCore.git
+	url = ../MonAgentCore.git
 	branch = main
