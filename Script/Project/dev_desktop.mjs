@@ -92,6 +92,17 @@ let cleaned = false
 let webProc
 let desktopProc
 
+function handleOutputError(error) {
+  if (error?.code === "EPIPE" || error?.code === "ERR_STREAM_DESTROYED") {
+    void cleanup().finally(() => process.exit(0))
+    return
+  }
+  setImmediate(() => { throw error })
+}
+
+process.stdout.on("error", handleOutputError)
+process.stderr.on("error", handleOutputError)
+
 function relay(readable, target) {
   if (!readable) return
   readable.on("data", (chunk) => target.write(chunk))
@@ -113,6 +124,11 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   void cleanup().finally(() => process.exit())
 })
+if (process.platform !== "win32") {
+  process.on("SIGHUP", () => {
+    void cleanup().finally(() => process.exit())
+  })
+}
 
 if (await isWebReady()) {
   console.log(`\n  Web 前端已就绪：http://127.0.0.1:${webPort}\n`)
@@ -138,6 +154,7 @@ desktopProc = spawn(npmCommand(), ["--prefix", "frontend/desktop", "run", "dev"]
   env: {
     ...process.env,
     MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
+    MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
   },
   detached: process.platform !== "win32",
   windowsHide: true,

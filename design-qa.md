@@ -88,6 +88,60 @@ final result: passed
 
 ---
 
+# 实时语音转写输入框：设计 QA
+
+## Evidence
+
+- Source visual truth: `文档/参考/设计思路/桌宠语音输入/02-实时转写.png`
+- Implementation target: `frontend/web/src/components/ChatInput.tsx`
+- Viewport: intended desktop chat composer at the application's current proportional window size.
+- State: microphone connecting, recording/live transcription, and finalizing transcription.
+- Rendered implementation screenshot: unavailable in the current tool session; the already-running Electron process was preserved rather than starting a duplicate window.
+- Full-view comparison evidence: blocked because no browser-rendered recording-state capture is available.
+- Focused region comparison evidence: blocked for the same reason.
+
+## Findings
+
+- [P2] Visual comparison is not yet evidenced.
+  Location: chat-page bottom composer while recording.
+  Evidence: the source image is available and the implementation builds, but the current tool session cannot open or capture the live microphone state from the existing Electron renderer.
+  Impact: spacing, live transcript wrapping, and action alignment have not been visually certified at runtime.
+  Fix: activate microphone input in the existing MonAgent chat window, capture the composer at its normal viewport, and compare that capture beside the source image.
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: implemented with the existing application type stack and proportional `vh` sizing; runtime wrapping remains to be visually checked.
+- Spacing and layout rhythm: implemented as a 26% / flexible / 23% three-region grid with proportional spacing; runtime capture remains required.
+- Colors and visual tokens: uses existing `accent`, `text`, `text-muted`, `border`, `bg`, and `card` tokens.
+- Image quality and asset fidelity: the design contains no raster content. UI icons use the project's existing Lucide icon set.
+- Copy and content: includes `正在转写`, elapsed time, live transcript, `取消`, and `完成`.
+
+## Functional Verification
+
+- TypeScript typecheck: passed.
+- Production Vite build: passed.
+- Git whitespace validation: passed.
+- Implemented states: connecting, live recording level, elapsed time, incremental transcript, cancel-and-restore, finalizing, and completion.
+- Browser-rendered interaction test: blocked by unavailable browser/capture tooling for the existing Electron renderer.
+- Console error check: blocked for the same reason.
+
+## Implementation Checklist
+
+- [x] Replace the normal composer while microphone input is active.
+- [x] Show live transcript and elapsed recording time.
+- [x] Keep cancel and complete actions separate.
+- [x] Restore the pre-recording input when cancelled.
+- [x] Preserve the transcript after completion.
+- [ ] Capture and compare the live Electron recording state.
+
+## Comparison History
+
+- No visual iteration has been completed because the implementation screenshot is unavailable.
+
+final result: blocked
+
+---
+
 # 桌宠轻量悬浮气泡：设计 QA
 
 ## Evidence

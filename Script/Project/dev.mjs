@@ -14,6 +14,17 @@ rmSync(quitFlag, { force: true })
 const children = []
 let shuttingDown = false
 
+function handleOutputError(error) {
+  if (error?.code === "EPIPE" || error?.code === "ERR_STREAM_DESTROYED") {
+    void shutdown(0)
+    return
+  }
+  setImmediate(() => { throw error })
+}
+
+process.stdout.on("error", handleOutputError)
+process.stderr.on("error", handleOutputError)
+
 const ansi = {
   reset: "\x1b[0m",
   dev: "\x1b[90m",
@@ -294,6 +305,7 @@ async function shutdown(code = 0) {
 
 process.on("SIGINT", () => void shutdown(0))
 process.on("SIGTERM", () => void shutdown(0))
+if (process.platform !== "win32") process.on("SIGHUP", () => void shutdown(0))
 
 const quitWatcher = setInterval(() => {
   if (existsSync(quitFlag)) {
@@ -316,7 +328,10 @@ try {
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
-  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"], { ELECTRON_RUN_AS_NODE: undefined })
+  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"], {
+    ELECTRON_RUN_AS_NODE: undefined,
+    MON_AGENT_DEV_PARENT_PID: String(process.pid),
+  })
 
   devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
   desktop.on("exit", () => void shutdown(0))
