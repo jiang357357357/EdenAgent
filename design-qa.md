@@ -88,6 +88,354 @@ final result: passed
 
 ---
 
+# 全局提问确认层：设计 QA
+
+## Evidence
+
+- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-c10fecdd-0ba8-4333-91ff-2ad4da2c2955.png`
+- Rendered implementation: `artifacts/design-qa/question-decision-overlay-implementation-final.png`
+- Full-view comparison evidence: `artifacts/design-qa/question-decision-overlay-comparison-full-final.png`
+- Focused region comparison evidence: `artifacts/design-qa/question-decision-overlay-comparison-focus-final.png`
+- Viewport: source 1750 × 894; Electron implementation normalized from 1920 × 981 content to 1750 × 894 for comparison.
+- State: authenticated desktop chat, one real `ask_user` request, single choice, no selection, optional supplement empty.
+- Capture method: running Electron renderer captured from the active MonAgent window; source and normalized implementation were joined into the same full and focused comparison images.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains in the final comparison.
+- [P3] The implementation uses MonAgent's existing `#d97706` accent token, which is slightly darker than the generated concept's orange.
+  Location: confirmation button and selected state.
+  Resolution: accepted to preserve the product design system and consistency with the chat header controls.
+- [P3] The live background contains the current conversation and active character action rather than the concept's empty-chat copy and neutral standee.
+  Location: dimmed application content behind the dialog.
+  Resolution: accepted as dynamic product content; the 66/34 chat-character composition, warm scrim, blur, and modal placement match the source.
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: the eyebrow, Chinese display question, option labels, descriptions, optional-note label, input copy, and actions follow the source hierarchy and the existing Helvetica/Arial/system and serif fallbacks. Wrapping and line-height match at the target state.
+- Spacing and layout rhythm: centered 32vw decision panel, 74.5vh frame, measured internal padding, full-width choice rows, compact no-description row, divider, textarea, full-width primary action, and quiet rejection action align with the focused comparison. The single-question scrollbar is visually suppressed while multi-question dialogs remain scrollable.
+- Colors and visual tokens: warm translucent scrim, white panel, stone borders and text, subtle elevation, amber focus/selection, and product orange primary action map to current project tokens with legible contrast.
+- Image quality and asset fidelity: the implementation reuses the real current character asset and underlying application. No placeholder, handcrafted SVG, CSS illustration, emoji, or fake raster asset was introduced.
+- Copy and content: the real `ask_user` header, question, option labels, option descriptions, and custom-answer capability populate the overlay. Empty descriptions remain empty instead of being duplicated from the option label.
+- Accessibility and interaction: the layer is an `aria-modal` dialog, traps Tab focus, restores focus after closing, supports native radio/checkbox semantics, validates incomplete submissions, exposes an alert on failure, and maps Escape to the quiet rejection path.
+- Responsiveness: viewport-relative sizing preserves the source proportions at the Electron target; the panel has a narrow-screen minimum/maximum width and internal scrolling for longer or multi-question requests.
+
+## Functional Verification
+
+- Triggered a real `ask_user` call from the running Python AgentCore chain and confirmed the global overlay appeared outside the message/composer layout.
+- Selected `直接修改` with the keyboard, submitted it, and verified the pending question disappeared, the tool resumed, and the assistant returned `提问链路测试完成：直接修改`.
+- Triggered another real question, pressed Escape, and verified the reject endpoint released the waiting tool and removed the overlay.
+- Restarted the Python server, rehydrated a pending question after renderer reload, and confirmed the global layer restores from `/question` state.
+- Verified a missing option description remains an empty string through the server payload and renders as the compact source row.
+- Server unit suite: 84 tests passed.
+- TypeScript typecheck: passed.
+- Production Vite build: passed; only the existing large-chunk advisory remains.
+- Git whitespace validation: passed for the root, frontend, and Server worktrees.
+
+## Comparison History
+
+### Iteration 1
+
+- Earlier P1: the prior question UI lived above the composer, resized the chat grid, and duplicated the interaction on page-specific surfaces.
+- Fix: mounted one ordered question overlay at the App root and removed the chat-page question cards while preserving the compact desktop-pet surface.
+- Post-fix evidence: `artifacts/design-qa/question-decision-overlay-runtime-v2.png` showed the correct global scrim and centered decision composition.
+
+### Iteration 2
+
+- Earlier P2: fixed-pixel sizing rendered the panel roughly twice as large under the Electron display scale, clipping most choices and actions.
+- Fix: converted the panel, type, row, and spacing geometry to the app's viewport-relative system and aligned the modal to the reference's 32vw placement.
+- Post-fix evidence: `artifacts/design-qa/question-decision-overlay-selected.png` showed the full panel and working selected state without content clipping.
+
+### Iteration 3
+
+- Earlier P2: the disabled primary action was gray, empty option descriptions were repeated from labels, modal height was short, and the single-question body exposed a scrollbar.
+- Fix: kept the primary action orange with inline validation, preserved empty descriptions in the interaction tool payload, added compact no-description rows, matched the measured 74.5vh frame, and suppressed the redundant single-question scrollbar.
+- Post-fix evidence: `artifacts/design-qa/question-decision-overlay-comparison-full-final.png` and `artifacts/design-qa/question-decision-overlay-comparison-focus-final.png` show the corrected same-state composition.
+
+## Implementation Checklist
+
+- [x] Replace page-local question cards with one global blocking decision layer.
+- [x] Preserve real reply/reject endpoints and sequential pending-question behavior.
+- [x] Match source geometry, typography, warm scrim, choices, supplement field, and actions.
+- [x] Support keyboard focus, validation, rejection, multi-select, custom answers, and multi-question scrolling.
+- [x] Verify both submit and reject paths against the running Python agent runtime.
+- [x] Pass source/rendered comparison, tests, typecheck, build, and whitespace checks.
+
+## Follow-up Polish
+
+- A future pass can tune the accent token globally if MonAgent adopts the concept's brighter orange across the whole product; this component intentionally does not introduce a one-off hue.
+
+final result: passed
+
+---
+
+# 备忘录时间轴工作台：设计 QA
+
+## Evidence
+
+- Source visual truth: `文档/参考/设计思路/备忘录设计方案/02-时间轴工作台.png`
+- Implementation target: `frontend/web/src/pages/memo/MemoPage.tsx`
+- Rendered implementation: `artifacts/design-qa/memo-timeline-1730x909-final.png`
+- Exact-size full comparison: `artifacts/design-qa/memo-timeline-reference-vs-final.png`
+- Focused detail comparison: `artifacts/design-qa/memo-timeline-detail-reference-vs-final.png`
+- Editor interaction state: `artifacts/design-qa/memo-timeline-edit-state.png`
+- Viewport: 1730 × 909, matching the reference image exactly.
+- State: real Electron application, current authenticated memo data, archived-status filter, all memo types, email/QQ reminder selected.
+
+## Findings
+
+- No actionable P0, P1, or P2 visual mismatch remains in the tested master-detail state.
+- [P3] The live dataset contains no active future reminder, so the top strip correctly shows an empty reminder state instead of the reference's scheduled reminder. This is real data variation, not layout drift.
+- [P3] Live memo dates are July 6–7 rather than the reference's July 7 and July 16 grouping. Group ordering, time ordering, selection, and metadata formatting follow the same design behavior.
+- [P3] The Linux native Electron title bar is slightly taller than the reference environment's title bar. The application content below it is proportioned to the same 1730 × 909 outer viewport.
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: serif display titles and memo names reproduce the paper-workspace character; sans-serif controls and metadata keep the existing MonAgent type system.
+- Spacing and layout rhythm: the implementation matches the reference's approximately 32/68 master-detail split, compact left controls, grouped timeline rows, large reading field, and metadata cadence.
+- Colors and visual tokens: warm paper white, stone text, faint neutral borders, pale amber selection, and orange action accents use existing project tokens and assets.
+- Image quality and asset fidelity: the existing high-resolution memo background and diary paper texture are reused. All interface symbols use the project's Lucide dependency; no placeholder, emoji, CSS illustration, handcrafted SVG, or fake asset was introduced.
+- Copy and content: the UI uses current API memo titles, bodies, reminder timestamps, creation timestamps, types, and statuses instead of hard-coded screenshot data.
+- Responsiveness and overflow: the outer view remains fixed to the usable desktop space; the timeline and reading article own independent internal scroll regions.
+
+## Functional Verification
+
+- Clicking a timeline row updates the selected rail, title, body, and all metadata fields in the right reader.
+- Double-clicking a row or clicking `编辑` opens the existing paper editor with the selected memo's real values.
+- Closing the editor returns to the same selected timeline item without losing state.
+- Search, status filter, type filter, refresh, create, save, complete, archive, and snooze behavior remain connected to the existing API implementation.
+- Targeted oxlint: 0 errors and 0 warnings.
+- TypeScript typecheck: passed.
+- Production Vite build: passed.
+- Git whitespace validation: passed.
+- Build emitted only the existing Vite large-chunk advisory.
+
+## Comparison History
+
+### Iteration 1
+
+- P1: the previous memo page used a three-column paper-card wall and had no persistent reading surface.
+- Fix: rebuilt the page as a grouped timeline master list plus a full-height detail reader while preserving the real API and editor.
+
+### Iteration 2
+
+- P2: the first runtime render defaulted to an empty active filter and selected a different live record from the reference content.
+- Fix: aligned the current four-record archived state, added stable grouped ordering and selection, and selected the matching email/QQ reminder for comparison.
+
+### Iteration 3
+
+- P2: the first side-by-side pass had a wider left column, full-width filters, a denser paper texture, and undersized detail typography.
+- Fix: matched the 32.2vw column width, compact filter footprint, lighter paper treatment, lower title start, and larger title/body/metadata scale.
+
+## Implementation Checklist
+
+- [x] Match the selected time-axis master-detail composition.
+- [x] Keep current memo API data, filters, refresh, selection, creation, editing, and lifecycle actions.
+- [x] Use independent internal scrolling for the timeline and paper reader.
+- [x] Perform exact-size source/rendered comparison and focused detail comparison.
+- [x] Verify timeline selection and editor open/close interactions in Electron.
+- [x] Pass lint, typecheck, production build, and whitespace validation.
+
+final result: passed
+
+---
+
+# 自醒日记目录阅读台：设计 QA
+
+## Evidence
+
+- Source visual truth: `文档/参考/设计思路/自醒日记/01-日记目录阅读台.png`
+- Rendered implementation: `artifacts/design-qa/self-awake-diary-1672x941-final.png`
+- Same-input source/render comparison: `artifacts/design-qa/self-awake-diary-reference-vs-final.png`
+- Search state: `artifacts/design-qa/self-awake-diary-search-state.png`
+- Day expansion and selection state: `artifacts/design-qa/self-awake-diary-expanded-day-state.png`
+- Viewport: source and implementation are both 1672 × 941 Electron-window captures.
+- State: authenticated local user, real self-awake records, `日记` selected, 2026 / 07 expanded, July 14 expanded, completed diary selected.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains in the final comparison.
+- [P3] The rendered title, diary text, timestamps, and per-day counts differ from the concept because the implementation uses current server records rather than frozen mock content. The selected date, hierarchy, density, and reading composition match the reference state.
+- [P3] Linux window decoration renders a 64px native title bar, while the concept capture uses a roughly 54px title bar. The application header and all content below it preserve the reference proportions.
+- [P3] The current dataset contains ten July 14 entries rather than five. The UI intentionally shows the first three entries plus an ellipsis, matching the reference's compact directory treatment while preserving access through pagination.
+
+## Required Fidelity Surfaces
+
+- Typography: compact sans-serif directory metadata, serif date/title/body reading hierarchy, muted author metadata, and reference-scale body leading.
+- Layout rhythm: seamless 31.8vw / flexible split, flat directory tree, fixed header, full-height paper reader, dashed separators, and compact footer metadata.
+- Colors and visual tokens: warm paper canvas, white directory pane, orange selection/accent, emerald completion badge, stone borders, and restrained shadows.
+- Asset fidelity: the existing high-resolution MonAgent paper background and Lucide icon library are reused; no placeholder, emoji, handcrafted SVG, or CSS illustration was introduced.
+- Responsiveness and overflow: the page uses viewport-relative sizing, independent directory/reader scrolling, stable scrollbar gutters, truncation for long row titles, and no minimum page dimensions.
+
+## Functional Verification
+
+- Overview/diary segmented navigation works in the running Electron client.
+- Year, month, and day rows expand and collapse; opening July 14 selects its latest visible diary and updates the reading pane.
+- Diary rows select real records and update date, title, author/time, content, status, next wake, and action metadata.
+- Search accepts input, updates the result state through the existing API path, shows an intentional empty state, and clears back to the directory.
+- Refresh and paginated “加载更多” retain their existing handlers.
+- TypeScript typecheck: passed.
+- Production Vite build: passed; only the existing large-chunk advisory was emitted.
+- Targeted oxlint: 0 warnings and 0 errors.
+- Runtime smoke check: no renderer exception or Vite error overlay; only known Electron X11 atom-cache diagnostics appeared.
+
+## Comparison History
+
+### Iteration 1
+
+- P1: the previous diary view used separated rounded cards and lined notebook paper, which did not match the seamless directory-and-reader composition.
+- Fix: rebuilt the diary branch as a flat 31.8/68.2 split with a white directory pane and full-height warm paper reader while preserving live data and handlers.
+
+### Iteration 2
+
+- P2: the initial rendered title and body were oversized, the single-day list was too dense, and the paper asset showed an obvious desktop corner.
+- Fix: matched the date-stamp geometry, reduced title/body scale and leading, limited expanded days to three entries plus an ellipsis, and softened the background asset with a higher-opacity paper veil.
+
+### Iteration 3
+
+- P2: the first comparison still showed body copy larger than the reference and did not exercise the target July 14 branch.
+- Fix: reduced the reader scale once more, opened July 14 in the live Electron client, verified selection behavior, and recaptured at the exact 1672 × 941 reference size.
+
+## Implementation Checklist
+
+- [x] Match the selected seamless directory/reader composition.
+- [x] Preserve real records, search, tree expansion, selection, refresh, and pagination.
+- [x] Match the date stamp, completion badge, paper surface, separators, and footer metadata.
+- [x] Compare source and rendered implementation together at the same viewport.
+- [x] Verify search and day-selection states in the actual Electron client.
+- [x] Pass typecheck, production build, targeted lint, and runtime smoke checks.
+
+final result: passed
+
+---
+
+# 自醒观察报告：设计 QA
+
+## Evidence
+
+- Source visual truth: `文档/参考/设计思路/自醒/02-观察报告.png`
+- Rendered implementation: `artifacts/design-qa/self-awake-observation-report-v3.png`
+- Same-size side-by-side comparison: `artifacts/design-qa/self-awake-observation-report-comparison-final.png`
+- Focused content comparison: `artifacts/design-qa/self-awake-observation-report-focus-final.png`
+- Normalized viewport: 1672 × 941.
+- State: authenticated user, real self-awake API records, overview selected, latest successful restart wake displayed.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains.
+- [P3] Live content length differs from the reference because the implementation renders the currently selected self-awake record instead of mock copy; the report hierarchy and overflow behavior remain equivalent.
+- [P3] The current capture shows newer retry/startup events and a later next-wake timestamp. These are dynamic backend values and are intentionally preserved.
+- [P3] The implementation uses the existing MonAgent background texture at very low contrast; the reference is nearly white. The resulting hierarchy remains visually equivalent without replacing the product asset.
+
+## Required Fidelity Surfaces
+
+- Header: compact title block, segmented overview/diary navigation, refresh action, and current-user control.
+- Summary strip: current wake time/type/status on the left and next wake on the right.
+- Recent list: date grouping, active orange marker and tint, event metadata, time, scrolling, and incremental loading.
+- Observation report: title and actor, summary callout, full work diary, action result, current judgment, observation facts, follow-up schedule, and expandable raw data.
+- Responsive proportions: the body uses proportional grid columns and viewport-relative spacing/type; no minimum page dimensions were introduced.
+
+## Functional Verification
+
+- Recent records remain selectable and drive every detail surface from the real API record.
+- “查看更多” continues paginated loading through the existing request path.
+- “查看原始数据” expands/collapses the selected record payload and resets when the selection changes.
+- Overview/diary navigation and refresh retain their existing handlers.
+- TypeScript typecheck: passed.
+- Production Vite build: passed.
+- Git whitespace validation: passed.
+- Production build emitted only the existing large-chunk advisory; no build error occurred.
+
+## Comparison History
+
+### Iteration 1
+
+- P1: the old overview used a dense review-desk dashboard and exposed raw nested context as the primary content.
+- Fix: replaced it with the reference's recent-record list and observation-report reading layout while retaining live data.
+
+### Iteration 2
+
+- P2: header, cards, and background were visually heavier than the reference.
+- Fix: reduced the header height and radii, simplified the segmented tabs, flattened the report card, and raised the neutral background overlay.
+
+### Iteration 3
+
+- P2: the report needed clearer separation between narrative and facts.
+- Fix: assigned stable proportional columns, introduced orange section rules, and aligned judgment/facts/follow-up as a dedicated right rail.
+
+final result: passed
+
+---
+
+# 自醒双栏审阅台：设计 QA
+
+## Evidence
+
+- Source visual truth: `文档/参考/设计思路/自醒/03-双栏审阅台.png`
+- Rendered implementation: `artifacts/design-qa/self-awake-overview-implementation-v4.png`
+- Full-view side-by-side comparison: `artifacts/design-qa/self-awake-overview-comparison-final.png`
+- Interaction-restored capture: `artifacts/design-qa/self-awake-overview-interactions-final.png`
+- Source viewport: 1672 × 941. Runtime capture: 1920 × 1080 with a 1920 × 1000 Electron work area and an 80px operating-system panel. The comparison crops the system panel and normalizes the work area to the source dimensions.
+- State: real authenticated user, real self-awake records, `概览` selected, all records visible, completed run selected.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains in the final comparison.
+- [P3] The selected record copy and the number of records per date differ from the concept because the implementation renders current server data rather than mock rows. The table density, grouping, hierarchy, and column geometry remain faithful.
+- [P3] The native Electron title bar is slightly taller than the concept title bar. The product window chrome is preserved; the application header below it matches the reference hierarchy and keeps the main 34/66 split aligned.
+- [P3] The concept shows a custom abstract app mark, while the implementation uses MonAgent's existing Lucide spark identity to stay within the established product icon system.
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: compact Chinese system sans-serif for operational data, serif display treatment for titles, clear metadata hierarchy, single-line table truncation, and controlled two-line detail truncation.
+- Spacing and layout rhythm: 35.5vw master column, flexible detail column, compact header, grouped record table, three-step review flow, balanced observation/result panels, and a bottom diary summary all fit without overlap.
+- Colors and visual tokens: warm paper workspace background, white review cards, stone borders, orange selection/accent, emerald completion state, and muted secondary data reuse existing project tokens.
+- Image quality and asset fidelity: the existing high-resolution paper background is reused. All interface symbols use the project's Lucide dependency; no placeholder, emoji, CSS illustration, handcrafted SVG, or fake asset was introduced.
+- Copy and content: raw context JSON is replaced with structured event and environment facts. Current desire, action result, next wake time, interval reason, and diary data come from the real API response.
+- Responsiveness and overflow: the main page uses proportional `vw`/`vh` sizing, stable internal scroll regions, and explicit shrink behavior. The observation/result cards and diary summary no longer overlap at the tested Electron work area.
+
+## Functional Verification
+
+- Record filters (`全部`, `重启`, `定时`, `异常`) update the visible master list and keep selection valid.
+- Selecting a record refreshes every detail surface, including missing-context fallbacks.
+- Work-diary summary expands and collapses; the three factual summary lines remain visible in the compact state.
+- `概览` and `日记` tabs navigate correctly and return without losing the selected record.
+- Runtime stream after interaction showed successful API presence requests and no renderer exception or Vite error overlay.
+- TypeScript typecheck: passed.
+- Production Vite build: passed.
+- Git whitespace validation: passed.
+- Build emitted only the existing Vite large-chunk advisory.
+
+## Comparison History
+
+### Iteration 1
+
+- P2: the original overview used metric cards plus a raw context block and did not match the selected master-detail concept.
+- Fix: rebuilt the overview as a grouped review table, three-step decision flow, structured observation facts, result panel, and diary summary while preserving the live API.
+
+### Iteration 2
+
+- P1: increasing the diary summary height caused the flexible fact panels to shrink while their contents overflowed behind the diary card.
+- Fix: made the fact grid non-shrinking, reduced its internal vertical density to the reference proportions, and kept the detail column's internal scroll boundary.
+
+### Iteration 3
+
+- P2: title punctuation, account affordance, result summary, and diary density differed visibly from the reference.
+- Fix: normalized middle-dot spacing, restored the user icon, preferred the current desire for the review conclusion, and composed three real structured diary facts.
+
+## Implementation Checklist
+
+- [x] Match the selected 34/66 master-detail composition.
+- [x] Keep real self-awake records, filters, selection, diary navigation, and refresh behavior.
+- [x] Replace raw JSON with readable structured context facts.
+- [x] Match the review flow, observation/result cards, and diary summary.
+- [x] Perform same-input source/rendered visual comparison and interaction regression.
+- [x] Pass typecheck, production build, runtime smoke check, and whitespace validation.
+
+final result: passed
+
+---
+
 # 实时语音转写输入框：设计 QA
 
 ## Evidence
