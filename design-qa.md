@@ -88,6 +88,163 @@ final result: passed
 
 ---
 
+# 助手切换名册：设计 QA
+
+## Evidence
+
+- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-97e52746-1f4e-46f6-be47-6a2409a9695b.png`
+- Rendered implementation: `.artifacts/design-qa/assistant-switcher-implementation.png`
+- Full side-by-side comparison: `.artifacts/design-qa/assistant-switcher-comparison-full.png`
+- Focused sidebar comparison: `.artifacts/design-qa/assistant-switcher-comparison-left.png`
+- Viewport: Electron full work area 1920 × 1000, captured at 1920 × 1080 with the 80px operating-system panel removed for comparison; source 1672 × 941 was aspect-padded before normalization.
+- State: authenticated desktop settings window, real assistant list loaded, non-default assistant selected, switch action available, current default restored to `莉莉安` after the end-to-end test.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains in the final comparison.
+- [P3] The selected assistant, avatar, standee, model and personality copy differ from the generated concept because the implementation renders live Core data. The information hierarchy, selection treatment and image slot match the source.
+- [P3] The source uses a slightly denser paper texture. The implementation intentionally keeps the generated raster texture at low opacity so live standees and longer Chinese descriptions remain legible.
+- [P3] Real assistant descriptions vary in length. The primary summary is constrained to one line with a native title affordance, and secondary rows truncate rather than shifting the action area.
+
+## Required Fidelity Surfaces
+
+- Typography and hierarchy: custom MonAgent title bar, serif display names, neutral Chinese interface text, muted metadata and orange current/selected accents follow the source.
+- Layout: 28% assistant sidebar, back/search header, recent/all sections, selected leading rule, information table, notice card, primary action, secondary settings link and right-aligned full-body standee match the source composition.
+- Assets: avatars and standees come from the actual Core assistant records. The background is a generated raster paper asset; Lucide supplies all visible interface icons.
+- Interaction and accessibility: search is labeled, assistant rows expose listbox/option semantics, selected state is announced, window controls have accessible names, focus states are visible and the switch action reports loading, success and error states.
+
+## Functional Verification
+
+- Loaded four real assistants through `GET /api/assistants/` with avatars/standees and selected each row without losing current conversation history.
+- Entered a live search query and verified the assistant list updates to the empty-result state.
+- Switched the default assistant to `伊芙`; desktop bridge log confirmed `PATCH /api/assistants/4/ -> 200`.
+- Switched the default assistant back to `莉莉安`; desktop bridge log confirmed `PATCH /api/assistants/3/ -> 200`.
+- TypeScript typecheck: passed.
+- Frontend unit tests: 16 passed.
+- Production Vite build: passed; only the existing large-chunk advisory remains.
+- Electron main-process syntax check: passed.
+- Git whitespace validation: passed.
+
+## Comparison History
+
+### Iteration 1
+
+- P2: the first implementation reused a ruled diary texture, omitted the custom title bar and placed the standee too close to the information table.
+- Fix: added the working frameless title bar, generated a dedicated paper texture and repositioned the real standee.
+
+### Iteration 2
+
+- P2: Core personality/setting fields rendered as `[object Object]`, and the full-strength texture reduced text contrast.
+- Fix: added structured text extraction with a literal-object guard, moved the texture to a low-opacity image layer and constrained information widths.
+
+### Iteration 3
+
+- P2: long live descriptions wrapped and shifted the primary action vertically.
+- Fix: constrained the main summary to one line with truncation/title disclosure while retaining the complete live data for semantic access.
+
+## Implementation Checklist
+
+- [x] Match the selected first design direction with real MonAgent visual tokens.
+- [x] Connect settings `更换` to a dedicated assistant-switcher page.
+- [x] Load, search and select live assistant records.
+- [x] Persist the selected default assistant through the desktop Core bridge.
+- [x] Preserve conversation history and restore the user's original default after testing.
+- [x] Compare source and implementation together and resolve all P0–P2 findings.
+
+final result: passed
+
+---
+
+# 聊天输入 Token 指示器：设计 QA
+
+## Evidence
+
+- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-3afc00f0-8f1d-4a52-bd4c-4af9e935d185.png`
+- Interaction override: the user's latest direction places the detail above the Token ring rather than to its left.
+- Rendered implementation: `artifacts/design-qa/token-meter-implementation-hover-1920x936.png`
+- Full-view comparison evidence: `artifacts/design-qa/token-meter-reference-vs-implementation.png`（上半部分）
+- Focused region comparison evidence: `artifacts/design-qa/token-meter-reference-vs-implementation.png`（下半部分输入框裁切）
+- Responsive evidence: `artifacts/design-qa/token-meter-responsive-1366x768.png`
+- Viewport: implementation 1920 × 936 Electron content capture; responsive check 1366 × 768; source 1807 × 870.
+- State: authenticated desktop chat, light theme, Token detail hovered, no text in final comparison; live conversation and current assistant artwork loaded.
+- Primary interactions tested: typing updates the input estimate, hovering reveals the three-row detail above the ring, the ring and send action remain vertically aligned, and the narrow desktop layout preserves all composer controls.
+- Console/runtime errors checked: no application exception observed during HMR and interaction capture; production build completed with only the existing Vite large-chunk advisory.
+
+## Findings
+
+- No actionable P0, P1, or P2 mismatch remains in the final comparison.
+- [P3] The live input is empty in the final evidence, so the ring reads `0`, while the concept uses a 23-token example.
+  Location: Token ring and `本次输入` detail row.
+  Evidence: the earlier live input capture `artifacts/design-qa/token-meter-initial-input-state.png` shows the value changing to `11`; the final hover capture intentionally uses the settled empty state.
+  Resolution: accepted as dynamic product state rather than visual drift.
+- [P3] The implementation reports the runtime's real 256,000-token fallback rather than the concept's illustrative 128,000 limit.
+  Location: `可用上限` row.
+  Resolution: accepted because model-provided context-window metadata now overrides the fallback and the UI should not display fabricated model limits.
+- [P3] The live conversation and assistant pose differ from the generated reference.
+  Location: content behind the composer.
+  Resolution: accepted as dynamic product content; the scoped composer composition and interaction state are the comparison target.
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: the ring uses the existing neutral UI font, medium tabular numerals, and the tooltip follows the concept's compact two-column hierarchy. Labels remain muted and values retain stronger contrast without wrapping.
+- Spacing and layout rhythm: the Token ring and send button share one right-edge vertical axis with a compact gap. The tooltip is right-aligned above the ring and stays inside the composer. Existing microphone, model selector, permission mode, and attachment controls retain their spacing at 1920 × 936 and 1366 × 768.
+- Colors and visual tokens: the ring reuses the product's stone border and orange accent, the tooltip uses the existing card/border/text tokens, and the active send button keeps MonAgent orange. The disabled send state remains visually distinct.
+- Image quality and asset fidelity: the feature introduces no new raster imagery or CSS illustration. The ring and send affordance use Lucide icons already present in the project; the actual assistant asset remains untouched.
+- Copy and content: tooltip copy matches the selected three-row design: `本次输入`, `会话上下文`, and `可用上限`. Counts are localized and derived from live input, ordered message content, and runtime model metadata.
+- Icons and surfaces: icon stroke weight, circular controls, border radius, and subtle card elevation are consistent with the existing composer and the selected design.
+- Responsiveness: the 1366 × 768 capture shows no collision or clipping; the detail opens inward, while the vertical control stack remains usable at the right edge.
+- Accessibility: the Token meter is a semantic button with a descriptive accessible label, `aria-describedby`, keyboard focus support, and hover/focus-within tooltip behavior. Numeric text remains visible without relying on color alone.
+
+## Functional Verification
+
+- Entered live text and observed the input estimate change from `0` to `11` without submitting.
+- Hovered the ring and verified all three values render in the detail above the ring.
+- Verified context usage is estimated from ordered message segments, reasoning, tool data, and image references.
+- Verified the model API exposes `contextWindow`, honoring Core model configuration with a 256,000 fallback shared by frontend and runtime.
+- Frontend unit tests: 13 passed.
+- Server route unit tests: 4 passed.
+- TypeScript typecheck: passed.
+- Production Vite build: passed; only the existing large-chunk advisory remains.
+- Python server package compile check: passed.
+
+## Comparison History
+
+### Iteration 1
+
+- Earlier P2 finding: the first ring used Lucide's loader glyph, producing an almost complete orange circle and reading as an indefinite loading state instead of context usage.
+- Fix: retained the Lucide circle icon but changed its standard stroke attributes to a short, rounded arc driven by context-window percentage.
+- Post-fix visual evidence: `artifacts/design-qa/token-meter-implementation-hover-1920x936.png` and the focused lower half of `artifacts/design-qa/token-meter-reference-vs-implementation.png`.
+
+### Iteration 2
+
+- Earlier P2 finding: the first tooltip included a fourth explanatory footer, increasing its height and drifting from the selected three-row concept.
+- Fix: removed the extra footer while keeping the estimate semantics in the accessible label and implementation behavior.
+- Post-fix visual evidence: the final three-row tooltip in `artifacts/design-qa/token-meter-reference-vs-implementation.png`.
+
+### Iteration 3
+
+- User-directed layout change: move the hover/focus detail from the left side to above the Token ring.
+- Fix: right-aligned the detail above the ring, changed the entrance motion to vertical, and moved the pointer to the lower edge so it points down to the ring.
+- Post-fix visual evidence: `artifacts/design-qa/token-meter-implementation-hover-1920x936.png` and `artifacts/design-qa/token-meter-reference-vs-implementation.png`.
+
+## Implementation Checklist
+
+- [x] Place the Token ring above the send button on one vertical axis.
+- [x] Update the input estimate live without sending the message.
+- [x] Show context usage and model limit in a hover/focus detail above the Token ring.
+- [x] Read the context-window limit from runtime model configuration with a shared fallback.
+- [x] Preserve all existing composer actions and the compact desktop-pet input.
+- [x] Verify target, hover, empty, typed, and narrow desktop states.
+- [x] Pass frontend tests, server route tests, typecheck, production build, and visual comparison.
+
+## Follow-up Polish
+
+- Exact provider tokenization can replace the current deterministic estimate later if the runtime exposes tokenizer-specific counts; the UI contract does not need to change.
+
+final result: passed
+
+---
+
 # 全局提问确认层：设计 QA
 
 ## Evidence
