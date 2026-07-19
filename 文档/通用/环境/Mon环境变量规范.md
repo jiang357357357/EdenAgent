@@ -166,17 +166,18 @@ PRODUCTION=off
 
 ### 5.4 MonAgent 搜索服务变量
 
-MonAgent 默认使用内置 DuckDuckGo 网页搜索入口。它不需要 Docker、Python 或额外账号，Windows 与 Linux 都可以直接使用。
+MonAgent 默认使用内置必应网页搜索入口，并在首选入口失败时自动回退到 DuckDuckGo。它不需要 Docker、Python 或额外账号，Windows 与 Linux 都可以直接使用。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `MON_AGENT_SEARCH_TIMEOUT_MS` | 由运行时控制 | 预留变量，用于后续统一控制网页搜索超时 |
+| `MON_AGENT_SEARCH_PROVIDER` | `bing` | 首选搜索提供商；支持 `bing`、`duckduckgo`，首选失败时自动尝试另一个入口 |
+| `MON_AGENT_SEARCH_TIMEOUT_MS` | `10000` | 单个搜索入口的连接与响应超时，范围 `1000`～`60000` 毫秒 |
 
 示例：
 
 ```ini
 [agent]
-# 默认无需配置，Agent 会直接使用 DuckDuckGo 网页搜索。
+# 默认无需配置，Agent 会优先使用必应，失败时自动回退 DuckDuckGo。
 ```
 
 旧版外部搜索进程变量已废弃。Agent 不再读取外部搜索地址、启动命令、搜索端口等配置，也不会在 `.mon-agent/search` 下启动或维护搜索进程。
