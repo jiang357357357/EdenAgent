@@ -12,6 +12,8 @@ Thumbs.db
 # 本地阅读用外部参考仓库，体积较大，不进入 MonAgent 源码仓库。
 文档/参考/Claude-Code/
 文档/参考/codex-cli/
+文档/参考/codex/
+文档/参考/opencode/
 文档/参考/pi/
 
 # Image assets
