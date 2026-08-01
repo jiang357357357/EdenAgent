@@ -1,9 +1,11 @@
 import net from "node:net"
-import { spawn } from "node:child_process"
 import { existsSync, readFileSync, rmSync } from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+import { spawnExecutable, spawnNpm } from "../../frontend/Script/Project/process_runner.mjs"
 import { loadMonConfig } from "./monconfig.mjs"
 
-const root = process.cwd()
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
 const serverPort = config.number("server", "PORT", 40092)
 const webPort = config.number("server", "WEB_PORT", 40091)
@@ -31,10 +33,6 @@ const ansi = {
   server: "\x1b[36m",
   web: "\x1b[35m",
   desktop: "\x1b[32m",
-}
-
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm"
 }
 
 function sleep(ms) {
@@ -73,7 +71,7 @@ function prefixOutput(label, readable, stream) {
 
 function runWithTimeout(cmd, timeoutMs) {
   return new Promise((resolve) => {
-    const child = spawn(cmd[0], cmd.slice(1), { cwd: root, stdio: "ignore", windowsHide: true })
+    const child = spawnExecutable(cmd[0], cmd.slice(1), { cwd: root, stdio: "ignore" })
     const timer = setTimeout(() => child.kill(), timeoutMs)
     child.on("exit", () => {
       clearTimeout(timer)
@@ -88,7 +86,10 @@ function runWithTimeout(cmd, timeoutMs) {
 
 function runCapture(cmd, timeoutMs = 3000) {
   return new Promise((resolve) => {
-    const child = spawn(cmd[0], cmd.slice(1), { cwd: root, stdout: "pipe", stderr: "pipe", windowsHide: true })
+    const child = spawnExecutable(cmd[0], cmd.slice(1), {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+    })
     let stdout = ""
     let stderr = ""
     const timer = setTimeout(() => child.kill(), timeoutMs)
@@ -235,14 +236,12 @@ function childEnv(extraEnv = {}) {
   return env
 }
 
-function start(label, cmd, extraEnv = {}) {
-  const child = spawn(cmd[0], cmd.slice(1), {
+function start(label, args, extraEnv = {}) {
+  const child = spawnNpm(args, {
     cwd: root,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
     env: childEnv(extraEnv),
     detached: process.platform !== "win32",
-    windowsHide: true,
   })
   children.push(child)
 
@@ -252,6 +251,12 @@ function start(label, cmd, extraEnv = {}) {
     if (!shuttingDown && code !== 0) {
       process.stderr.write(`${labelText("dev")} ${label} exited with code ${code}\n`)
       shutdown(code || 1)
+    }
+  })
+  child.on("error", (error) => {
+    if (!shuttingDown) {
+      process.stderr.write(`${labelText("dev")} 无法启动 ${label}: ${error.message}\n`)
+      void shutdown(1)
     }
   })
 
@@ -320,15 +325,15 @@ try {
   await ensurePortFree(webPort, "web")
 
   devLog(`启动 server，端口 ${serverPort}`)
-  const server = start("server", [npmCommand(), "run", "dev:server"])
+  const server = start("server", ["run", "dev:server"])
   await waitFor(`http://127.0.0.1:${serverPort}/api/tools/status`, "server", server)
 
   devLog(`启动 web，端口 ${webPort}`)
-  const web = start("web", [npmCommand(), "run", "dev:web"])
+  const web = start("web", ["run", "dev:web"])
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
-  const desktop = start("desktop", [npmCommand(), "run", "dev:desktop"], {
+  const desktop = start("desktop", ["run", "dev:desktop"], {
     ELECTRON_RUN_AS_NODE: undefined,
     MON_AGENT_DEV_PARENT_PID: String(process.pid),
   })

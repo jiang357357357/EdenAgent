@@ -1,19 +1,16 @@
 import path from "node:path"
-import { spawn } from "node:child_process"
 import { rm } from "node:fs/promises"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { spawnExecutable, spawnNpm } from "../../frontend/Script/Project/process_runner.mjs"
 import { loadMonConfig } from "./monconfig.mjs"
 
-const root = process.cwd()
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
 const webPort = config.number("server", "WEB_PORT", 40091)
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
 
 await rm(quitFlag, { force: true }).catch(() => {})
-
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm"
-}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -53,7 +50,7 @@ async function waitForVite(webProc) {
 
 function runWithTimeout(cmd, timeoutMs) {
   return new Promise((resolve) => {
-    const child = spawn(cmd[0], cmd.slice(1), { cwd: root, stdio: "ignore", windowsHide: true })
+    const child = spawnExecutable(cmd[0], cmd.slice(1), { cwd: root, stdio: "ignore" })
     const timer = setTimeout(() => child.kill(), timeoutMs)
     child.on("exit", () => {
       clearTimeout(timer)
@@ -108,6 +105,13 @@ function relay(readable, target) {
   readable.on("data", (chunk) => target.write(chunk))
 }
 
+function handleChildError(label, child) {
+  child.on("error", (error) => {
+    process.stderr.write(`[dev] 无法启动 ${label}: ${error.message}\n`)
+    void cleanup().finally(() => process.exit(1))
+  })
+}
+
 async function cleanup() {
   if (cleaned) return
   cleaned = true
@@ -134,32 +138,30 @@ if (await isWebReady()) {
   console.log(`\n  Web 前端已就绪：http://127.0.0.1:${webPort}\n`)
 } else {
   console.log(`\n  启动 Web 前端：http://127.0.0.1:${webPort}\n`)
-  webProc = spawn(npmCommand(), ["run", "dev:web"], {
+  webProc = spawnNpm(["run", "dev:web"], {
     cwd: root,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
     detached: process.platform !== "win32",
-    windowsHide: true,
   })
+  handleChildError("web", webProc)
   relay(webProc.stdout, process.stdout)
   relay(webProc.stderr, process.stderr)
   await waitForVite(webProc)
 }
 
-desktopProc = spawn(npmCommand(), ["--prefix", "frontend/desktop", "run", "dev"], {
+desktopProc = spawnNpm(["--prefix", "frontend/desktop", "run", "dev"], {
   cwd: root,
-  stdout: "pipe",
-  stderr: "pipe",
+  stdio: ["ignore", "pipe", "pipe"],
   env: {
     ...process.env,
     MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
     MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
   },
   detached: process.platform !== "win32",
-  windowsHide: true,
 })
 
+handleChildError("desktop", desktopProc)
 relay(desktopProc.stdout, process.stdout)
 relay(desktopProc.stderr, process.stderr)
 
