@@ -10,6 +10,8 @@
     "dev:server": "uv run --project Server python -m mon_agent_server",
     "dev:web": "npm --prefix frontend/web run dev",
     "dev:desktop": "node Script/Project/dev_desktop.mjs",
+    "test:dev-smoke": "npm --prefix frontend run test:dev-smoke",
+    "test:process-runner": "npm --prefix frontend run test:process-runner",
     "lint": "oxlint",
     "typecheck": "uv run --project Server python Script/Project/check_server.py && npm --prefix frontend/web run typecheck",
     "postinstall": "node -e \"console.log('MonAgent uses the Pi runtime; no legacy node-pty patch is required.')\"",
