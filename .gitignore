@@ -3,6 +3,8 @@ dist/
 target/
 .mon-agent/
 .artifacts/
+temp_web/
+temp_web_lily/
 Data/
 .env
 *.log

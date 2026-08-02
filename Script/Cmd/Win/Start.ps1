@@ -71,7 +71,7 @@ function Stop-ProcessTree {
     return
   }
 
-  Write-Host "清理旧进程：PID $ProcessId ($($process.ProcessName))" -ForegroundColor DarkYellow
+  Write-Host "Stopping stale process: PID $ProcessId ($($process.ProcessName))" -ForegroundColor DarkYellow
   & taskkill.exe /PID $ProcessId /T /F | Out-Null
 }
 
@@ -88,7 +88,7 @@ function Clear-MonAgentDevProcesses {
     if (Test-MonAgentDevProcess -ProcessId $owner) {
       Stop-ProcessTree -ProcessId $owner
     } else {
-      Write-Warning "端口被非 MonAgent 进程占用，未自动清理：PID $owner"
+      Write-Warning "Port is owned by a non-MonAgent process and was not stopped automatically: PID $owner"
     }
   }
 
@@ -137,10 +137,10 @@ $process = Start-Process -FilePath "powershell.exe" -ArgumentList @(
   $command
 ) -WorkingDirectory $agentRoot.Path -WindowStyle Normal -PassThru
 
-Write-Host "MonAgent dev 已在独立终端启动。" -ForegroundColor Green
+Write-Host "MonAgent development services started in separate terminals." -ForegroundColor Green
 Write-Host "PID:    $($process.Id)"
 Write-Host "Root:   $($agentRoot.Path)"
 Write-Host "Web:    http://127.0.0.1:$webPort/"
 Write-Host "Server: http://127.0.0.1:$serverPort/"
-Write-Host "日志在新打开的 PowerShell 窗口中；如需当前窗口显示日志："
+Write-Host "Logs are shown in the new PowerShell windows. To show logs in the current window:"
 Write-Host "  $PSCommandPath -Foreground"
