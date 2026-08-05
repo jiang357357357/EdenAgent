@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "installationID": "skill_0fa22bb2fa8e4726a8ce0c974c79006b",
+  "skillName": "direct-skill-smoke",
+  "scope": "project",
+  "source": {
+    "type": "generated",
+    "uri": "generated:direct-skill-smoke",
+    "ref": "",
+    "subpath": ""
+  },
+  "version": "1.0.0",
+  "contentHash": "58074544362182af2e4ffde32a5b110a12924d7b1ee76dc3932cf0ba3cf22f65",
+  "enabled": true,
+  "trustStatus": "trusted"
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "installationID": "skill_ab3f591d47ab4319807d421c82ac4a4f",
+  "skillName": "skill-change-summary",
+  "scope": "project",
+  "source": {
+    "type": "generated",
+    "uri": "generated:skill-change-summary",
+    "ref": "",
+    "subpath": ""
+  },
+  "version": "1.0.0",
+  "contentHash": "8f3859d132ff61f2c32ef5eb4e6acff7d9ac7b4da7d4d0e97af4702ad6179742",
+  "enabled": true,
+  "trustStatus": "trusted"
+}

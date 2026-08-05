@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "installationID": "skill_d6cd4b5b8f2e4bfe809b0ca38eb67749",
+  "skillName": "repo-health-brief",
+  "scope": "project",
+  "source": {
+    "type": "generated",
+    "uri": "generated:repo-health-brief",
+    "ref": "",
+    "subpath": ""
+  },
+  "version": "1.0.0",
+  "contentHash": "609cfbd90122e0c17c34fb28f0244f11a09cac3859238df1ba617b61e2b53a0e",
+  "enabled": true,
+  "trustStatus": "trusted",
+  "deviceID": "local"
+}
