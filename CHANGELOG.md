@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-05
+
+### Added
+
+- 建立内置技能示例与技能变更检查基线，并收录 AgentFrontend、AgentServer、AgentCore 的 `1.8.0` 源码快照。
+
+### Changed
+
+- 更新聚合配置和三个子仓库引用，统一到新的 Agent 运行时能力。
+
 ## [1.7.5] - 2026-08-04
 
 ### Changed
