@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "installationID": "skill_fe8551bd36e747049d18591721dd69fc",
+  "skillName": "openttd-line-planning",
+  "scope": "project",
+  "source": {
+    "type": "generated",
+    "uri": "generated:openttd-line-planning",
+    "ref": "",
+    "subpath": ""
+  },
+  "version": "1.0.0",
+  "contentHash": "b22346b2cd72a426e0c95c61377e4c559a81e7c58d89e0e69bb8038a02a50467",
+  "fileCount": 2,
+  "totalBytes": 2515,
+  "enabled": true,
+  "trustStatus": "trusted",
+  "deviceID": "local"
+}

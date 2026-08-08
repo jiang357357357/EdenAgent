@@ -8,6 +8,24 @@ import sys
 from pathlib import Path
 
 
+def load_project_env(root: Path, env: dict[str, str]) -> None:
+    path = root / ".env"
+    if not path.is_file():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or key in env:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        env[key] = value
+
+
 def python_command(root: Path) -> list[str]:
     explicit = os.environ.get("MON_AGENT_PYTHON") or os.environ.get("PYTHON")
     if explicit:
@@ -31,6 +49,7 @@ def main() -> int:
     root = Path.cwd()
     python = python_command(root)
     env = os.environ.copy()
+    load_project_env(root, env)
     paths = [root / "Server" / "src", root / "AgentCore" / "src"]
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = os.pathsep.join([*(str(path) for path in paths), *([existing] if existing else [])])

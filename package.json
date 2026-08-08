@@ -7,7 +7,7 @@
   "packageManager": "npm@10.9.7",
   "scripts": {
     "dev": "node Script/Project/dev.mjs",
-    "dev:server": "uv run --project Server python -m mon_agent_server",
+    "dev:server": "uv run --project Server python Script/Project/dev_server.py",
     "dev:web": "npm --prefix frontend/web run dev",
     "dev:desktop": "node Script/Project/dev_desktop.mjs",
     "test:dev-smoke": "npm --prefix frontend run test:dev-smoke",
