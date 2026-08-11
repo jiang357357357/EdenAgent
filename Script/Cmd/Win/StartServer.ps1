@@ -13,8 +13,6 @@ $pythonBin = if ($Python) {
   $env:MON_AGENT_PYTHON
 } elseif ($env:PYTHON) {
   $env:PYTHON
-} elseif (Test-Path $venvPython) {
-  $venvPython
 } else {
   $null
 }
@@ -32,7 +30,9 @@ Set-Location -LiteralPath $agentRoot.Path
 if ($pythonBin) {
   & $pythonBin -m mon_agent_server
 } elseif (Get-Command "uv" -ErrorAction SilentlyContinue) {
-  & uv run --project $serverRoot python -m mon_agent_server
+  & uv run --project $serverRoot --locked python -m mon_agent_server
+} elseif (Test-Path $venvPython) {
+  & $venvPython -m mon_agent_server
 } else {
   & python -m mon_agent_server
 }
