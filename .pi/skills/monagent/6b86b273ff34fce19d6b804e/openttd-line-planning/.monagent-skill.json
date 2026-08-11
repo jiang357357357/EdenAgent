@@ -9,10 +9,10 @@
     "ref": "",
     "subpath": ""
   },
-  "version": "1.0.0",
-  "contentHash": "b22346b2cd72a426e0c95c61377e4c559a81e7c58d89e0e69bb8038a02a50467",
+  "version": "1.2.0",
+  "contentHash": "cb485ded3e52c11a106ed627a13913578debd0c1a709eff6730f9917f4266814",
   "fileCount": 2,
-  "totalBytes": 2515,
+  "totalBytes": 4702,
   "enabled": true,
   "trustStatus": "trusted",
   "deviceID": "local"
