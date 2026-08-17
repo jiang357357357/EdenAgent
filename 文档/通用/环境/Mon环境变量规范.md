@@ -54,49 +54,12 @@ SETTING=value
 
 ---
 
-## 3. 配置继承机制
+## 3. 配置边界
 
-### 3.1 查找规则
-
-从当前目录向上查找最多 **10 层** `.monconfig` 文件：
-
-```
-当前目录/
-├── .monconfig          ← 第1层（最近，优先级最高）
-└── 父目录1/
-    ├── .monconfig      ← 第2层
-    └── 父目录2/
-        ├── .monconfig  ← 第3层
-        └── ...         ← 最多查找10层
-```
-
-### 3.2 合并规则
-
-- **近层覆盖远层**：同名变量以最近的配置文件为准
-- **配置节合并**：不同配置节会合并到一起
-- **工作区标识**：第一个找到的 `.monconfig` 所在文件夹为工作区根目录
-
-### 3.3 继承示例
-
-```
-全局配置 (项目根/.monconfig)
-[server]
-HOST=127.0.0.1
-PORT=8000
-DEBUG=false
-
-模块配置 (MonCore/.monconfig)  
-[server]
-HOST=0.0.0.0        # 覆盖全局的 127.0.0.1
-PORT=6020           # 覆盖全局的 8000
-# DEBUG 继承全局的 false
-
-最终合并结果：
-[server]
-HOST=0.0.0.0        # 来自模块配置
-PORT=6020           # 来自模块配置  
-DEBUG=false         # 来自全局配置
-```
+- 模块只加载从调用位置向上找到的第一份 `.monconfig`，不继承父模块配置。
+- Mon 工作区根目录由 `.monconfig` 与 `.monworkspace` 双锚点识别。
+- 跨模块读取必须显式声明；生命周期和健康检查统一位于 MonPM 配置。
+- 完整语法、优先级和目录规则见根目录 `docs/config/monconfig.md`。
 
 ---
 
@@ -112,7 +75,6 @@ DEBUG=false         # 来自全局配置
 | `[storage]` | 数据存储 | `MEDIA_ROOT`, `STATIC_ROOT` |
 | `[log]` | 日志配置 | `LEVEL`, `FILE`, `PLAIN_FILE` |
 | `[process]` | 进程管理 | `NAME`, `SCRIPT_START`, `SCRIPT_STOP` |
-| `[discovery]` | Hub发现配置 | `UDP_PORT`, `TIMEOUT`, `RETRIES`, `BROADCAST_ADDRESS` |
 
 ### 4.2 模块专用配置节
 
@@ -120,8 +82,6 @@ DEBUG=false         # 来自全局配置
 |--------|----------|------|
 | `[websocket]` | MonCore | WebSocket服务配置 |
 | `[esp32]` | MonCore | ESP32设备配置 |
-| `[zeromq]` | MonHub | ZeroMQ消息队列 |
-| `[metrics]` | MonHub | 监控指标配置 |
 
 ---
 
@@ -247,46 +207,6 @@ NAME=core
 SCRIPT_START=Script/Start/start_moncore.ps1
 SCRIPT_STOP=Script/Start/stop_moncore.ps1
 
-[discovery]
-UDP_PORT=40053
-TIMEOUT=3.0
-RETRIES=2
-BROADCAST_ADDRESS=255.255.255.255
-```
-
-### 6.2 MonHub 配置示例
-
-```ini
-# ============================================================
-# MonHub .monconfig  
-# ZeroMQ 消息中转站配置
-# ============================================================
-
-[service]
-NAME=MonHub
-VERSION=1.0.0
-
-[server]
-HOST=0.0.0.0
-PORT=6040
-METRICS_PORT=6050
-
-[zeromq]
-BACKEND_URL=tcp://*:6040
-FRONTEND_URL=tcp://*:6041
-MAX_MESSAGE_SIZE=1048576
-MESSAGE_TIMEOUT=30000
-HEARTBEAT_INTERVAL=5000
-
-[log]
-LEVEL=info
-FILE=Logs/TextLogs/MonHub.log
-PLAIN_FILE=Logs/TextLogs/MonHub_plain.log
-
-[process]
-NAME=hub
-SCRIPT_START=Script/main/start_monhub.ps1
-SCRIPT_STOP=Script/main/stop_monhub.ps1
 ```
 
 ---

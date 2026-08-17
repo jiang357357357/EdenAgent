@@ -327,6 +327,44 @@ for companion in private.cfg secrets.cfg; do
   fi
 done
 
+# OpenTTD 15.x only reads the admin password from secrets.cfg (the
+# admin_password key in openttd.cfg is ignored). The copied secrets.cfg may
+# carry an empty admin_password, which would leave the admin port closed and
+# the MonAgent connector unable to attach. Resolve the password from the
+# connector env var first, then from the base openttd.cfg, and force it into
+# the instance secrets.cfg before the game starts.
+instance_secrets="${instance_config_dir}/secrets.cfg"
+admin_password="${MON_CONNECTOR_OPENTTD_RIOU:-}"
+if [[ -z "${admin_password}" ]]; then
+  admin_password="$(python3 - "${OPEN_TTD_BASE_CONFIG}" <<'PY'
+import configparser
+import sys
+config = configparser.RawConfigParser(strict=False, interpolation=None)
+config.optionxform = str
+config.read(sys.argv[1], encoding="utf-8")
+print(config.get("network", "admin_password", fallback="").strip())
+PY
+  )"
+fi
+if [[ -z "${admin_password}" ]]; then
+  echo "OpenTTD admin password is not configured (set MON_CONNECTOR_OPENTTD_RIOU or [network] admin_password in openttd.cfg)." >&2
+  exit 1
+fi
+python3 - "${instance_secrets}" "${admin_password}" <<'PY'
+import configparser
+import sys
+path, password = sys.argv[1:]
+config = configparser.RawConfigParser(strict=False, interpolation=None)
+config.optionxform = str
+config.read(path, encoding="utf-8")
+if not config.has_section("network"):
+    config.add_section("network")
+config.set("network", "admin_password", password)
+with open(path, "w", encoding="utf-8") as output:
+    config.write(output, space_around_delimiters=True)
+PY
+chmod 600 "${instance_secrets}"
+
 readarray -t ports < <(python3 - <<'PY'
 import socket
 sockets=[]

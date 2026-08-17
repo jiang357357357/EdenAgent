@@ -7,7 +7,7 @@ import { loadMonConfig } from "./monconfig.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
-const webPort = config.number("server", "WEB_PORT", 40091)
+const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
 
 await rm(quitFlag, { force: true }).catch(() => {})

@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 统一 MonAgent 模块配置边界和启动脚本，并更新 AgentCore、AgentServer 与 AgentFrontend 运行组件。
+
 ## [1.8.0] - 2026-08-05
 
 ### Added

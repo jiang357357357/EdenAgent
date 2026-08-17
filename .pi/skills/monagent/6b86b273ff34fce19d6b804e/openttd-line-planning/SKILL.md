@@ -1,26 +1,11 @@
 ---
 name: openttd-line-planning
-description: 为 OpenTTD 当前服务器规划开局盈利线路：探查周边城镇与产业、定位装卸货运站、判断车型与货种，并给出建站/修路/设调度的工作流。适合新开局选线路或排查调度问题时使用。
+description: 为 OpenTTD 当前服务器规划开局盈利线路：探查周边城镇与产业、定位装卸货运站、判断车型与货种，并给出建站/修路/设调度的工作流。默认由用户自行启动
+  OpenTTD 服务器，助手根据用户提供的实例信息接入；适合新开局选线路或排查调度问题时使用。
 metadata:
   monagent:
     display_name: OpenTTD 开局线路规划
-    version: 1.2.0
-    tools:
-    - query_openttd
-    - execute_connector_action
-    - list_connectors
-    profiles:
-    - user_chat
-    - self_awake
----
-
----
-name: openttd-line-planning
-description: 为 OpenTTD 当前服务器规划开局盈利线路：探查周边城镇与产业、定位装卸货运站、判断车型与货种，并给出建站/修路/设调度的工作流。适合新开局选线路或排查调度问题时使用。
-metadata:
-  monagent:
-    display_name: OpenTTD 开局线路规划
-    version: 1.2.0
+    version: 1.3.0
     tools:
     - query_openttd
     - execute_connector_action
@@ -31,6 +16,11 @@ metadata:
 ---
 
 当需要为当前 OpenTTD 服务器规划线路、排查调度、或评估运营时使用本技能。
+
+## 服务器启动约定（默认）
+1. 默认由用户自行启动 OpenTTD 服务器（在游戏内选择「多人游戏」以主机身份开始或载入存档，或由用户手动启动服务器进程）。助手不主动拉起受管实例。
+2. 用户启动后，助手根据用户提供的实例信息接入：确认游戏进程（PID）、游戏端口与 admin 端口（admin 端口取 openttd.cfg 的 server_admin_port），必要时生成/确认 active-instance.json，再让连接器连接。
+3. 只有用户明确要求时，助手才代为启动受管实例；启动后也必须告知用户当前实例信息，而不是默认接管。
 
 ## 第一步：拉取现状
 先调用 query_openttd 的 get_state 确认服务器日期与在线公司列表。注意：桥的 get_state 只返回日期 + 公司名/总裁；资金、贷款、收入、车辆数、站点数来自连接器管理协议侧的 economy/statistics 状态，属于另一套数据源，需另外读取。再调用 get_company_assets 查看现有车队和站点（站点含 accepted_cargo 与 waiting 量；车辆含 cargo_loaded、容量、profit、orders）。注意 get_company_assets 的 accepted_cargo 只反映当前正在计费/等待的货，不代表站点"能接受"的货，判断站点收货能力时不要据此下结论。

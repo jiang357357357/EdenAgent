@@ -6,39 +6,8 @@ $ErrorActionPreference = "Stop"
 
 $agentRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
 $escapedRoot = $agentRoot.Path.Replace("'", "''")
-
-function Get-MonConfigValue {
-  param(
-    [string]$Section,
-    [string]$Key,
-    [string]$DefaultValue
-  )
-
-  $configPath = Join-Path $agentRoot.Path ".monconfig"
-  if (-not (Test-Path -LiteralPath $configPath)) {
-    return $DefaultValue
-  }
-
-  $currentSection = ""
-  foreach ($line in Get-Content -LiteralPath $configPath) {
-    $trimmed = $line.Trim()
-    if ($trimmed -eq "" -or $trimmed.StartsWith("#")) {
-      continue
-    }
-    if ($trimmed -match '^\[(.+)\]$') {
-      $currentSection = $Matches[1]
-      continue
-    }
-    if ($currentSection -eq $Section -and $trimmed -match "^$([regex]::Escape($Key))=(.*)$") {
-      return $Matches[1].Trim()
-    }
-  }
-
-  return $DefaultValue
-}
-
-$serverPort = Get-MonConfigValue -Section "server" -Key "PORT" -DefaultValue "40092"
-$webPort = Get-MonConfigValue -Section "server" -Key "WEB_PORT" -DefaultValue "40091"
+$serverPort = if ($env:MON_AGENT_PORT) { [int]$env:MON_AGENT_PORT } else { 40092 }
+$webPort = if ($env:MON_AGENT_WEB_PORT) { [int]$env:MON_AGENT_WEB_PORT } else { 40091 }
 
 function Test-MonAgentDevProcess {
   param(

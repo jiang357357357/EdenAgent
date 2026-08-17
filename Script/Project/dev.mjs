@@ -7,8 +7,8 @@ import { loadMonConfig } from "./monconfig.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
-const serverPort = config.number("server", "PORT", 40092)
-const webPort = config.number("server", "WEB_PORT", 40091)
+const serverPort = Number(process.env.MON_AGENT_PORT ?? config.number("server", "PORT", 40092))
+const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
 
 rmSync(quitFlag, { force: true })
