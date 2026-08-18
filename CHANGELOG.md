@@ -7,6 +7,7 @@
 ### Changed
 
 - 统一 MonAgent 模块配置边界和启动脚本，并更新 AgentCore、AgentServer 与 AgentFrontend 运行组件。
+- `AgentCore` 已由仓库内的 Rust workspace 正式接管，通过原生 sidecar 与 AgentServer 通信；旧 Python 实现不再作为活动子模块参与安装、启动和发布。
 
 ## [1.8.0] - 2026-08-05
 

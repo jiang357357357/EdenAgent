@@ -1,0 +1,11 @@
+[package]
+name = "mon-agent-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+mon-agent-core = { path = "../mon-agent-core" }
+serde.workspace = true
+serde_json.workspace = true

@@ -16,7 +16,7 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set +a
 fi
 
-export PYTHONPATH="$PROJECT_ROOT/Server/src:$PROJECT_ROOT/AgentCore/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$PROJECT_ROOT/Server/src${PYTHONPATH:+:$PYTHONPATH}"
 if [[ -n "${MON_AGENT_PYTHON:-}" ]]; then
   exec "$MON_AGENT_PYTHON" -m mon_agent_server
 fi

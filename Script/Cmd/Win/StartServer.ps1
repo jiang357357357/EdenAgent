@@ -18,8 +18,7 @@ $pythonBin = if ($Python) {
 }
 
 $paths = @(
-  (Join-Path $agentRoot.Path "Server\src"),
-  (Join-Path $agentRoot.Path "AgentCore\src")
+  (Join-Path $agentRoot.Path "Server\src")
 )
 if ($env:PYTHONPATH) {
   $paths += $env:PYTHONPATH

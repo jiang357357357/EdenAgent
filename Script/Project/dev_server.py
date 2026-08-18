@@ -50,7 +50,7 @@ def main() -> int:
     python = python_command(root)
     env = os.environ.copy()
     load_project_env(root, env)
-    paths = [root / "Server" / "src", root / "AgentCore" / "src"]
+    paths = [root / "Server" / "src"]
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = os.pathsep.join([*(str(path) for path in paths), *([existing] if existing else [])])
     child = subprocess.Popen(

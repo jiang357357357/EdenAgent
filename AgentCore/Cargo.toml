@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mon-agent-core",
+    "crates/mon-agent-protocol",
+    "crates/mon-agent-runtime",
+    "crates/mon-agent-tools",
+]
+
+[workspace.package]
+version = "1.8.0"
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.dependencies]
+async-trait = "0.1"
+futures = "0.3"
+base64 = "0.22"
+globset = "0.4"
+ignore = "0.4"
+libc = "0.2"
+mime_guess = "2"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+similar = "2"
+thiserror = "2"
+tiktoken-rs = "0.12"
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
+tokio-util = "0.7"
+unicode-normalization = "0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -6,7 +6,3 @@
 	path = Server
 	url = ../MonAgentServer.git
 	branch = main
-[submodule "AgentCore"]
-	path = AgentCore
-	url = ../MonAgentCore.git
-	branch = main

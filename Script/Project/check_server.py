@@ -34,7 +34,7 @@ def main() -> int:
     root = Path.cwd()
     python = python_command(root)
     env = os.environ.copy()
-    paths = [root / "Server" / "src", root / "AgentCore" / "src"]
+    paths = [root / "Server" / "src"]
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = os.pathsep.join([*(str(path) for path in paths), *([existing] if existing else [])])
 
