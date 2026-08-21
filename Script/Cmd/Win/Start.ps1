@@ -23,8 +23,8 @@ function Test-MonAgentDevProcess {
   $rootPattern = [regex]::Escape($agentRoot.Path)
   return (
     $commandLine -match $rootPattern -or
-    $commandLine -match 'mon_agent_server' -or
-    $commandLine -match 'Server[\\/]src' -or
+    $commandLine -match 'mon-agent-server' -or
+    $commandLine -match 'cargo.+mon-agent-server' -or
     $commandLine -match 'frontend[\\/]web[\\/]node_modules[\\/]vite' -or
     $commandLine -match 'npm run dev'
   )

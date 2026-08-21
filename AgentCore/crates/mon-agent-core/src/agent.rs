@@ -192,13 +192,14 @@ fn apply_event(state: &RwLock<AgentState>, event: &AgentEvent) {
             message: Message::Assistant(message),
         } => state.streaming_message = Some(message.clone()),
         AgentEvent::MessageUpdate { message, .. } => state.streaming_message = Some(message.clone()),
+        AgentEvent::StreamReset { .. } => state.streaming_message = None,
         AgentEvent::MessageEnd { message } => {
             state.streaming_message = None;
             state.context.messages.push(message.clone());
-            if let Message::Assistant(message) = message
-                && let Some(error) = &message.error_message
-            {
-                state.error_message = Some(error.clone());
+            if let Message::Assistant(message) = message {
+                if let Some(error) = &message.error_message {
+                    state.error_message = Some(error.clone());
+                }
             }
         }
         AgentEvent::ToolExecutionStart { tool_call_id, .. } => {

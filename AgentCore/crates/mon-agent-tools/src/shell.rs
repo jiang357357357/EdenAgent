@@ -1,7 +1,7 @@
-use crate::NativeToolConfig;
 use crate::common::{ensure_not_cancelled, fail, required_string, text_output};
+use crate::{NativeToolConfig, ProcessSandbox};
 use async_trait::async_trait;
-use mon_agent_core::{Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
+use mon_agent_core::{PermissionRequest, Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::env;
@@ -12,11 +12,76 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::io::AsyncWriteExt as _;
+use tokio_util::sync::CancellationToken;
 
 const DEFAULT_YIELD_TIME_MS: u64 = 10_000;
 const MAX_YIELD_TIME_MS: u64 = 30_000;
 const MAX_CAPTURE_CHARS: usize = 1_000_000;
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SandboxedProgramOutput {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: Option<i32>,
+}
+
+/// Run one argv-based program inside the configured process sandbox.
+///
+/// This is intentionally separate from the interactive shell tools: callers
+/// provide an executable and argv directly, stdin is closed after one bounded
+/// payload, and cancellation/timeout always drops a kill-on-drop child.
+pub async fn run_sandboxed_program(
+    sandbox: &ProcessSandbox,
+    workspace_root: &Path,
+    cwd: &Path,
+    program: &str,
+    arguments: &[String],
+    stdin: &[u8],
+    environment: &[(&str, &str)],
+    timeout: Duration,
+    cancellation: &CancellationToken,
+) -> Result<SandboxedProgramOutput, ToolFailure> {
+    let mut command =
+        sandboxed_program_command(sandbox, workspace_root, cwd, "program", Path::new(program), arguments)?;
+    command
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (name, value) in environment {
+        command.env(name, value);
+    }
+    configure_process_group(&mut command);
+    let mut command = tokio::process::Command::from(command);
+    command.kill_on_drop(true);
+    let mut child = command
+        .spawn()
+        .map_err(|error| fail("command_spawn_failed", error.to_string()))?;
+    if let Some(mut child_stdin) = child.stdin.take() {
+        child_stdin
+            .write_all(stdin)
+            .await
+            .map_err(|error| fail("stdin_write_failed", error.to_string()))?;
+    }
+    let wait = child.wait_with_output();
+    tokio::pin!(wait);
+    let output = tokio::select! {
+        _ = cancellation.cancelled() => {
+            return Err(fail("command_aborted", "sandboxed program was cancelled"));
+        }
+        _ = tokio::time::sleep(timeout) => {
+            return Err(fail("command_timeout", format!("sandboxed program exceeded {} seconds", timeout.as_secs())));
+        }
+        result = &mut wait => result.map_err(|error| fail("command_wait_failed", error.to_string()))?,
+    };
+    Ok(SandboxedProgramOutput {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        exit_code: output.status.code(),
+    })
+}
 
 #[derive(Default)]
 struct CapturedStreams {
@@ -77,21 +142,15 @@ struct ProcessSession {
 }
 
 impl ProcessSession {
-    fn start(command_text: &str, cwd: &Path, launcher: ProcessLauncher) -> Result<Arc<Self>, ToolFailure> {
-        let mut command = match launcher {
-            ProcessLauncher::Bash => {
-                let mut command = Command::new(resolve_bash()?);
-                command.arg("-lc").arg(command_text);
-                command
-            }
-            ProcessLauncher::PowerShell => {
-                let mut command = Command::new(resolve_powershell()?);
-                command
-                    .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-                    .arg(powershell_script(command_text));
-                command
-            }
-        };
+    fn start(
+        command_text: &str,
+        cwd: &Path,
+        workspace_root: &Path,
+        launcher: ProcessLauncher,
+        sandbox: &ProcessSandbox,
+    ) -> Result<Arc<Self>, ToolFailure> {
+        let (program, arguments) = launcher.command(command_text)?;
+        let mut command = sandboxed_command(sandbox, workspace_root, cwd, launcher, &program, &arguments)?;
         command
             .current_dir(cwd)
             .stdin(Stdio::piped())
@@ -267,6 +326,93 @@ impl ProcessLauncher {
         match self {
             Self::Bash => "bash",
             Self::PowerShell => "powershell",
+        }
+    }
+
+    fn command(self, command_text: &str) -> Result<(PathBuf, Vec<String>), ToolFailure> {
+        match self {
+            Self::Bash => Ok((resolve_bash()?, vec!["-lc".to_owned(), command_text.to_owned()])),
+            Self::PowerShell => Ok((
+                resolve_powershell()?,
+                vec![
+                    "-NoLogo".to_owned(),
+                    "-NoProfile".to_owned(),
+                    "-NonInteractive".to_owned(),
+                    "-Command".to_owned(),
+                    powershell_script(command_text),
+                ],
+            )),
+        }
+    }
+}
+
+fn sandboxed_command(
+    sandbox: &ProcessSandbox,
+    workspace_root: &Path,
+    cwd: &Path,
+    launcher: ProcessLauncher,
+    program: &Path,
+    arguments: &[String],
+) -> Result<Command, ToolFailure> {
+    sandboxed_program_command(sandbox, workspace_root, cwd, launcher.name(), program, arguments)
+}
+
+fn sandboxed_program_command(
+    sandbox: &ProcessSandbox,
+    workspace_root: &Path,
+    cwd: &Path,
+    launcher: &str,
+    program: &Path,
+    arguments: &[String],
+) -> Result<Command, ToolFailure> {
+    match sandbox {
+        ProcessSandbox::Disabled => Err(fail(
+            "sandbox_unavailable",
+            "Command execution is disabled because no OS sandbox is configured",
+        )),
+        ProcessSandbox::Bubblewrap(executable) => {
+            let workspace = workspace_root
+                .canonicalize()
+                .map_err(|error| fail("sandbox_workspace", error.to_string()))?;
+            let cwd = cwd
+                .canonicalize()
+                .map_err(|error| fail("sandbox_cwd", error.to_string()))?;
+            if !cwd.starts_with(&workspace) {
+                return Err(fail("sandbox_cwd", "command cwd is outside the workspace"));
+            }
+            let mut command = Command::new(executable);
+            command
+                .args(["--die-with-parent", "--new-session", "--unshare-all"])
+                .args(["--ro-bind", "/", "/"])
+                .arg("--bind")
+                .arg(&workspace)
+                .arg(&workspace)
+                .args(["--tmpfs", "/tmp", "--proc", "/proc", "--dev", "/dev"])
+                .arg("--chdir")
+                .arg(cwd)
+                .arg("--")
+                .arg(program)
+                .args(arguments);
+            Ok(command)
+        }
+        ProcessSandbox::External(executable) => {
+            let mut command = Command::new(executable);
+            command
+                .arg("--workspace")
+                .arg(workspace_root)
+                .arg("--cwd")
+                .arg(cwd)
+                .arg("--launcher")
+                .arg(launcher)
+                .arg("--")
+                .arg(program)
+                .args(arguments);
+            Ok(command)
+        }
+        ProcessSandbox::Direct => {
+            let mut command = Command::new(program);
+            command.args(arguments);
+            Ok(command)
         }
     }
 }
@@ -483,8 +629,15 @@ impl ProcessRegistry {
         }))
     }
 
-    fn start(&self, command: &str, cwd: &Path, launcher: ProcessLauncher) -> Result<Arc<ProcessSession>, ToolFailure> {
-        let session = ProcessSession::start(command, cwd, launcher)?;
+    fn start(
+        &self,
+        command: &str,
+        cwd: &Path,
+        workspace_root: &Path,
+        launcher: ProcessLauncher,
+        sandbox: &ProcessSandbox,
+    ) -> Result<Arc<ProcessSession>, ToolFailure> {
+        let session = ProcessSession::start(command, cwd, workspace_root, launcher, sandbox)?;
         self.0
             .sessions
             .lock()
@@ -516,6 +669,12 @@ impl ProcessRegistry {
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .remove(&session.id);
         }
+    }
+
+    pub(crate) fn active_count(&self) -> usize {
+        let mut sessions = self.0.sessions.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.retain(|_, session| !session.complete());
+        sessions.len()
     }
 }
 
@@ -560,6 +719,15 @@ impl Tool for BashTool {
         self.definition.clone()
     }
 
+    fn permission_request(&self, arguments: &Value) -> Option<PermissionRequest> {
+        let command = arguments.get("command").and_then(Value::as_str).unwrap_or("<unknown>");
+        Some(PermissionRequest {
+            permission: "shell.execute".to_owned(),
+            patterns: vec![command.to_owned()],
+            always: vec![command.to_owned()],
+        })
+    }
+
     async fn execute(&self, call: &ToolCall, context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {
         ensure_not_cancelled(&context.cancellation)?;
         let command = required_string(&call.arguments, "command")?;
@@ -584,6 +752,15 @@ impl Tool for PowerShellTool {
         self.definition.clone()
     }
 
+    fn permission_request(&self, arguments: &Value) -> Option<PermissionRequest> {
+        let command = arguments.get("command").and_then(Value::as_str).unwrap_or("<unknown>");
+        Some(PermissionRequest {
+            permission: "shell.execute".to_owned(),
+            patterns: vec![command.to_owned()],
+            always: vec![command.to_owned()],
+        })
+    }
+
     async fn execute(&self, call: &ToolCall, context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {
         ensure_not_cancelled(&context.cancellation)?;
         let command = required_string(&call.arguments, "command")?;
@@ -605,9 +782,13 @@ async fn execute_process_tool(
     context: &ToolCallContext,
     launcher: ProcessLauncher,
 ) -> Result<ToolOutput, ToolFailure> {
-    let session = config
-        .process_registry
-        .start(command, config.workspace_root(), launcher)?;
+    let session = config.process_registry.start(
+        command,
+        config.workspace_root(),
+        config.workspace_root(),
+        launcher,
+        config.process_sandbox(),
+    )?;
     let aborted = wait_for_session(
         &session,
         requested_yield(arguments, DEFAULT_YIELD_TIME_MS),
@@ -664,6 +845,18 @@ impl WriteStdinTool {
 impl Tool for WriteStdinTool {
     fn definition(&self) -> ToolDefinition {
         self.definition.clone()
+    }
+
+    fn permission_request(&self, arguments: &Value) -> Option<PermissionRequest> {
+        let session = arguments
+            .get("session_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<unknown>");
+        Some(PermissionRequest {
+            permission: "shell.interact".to_owned(),
+            patterns: vec![session.to_owned()],
+            always: Vec::new(),
+        })
     }
 
     async fn execute(&self, call: &ToolCall, context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {

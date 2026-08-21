@@ -1,7 +1,7 @@
 use crate::NativeToolConfig;
 use crate::common::{ensure_not_cancelled, fail, required_string, resolve_path, text_output};
 use async_trait::async_trait;
-use mon_agent_core::{Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
+use mon_agent_core::{PermissionRequest, Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
 use serde_json::{Value, json};
 use similar::TextDiff;
 use std::fs;
@@ -58,6 +58,15 @@ impl WriteTool {
 impl Tool for WriteTool {
     fn definition(&self) -> ToolDefinition {
         self.definition.clone()
+    }
+
+    fn permission_request(&self, arguments: &Value) -> Option<PermissionRequest> {
+        let path = arguments.get("path").and_then(Value::as_str).unwrap_or("<unknown>");
+        Some(PermissionRequest {
+            permission: "workspace.write".to_owned(),
+            patterns: vec![path.to_owned()],
+            always: vec![path.to_owned()],
+        })
     }
 
     async fn execute(&self, call: &ToolCall, context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {
@@ -171,6 +180,15 @@ impl EditTool {
 impl Tool for EditTool {
     fn definition(&self) -> ToolDefinition {
         self.definition.clone()
+    }
+
+    fn permission_request(&self, arguments: &Value) -> Option<PermissionRequest> {
+        let path = arguments.get("path").and_then(Value::as_str).unwrap_or("<unknown>");
+        Some(PermissionRequest {
+            permission: "workspace.write".to_owned(),
+            patterns: vec![path.to_owned()],
+            always: vec![path.to_owned()],
+        })
     }
 
     async fn execute(&self, call: &ToolCall, context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {

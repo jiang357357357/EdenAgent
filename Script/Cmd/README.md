@@ -1,12 +1,7 @@
-# Cmd Scripts
+# Command entrypoints
 
-这里放面向命令行或服务启动器调用的前台入口脚本。
+- `StartServer`：前台启动 `mon-agent-server` Rust 进程。
+- `StartDesktop`：启动 Web 和 Electron 桌面壳。
+- `StartAll`：开发期同时启动 Server、Web 和 Desktop。
 
-- `Win`: Windows PowerShell entry scripts.
-- `Linux`: Linux shell entry scripts.
-
-入口拆分：
-
-- `StartServer`: 清理后端端口占用后，前台启动 Python 后端，优先使用 `Server/.venv` 或 `uv run`。
-- `StartDesktop`: 启动客户端，先启动 Web 前端，再打开桌面壳。
-- `StartAll`: 开发期一键启动 Server/Web/Desktop。
+Windows 入口位于 `Win/`，Linux 入口位于 `Linux/`。

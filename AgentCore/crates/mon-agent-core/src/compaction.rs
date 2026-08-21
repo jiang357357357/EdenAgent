@@ -245,8 +245,10 @@ pub fn build_session_context(entries: &[Value]) -> Value {
             if entry.get("id") == first_kept_id {
                 found = true;
             }
-            if found && let Some(message) = entry_message_value(entry, false) {
-                messages.push(message);
+            if found {
+                if let Some(message) = entry_message_value(entry, false) {
+                    messages.push(message);
+                }
             }
         }
         messages.extend(
@@ -266,7 +268,9 @@ pub fn build_session_context(entries: &[Value]) -> Value {
 }
 
 fn build_session_messages(entries: &[Value]) -> Vec<Message> {
-    serde_json::from_value(build_session_context(entries)["messages"].clone()).unwrap_or_default()
+    let messages =
+        serde_json::from_value::<Vec<Message>>(build_session_context(entries)["messages"].clone()).unwrap_or_default();
+    crate::sanitize_model_history(&messages)
 }
 
 fn valid_cut_points(entries: &[Value], start: usize, end: usize) -> Vec<usize> {
@@ -440,6 +444,9 @@ pub fn prepare_compaction(
         tail_turns,
         model_id,
     );
+    if first_kept_index <= boundary_start {
+        return Ok(None);
+    }
     let first_kept_id = entries[first_kept_index]
         .get("id")
         .and_then(Value::as_str)
@@ -519,15 +526,15 @@ fn bash_execution_text(data: &serde_json::Map<String, Value>) -> String {
     }
     if data.get("cancelled").and_then(Value::as_bool) == Some(true) {
         text.push_str("\n\n(command cancelled)");
-    } else if let Some(code) = data.get("exitCode").and_then(Value::as_i64)
-        && code != 0
-    {
-        text.push_str(&format!("\n\nCommand exited with code {code}"));
+    } else if let Some(code) = data.get("exitCode").and_then(Value::as_i64) {
+        if code != 0 {
+            text.push_str(&format!("\n\nCommand exited with code {code}"));
+        }
     }
-    if data.get("truncated").and_then(Value::as_bool) == Some(true)
-        && let Some(path) = data.get("fullOutputPath").and_then(Value::as_str)
-    {
-        text.push_str(&format!("\n\n[Output truncated. Full output: {path}]"));
+    if data.get("truncated").and_then(Value::as_bool) == Some(true) {
+        if let Some(path) = data.get("fullOutputPath").and_then(Value::as_str) {
+            text.push_str(&format!("\n\n[Output truncated. Full output: {path}]"));
+        }
     }
     text
 }
@@ -679,10 +686,10 @@ pub fn build_compaction_summary_request(
         max_tokens = max_tokens.min(model_max);
     }
     let mut options = json!({"maxTokens": max_tokens});
-    if model.get("reasoning").and_then(Value::as_bool) == Some(true)
-        && let Some(level) = thinking_level.filter(|level| *level != "off")
-    {
-        options["reasoning"] = json!(level);
+    if model.get("reasoning").and_then(Value::as_bool) == Some(true) {
+        if let Some(level) = thinking_level.filter(|level| *level != "off") {
+            options["reasoning"] = json!(level);
+        }
     }
     Ok(json!({
         "context": {
@@ -824,6 +831,19 @@ mod tests {
     fn skips_when_latest_entry_is_already_a_compaction() {
         assert_eq!(
             prepare_compaction(&[json!({"type":"compaction","id":"c1"})], &json!({}), None).expect("planning succeeds"),
+            None
+        );
+    }
+
+    #[test]
+    fn skips_when_every_message_is_inside_the_recent_context_tail() {
+        let entries = vec![
+            entry(1, "user", json!("only question")),
+            entry(2, "assistant", json!([{"type":"text","text":"only answer"}])),
+        ];
+        assert_eq!(
+            prepare_compaction(&entries, &json!({"keepRecentTokens":8_000,"tailTurns":2}), None,)
+                .expect("planning succeeds"),
             None
         );
     }

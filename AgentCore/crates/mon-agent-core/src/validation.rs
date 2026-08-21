@@ -1,6 +1,8 @@
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
 
+use crate::tool::ToolDefinition;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationError(pub String);
 
@@ -11,6 +13,52 @@ impl Display for ValidationError {
 }
 
 impl std::error::Error for ValidationError {}
+
+/// Validate the portable contract used for function-tool input schemas.
+///
+/// Although an empty JSON Schema (`{}`) is valid JSON Schema, OpenAI-compatible
+/// function-calling APIs do not agree on whether it is accepted. MonAgent uses
+/// the strict common denominator: every function receives one JSON object and
+/// declares its properties explicitly.
+pub fn validate_tool_parameters_schema(tool_name: &str, schema: &Value) -> Result<(), ValidationError> {
+    let object = schema
+        .as_object()
+        .ok_or_else(|| ValidationError(format!("tool {tool_name} parameters must be a JSON Schema object")))?;
+    if object.get("type").and_then(Value::as_str) != Some("object") {
+        return Err(ValidationError(format!(
+            "tool {tool_name} parameters must declare root type \"object\""
+        )));
+    }
+    let properties = object
+        .get("properties")
+        .and_then(Value::as_object)
+        .ok_or_else(|| ValidationError(format!("tool {tool_name} parameters must declare object properties")))?;
+    if let Some(required) = object.get("required") {
+        let required = required
+            .as_array()
+            .ok_or_else(|| ValidationError(format!("tool {tool_name} parameters.required must be an array")))?;
+        for name in required {
+            let name = name.as_str().ok_or_else(|| {
+                ValidationError(format!(
+                    "tool {tool_name} parameters.required must contain only strings"
+                ))
+            })?;
+            if !properties.contains_key(name) {
+                return Err(ValidationError(format!(
+                    "tool {tool_name} requires undeclared property {name}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_tool_definitions(tools: &[ToolDefinition]) -> Result<(), ValidationError> {
+    for tool in tools {
+        validate_tool_parameters_schema(&tool.name, &tool.parameters)?;
+    }
+    Ok(())
+}
 
 fn matches_type(value: &Value, expected: &str) -> bool {
     match expected {
@@ -157,7 +205,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn validates_the_python_agent_core_schema_subset() {
+    fn validates_the_agent_core_schema_subset() {
         let schema = json!({
             "type": "object",
             "properties": {
@@ -180,5 +228,19 @@ mod tests {
                 .0,
             "arguments.extra is not allowed"
         );
+    }
+
+    #[test]
+    fn function_tool_parameters_require_an_explicit_object_schema() {
+        assert!(validate_tool_parameters_schema("ok", &json!({"type":"object","properties":{}})).is_ok());
+        for invalid in [
+            Value::Null,
+            json!({}),
+            json!({"type":"array","items":{}}),
+            json!({"type":"object"}),
+            json!({"type":"object","properties":{},"required":["missing"]}),
+        ] {
+            assert!(validate_tool_parameters_schema("invalid", &invalid).is_err());
+        }
     }
 }

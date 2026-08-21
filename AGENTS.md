@@ -1,34 +1,33 @@
 # 项目定位
 
-这是 MonAgent 的 Pi 运行时版本，目标是为 Mon 项目提供可嵌入的本地智能体服务。
+这是 MonAgent 的全 Rust 本地智能体服务，为 Mon 项目提供可嵌入、可持久化的 Agent 运行时。
 
 ## 当前结构
 
-- `Server`：Python 本地智能体宿主服务，通过 stdio 协议调用 `AgentCore` 的原生 sidecar。
-- `AgentCore`：Rust 智能体核心、协议、运行时与本地工具工作区。
-- `frontend/web`：MonAgent Web 前端，继续使用兼容旧接口形状的本地 API 封装。
-- `frontend/desktop`：Electron 桌面壳，用于承载 Web 前端。
-- `Script/Project`：项目内部开发启动脚本与 `.monconfig` 读取工具；Server 启动/检查脚本使用 Python。
-- `Script/Cmd`：面向命令行或服务启动器的前台入口，拆分 Server/Desktop/All；Desktop 会先启动 Web 再打开桌面壳。
+- `AgentCore`：宿主无关的 Rust library crates，负责领域类型、Agent 循环、上下文、工具执行和本地工作区工具。
+- `Server`：Rust 宿主服务，直接链接 AgentCore，负责 JSON-RPC、SQLite、模型供应商、权限、Blob、技能、多智能体、作业、连接器和 Mon 业务工具。
+- `frontend/web`：React/Vite 客户端，只使用生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问 Agent Server。
+- `frontend/desktop`：Electron 桌面壳，启动并监管 `mon-agent-server`，向渲染进程传递短期能力令牌。
+- `Script/Project`：开发启动和 `.monconfig` 读取工具。
+- `Script/Cmd`：Server、Desktop 和 All 的命令行入口。
 
 ## 默认运行链路
 
-1. `Script/Cmd/Linux/StartServer.sh` 或 `npm run dev:server` 启动 Python 宿主，默认监听 `0.0.0.0:40092`。
-2. Server 启动并管理 `mon-agent-runtime` sidecar；可用 `MON_AGENT_RUNTIME_PATH` 覆盖二进制路径。
-3. `Script/Cmd/Linux/StartDesktop.sh` 启动客户端：先启动 Web 前端，再打开桌面壳。
-4. `Script/Cmd/Linux/StartAll.sh` 或 `npm run dev` 仅用于开发期一键启动 Server/Web/Desktop。
-5. 模型由 `MON_AGENT_MODEL` 指定，格式为 `provider/model`，默认 `openai/gpt-4o-mini`。
+1. `Script/Cmd/Win/StartServer.ps1`、`Script/Cmd/Linux/StartServer.sh` 或 `npm run dev:server` 启动 Rust Server，默认监听 `127.0.0.1:40092`。
+2. Server 在同一进程内调用 AgentCore library crates；不存在 Python 宿主、stdio sidecar 或原生桥接协议。
+3. Desktop 开发入口先启动 Web，再由 Electron 启动/监管 Rust Server；`npm run dev` 可一键启动全部组件。
+4. 模型由 `MON_AGENT_MODEL=provider/model` 及对应供应商环境变量指定。
 
-## 改造方向
+## 边界与安全
 
-1. Rust AgentCore 负责 Agent/事件循环、工具执行、上下文压缩、技能解析和多智能体控制。
-2. Server 保留模型提供商、权限、持久化、HTTP、连接器和 Mon 业务工具等宿主职责。
-3. 对外保留前端需要的会话、消息、事件和权限接口形状，逐步收敛命名。
-4. 写文件和执行命令必须走权限请求；只读工具可以直接运行。
+1. AgentCore 不依赖 HTTP、SQLite、具体模型供应商、Electron 或 Mon Core。
+2. Server 拥有进程边界和所有外部副作用；事件先持久化再广播。
+3. 写文件、执行命令、外部通信和其他副作用必须经过权限请求。
+4. 命令工具只有在可用的 OS 沙箱中才注册；缺少沙箱时故障关闭。
+5. 前端协议以 `mon-agent-api` Rust 类型和生成客户端为唯一事实来源。
 
 ## 技术栈
 
-- Python 3.12+ / uv / 标准库 HTTP 服务
-- Rust 1.85+ / Cargo / Tokio
+- Rust 1.85+ / Cargo / Tokio / Axum / SQLx
 - Node.js 22+ / npm / TypeScript
 - React / Vite / Electron

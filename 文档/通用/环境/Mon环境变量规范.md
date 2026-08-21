@@ -59,7 +59,7 @@ SETTING=value
 - 模块只加载从调用位置向上找到的第一份 `.monconfig`，不继承父模块配置。
 - Mon 工作区根目录由 `.monconfig` 与 `.monworkspace` 双锚点识别。
 - 跨模块读取必须显式声明；生命周期和健康检查统一位于 MonPM 配置。
-- 完整语法、优先级和目录规则见根目录 `docs/config/monconfig.md`。
+- 完整语法、优先级和目录规则见根目录 `文档/配置/monconfig.md`。
 
 ---
 

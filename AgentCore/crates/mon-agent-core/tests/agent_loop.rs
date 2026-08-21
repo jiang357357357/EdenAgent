@@ -116,7 +116,14 @@ struct EchoTool;
 #[async_trait]
 impl Tool for EchoTool {
     fn definition(&self) -> ToolDefinition {
-        ToolDefinition::direct("echo", "Echo text")
+        let mut definition = ToolDefinition::direct("echo", "Echo text");
+        definition.parameters = serde_json::json!({
+            "type":"object",
+            "properties":{"text":{"type":"string"}},
+            "required":["text"],
+            "additionalProperties":false
+        });
+        definition
     }
 
     async fn execute(&self, call: &ToolCall, _context: ToolCallContext) -> Result<ToolOutput, ToolFailure> {
@@ -134,7 +141,14 @@ struct SlowTool;
 #[async_trait]
 impl Tool for SlowTool {
     fn definition(&self) -> ToolDefinition {
-        ToolDefinition::direct("slow", "Exceed its execution deadline")
+        let mut definition = ToolDefinition::direct("slow", "Exceed its execution deadline");
+        definition.parameters = serde_json::json!({
+            "type":"object",
+            "properties":{"text":{"type":"string"}},
+            "required":["text"],
+            "additionalProperties":false
+        });
+        definition
     }
 
     fn timeout(&self) -> Option<Duration> {
@@ -198,6 +212,12 @@ impl ConcurrencyTool {
 impl Tool for ConcurrencyTool {
     fn definition(&self) -> ToolDefinition {
         let mut definition = ToolDefinition::direct("work", "Observe scheduling");
+        definition.parameters = serde_json::json!({
+            "type":"object",
+            "properties":{"text":{"type":"string"}},
+            "required":["text"],
+            "additionalProperties":false
+        });
         definition.execution_mode = self.mode;
         definition
     }
@@ -219,6 +239,7 @@ fn assistant_with_calls(calls: &[(&str, &str)]) -> AssistantMessage {
                 id: (*id).to_owned(),
                 name: (*name).to_owned(),
                 arguments: serde_json::json!({"text": id}),
+                provider_item_id: None,
             })
             .collect(),
         stop_reason: "tool_calls".to_owned(),

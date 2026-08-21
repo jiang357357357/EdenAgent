@@ -1,11 +1,15 @@
 use crate::NativeToolConfig;
-use crate::common::{ensure_not_cancelled, fail, resolve_path, text_output};
+use crate::common::{ensure_not_cancelled, fail, resolve_path};
 use async_trait::async_trait;
-use mon_agent_core::{Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
+use mon_agent_core::{ContentBlock, Tool, ToolCall, ToolCallContext, ToolDefinition, ToolFailure, ToolOutput};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+
+const DEFAULT_MODEL_PATCH_CHARS: usize = 12_000;
+const MAX_MODEL_PATCH_CHARS: usize = 12_000;
+const MAX_REVIEW_PATCH_CHARS: usize = 40_000;
 
 fn git(cwd: &Path, arguments: &[&str]) -> Result<String, ToolFailure> {
     let output = Command::new("git")
@@ -68,6 +72,28 @@ fn line_counts(patch: &str) -> (usize, usize) {
     (additions, deletions)
 }
 
+fn bounded_text(text: &str, limit: usize) -> (String, bool) {
+    let count = text.chars().count();
+    if count <= limit {
+        return (text.to_owned(), false);
+    }
+    if limit == 0 {
+        return (String::new(), true);
+    }
+    let marker = format!(
+        "\n...[truncated {} diff chars; call get_diff with a narrower path]",
+        count - limit
+    );
+    let marker_chars = marker.chars().count();
+    if marker_chars >= limit {
+        return (text.chars().take(limit).collect(), true);
+    }
+    let keep = limit - marker_chars;
+    let mut bounded = text.chars().take(keep).collect::<String>();
+    bounded.push_str(&marker);
+    (bounded, true)
+}
+
 pub struct GetDiffTool {
     definition: ToolDefinition,
     config: NativeToolConfig,
@@ -124,11 +150,21 @@ impl Tool for GetDiffTool {
         diff_arguments.extend(["--", relative.as_str()]);
         let patch = git(&git_root, &diff_arguments)?;
         let sections = patches_by_path(&patch);
+        let requested_model_chars = call
+            .arguments
+            .get("max_chars")
+            .and_then(Value::as_u64)
+            .map_or(DEFAULT_MODEL_PATCH_CHARS, |value| value as usize)
+            .clamp(1_000, MAX_MODEL_PATCH_CHARS);
+        let (model_patch, model_patch_truncated) = bounded_text(&patch, requested_model_chars);
         let status = git(
             &git_root,
             &["status", "--short", "--untracked-files=all", "--", relative.as_str()],
         )?;
         let mut files = Vec::new();
+        let mut structured_files = Vec::new();
+        let mut review_patch_chars = 0_usize;
+        let mut review_truncated = false;
         for line in status.lines().filter(|line| line.len() >= 4) {
             let code = &line[..2];
             if (scope == "staged" && matches!(code.as_bytes()[0], b' ' | b'?'))
@@ -161,24 +197,63 @@ impl Tool for GetDiffTool {
             } else {
                 "modified"
             };
+            let remaining = MAX_REVIEW_PATCH_CHARS.saturating_sub(review_patch_chars);
+            let (review_patch, file_patch_truncated) = bounded_text(&file_patch, remaining);
+            review_patch_chars = review_patch_chars.saturating_add(review_patch.chars().count());
+            review_truncated |= file_patch_truncated || (remaining == 0 && !file_patch.is_empty());
             files.push(json!({
                 "path": path,
                 "movePath": move_path,
                 "status": status_name,
-                "patch": file_patch,
+                "patch":review_patch,
+                "patchChars":file_patch.chars().count(),
+                "patchTruncated":file_patch_truncated || (remaining == 0 && !file_patch.is_empty()),
                 "additions": additions,
                 "deletions": deletions,
             }));
+            structured_files.push(json!({
+                "path":path,
+                "movePath":move_path,
+                "status":status_name,
+                "patchChars":file_patch.chars().count(),
+                "additions":additions,
+                "deletions":deletions,
+            }));
         }
+        review_truncated |= review_patch_chars < patch.chars().count();
         let details = json!({
             "kind": "workspace_diff",
             "files": files,
-            "patch": patch,
             "scope": scope,
             "root": git_root.to_string_lossy(),
             "path": relative,
+            "patchChars":patch.chars().count(),
+            "patchTruncated":review_truncated,
         });
         let count = details["files"].as_array().map_or(0, Vec::len);
-        Ok(text_output(format!("{count} changed file(s)"), Some(details)))
+        let summary = if model_patch_truncated {
+            format!("{count} changed file(s); diff preview was bounded to {requested_model_chars} characters")
+        } else {
+            format!("{count} changed file(s)")
+        };
+        let content = if model_patch.trim().is_empty() {
+            summary
+        } else {
+            format!("{summary}\n\n{model_patch}")
+        };
+        Ok(ToolOutput {
+            content: vec![ContentBlock::Text { text: content }],
+            details,
+            structured_content: Some(json!({
+                "kind":"workspace_diff_summary",
+                "files":structured_files,
+                "scope":scope,
+                "path":relative,
+                "patchChars":patch.chars().count(),
+                "patchPreviewTruncated":model_patch_truncated,
+            })),
+            success: true,
+            ..ToolOutput::default()
+        })
     }
 }

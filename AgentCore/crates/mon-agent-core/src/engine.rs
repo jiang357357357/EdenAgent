@@ -518,13 +518,27 @@ impl AgentLoop {
             _ = cancellation.cancelled() => Err(ToolFailure::new("aborted", "Operation aborted")),
             result = self.config.hooks.before(before, before_cancellation) => result,
         };
-        if let Err(error) = before_result {
-            return self.finish_tool_failure(call, error, events).await;
-        }
+        let before_result = match before_result {
+            Ok(result) => result,
+            Err(error) => return self.finish_tool_failure(call, error, events).await,
+        };
         if cancellation.is_cancelled() {
             return self
                 .finish_tool_failure(call, ToolFailure::new("aborted", "Operation aborted"), events)
                 .await;
+        }
+
+        if let Some(mut cached) = before_result.cached_output {
+            cached.success = true;
+            return self.finish_tool(call, cached, false, None, events).await;
+        }
+
+        let mut tool_context = context.clone();
+        if let (Some(target), Some(extra)) = (
+            tool_context.metadata.as_object_mut(),
+            before_result.metadata.as_object(),
+        ) {
+            target.extend(extra.clone());
         }
 
         let tool_cancellation = cancellation.child_token();
@@ -533,6 +547,8 @@ impl AgentLoop {
             ToolCallContext {
                 cancellation: tool_cancellation.clone(),
                 events: events.clone(),
+                session_id: self.config.session_id.clone(),
+                metadata: tool_context.metadata.clone(),
             },
         );
         let executed = match tool.timeout() {
@@ -561,39 +577,46 @@ impl AgentLoop {
             },
         };
 
-        let mut output = match executed {
-            Ok(output) => output,
-            Err(error) => return self.finish_tool_failure(call, error, events).await,
+        let (mut output, mut is_error, mut tool_error) = match executed {
+            Ok(output) => (output, false, None),
+            Err(failure) => {
+                let mut output = ToolOutput::text(failure.message);
+                output.success = false;
+                output.details = failure.details.clone();
+                if !failure.details.is_null() && failure.details.as_object().is_none_or(|value| !value.is_empty()) {
+                    output.structured_content = Some(failure.details);
+                }
+                (output, true, Some(failure.info))
+            }
         };
-        if let Some(schema) = &definition.output_schema {
-            let Some(structured) = &output.structured_content else {
-                return self
-                    .finish_tool_failure(
-                        call,
-                        ToolFailure::new(
-                            "invalid_tool_output",
-                            format!(
-                                "Tool {} declares output_schema but returned no structuredContent",
-                                definition.name
-                            ),
-                        ),
-                        events,
-                    )
-                    .await;
+        if !is_error && let Some(schema) = &definition.output_schema {
+            let validation_error = match &output.structured_content {
+                Some(structured) => crate::validate_json_schema(structured, schema, "output")
+                    .err()
+                    .map(|error| error.to_string()),
+                None => Some(format!(
+                    "Tool {} declares output_schema but returned no structuredContent",
+                    definition.name
+                )),
             };
-            if let Err(error) = crate::validate_json_schema(structured, schema, "output") {
-                return self
-                    .finish_tool_failure(call, ToolFailure::new("invalid_tool_output", error.to_string()), events)
-                    .await;
+            if let Some(message) = validation_error {
+                is_error = true;
+                tool_error = Some(crate::ToolErrorInfo {
+                    code: "invalid_tool_output".to_owned(),
+                    message: message.clone(),
+                    retryable: false,
+                });
+                output = ToolOutput::text(message);
             }
         }
-        output.success = true;
+        output.success = !is_error;
         let after = AfterToolCall {
             assistant_message: assistant,
             call: call.clone(),
             output,
-            is_error: false,
-            context: context.clone(),
+            is_error,
+            error: tool_error,
+            context: tool_context,
         };
         let after_cancellation = cancellation.child_token();
         let after_result = tokio::select! {

@@ -1,0 +1,30 @@
+# Read-only telemetry hooks. They append effects to the vanilla on-actions and
+# never replace game content.
+
+on_actions = {
+	on_startup = {
+		effect = {
+			monagent_hoi4_emit_hello = yes
+			every_country = {
+				limit = {
+					exists = yes
+					is_ai = no
+				}
+				monagent_hoi4_emit_snapshot = yes
+			}
+		}
+	}
+
+	on_monthly = {
+		effect = {
+			if = {
+				limit = {
+					exists = yes
+					is_ai = no
+				}
+				monagent_hoi4_emit_snapshot = yes
+			}
+		}
+	}
+}
+

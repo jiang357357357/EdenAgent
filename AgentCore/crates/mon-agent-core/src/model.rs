@@ -69,6 +69,28 @@ impl ModelError {
 
 #[async_trait]
 pub trait ModelAdapter: Send + Sync {
+    /// Return the effective non-secret model specification for a session.
+    /// Providers without session-specific bindings may use the caller's fallback.
+    async fn model_spec_for(&self, _session_id: Option<&str>) -> Option<ModelSpec> {
+        None
+    }
+
+    /// Return the effective model for one actor in a multi-assistant session.
+    async fn model_spec_for_actor(&self, session_id: Option<&str>, _assistant_id: Option<&str>) -> Option<ModelSpec> {
+        self.model_spec_for(session_id).await
+    }
+
+    /// Prepare a user message for the effective session model. Providers may
+    /// use a separately bound vision model when the main model is text-only.
+    async fn prepare_user_message(
+        &self,
+        _session_id: Option<&str>,
+        message: Message,
+        _cancellation: CancellationToken,
+    ) -> Result<Message, ModelError> {
+        Ok(message)
+    }
+
     /// Generate one complete assistant message. Adapters may publish bounded
     /// deltas and retry notices through `events` while the request is running.
     async fn generate(

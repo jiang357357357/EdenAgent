@@ -1,5 +1,7 @@
 # 设置控制中心：设计 QA
 
+> 历史证据说明（2026-08-19）：本文件汇总的是界面设计迭代记录，其中标注“Python server”“Python AgentCore chain”或旧 REST 路由的运行结果均发生在全 Rust 迁移之前，只能作为视觉/交互历史基线，不能证明当前 Rust Server 已通过验收。当前运行时事实、迁移状态和待复验项分别以 `文档/技术/MonAgent 全 Rust 完整功能迁移计划.md`、`文档/技术/MonAgent 归档行为验收矩阵.md` 为准；收到明确“构建”指令后，相关界面必须重新对 Rust JSON-RPC 链路执行验证。
+
 ## Evidence
 
 - Source visual truth: `文档/参考/设计思路/桌宠设置/01-MonAgent设置-控制中心.png`

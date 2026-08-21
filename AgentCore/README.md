@@ -1,50 +1,17 @@
-# Mon AgentCore Rust
+# AgentCore
 
-Rust implementation of the Mon local agent runtime. This repository is being
-developed as the native replacement for the former Python `AgentCore` and is
-verified against the same event and message contracts.
+AgentCore 是 MonAgent 的可嵌入 Rust 核心库，不包含服务进程或传输协议。
 
-## Workspace
+## Crates
 
-- `mon-agent-core`: agent loop, messages, tools, cancellation, queues, and events.
-- `mon-agent-protocol`: versioned Server-to-Runtime NDJSON contract.
-- `mon-agent-runtime`: native sidecar executable. Standard output is reserved
-  for protocol frames; diagnostics are written to standard error.
+- `mon-agent-domain`：稳定 ID、消息与领域值对象。
+- `mon-agent-core`：模型无关的 Agent 循环、上下文压缩、工具注册和执行钩子。
+- `mon-agent-tools`：受工作区边界和权限策略约束的本地文件、搜索、补丁与命令工具。
 
-## Development
+`Server` 通过普通 Cargo path dependency 直接链接这些 crate。进程内调用是唯一生产链路，不再存在 stdio sidecar、独立 runtime 二进制或 Server/Core 私有线协议。
 
-```powershell
-cargo fmt --all --check
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+```bash
+cargo test -p mon-agent-core -p mon-agent-tools
 ```
 
-Run the sidecar over standard IO:
-
-```powershell
-cargo run -p mon-agent-runtime -- --transport=stdio
-```
-
-The first supported request is an initialization handshake:
-
-```json
-{"type":"runtime.initialize","requestID":"req_1","protocolVersion":1,"serverVersion":"dev"}
-```
-
-## Distribution
-
-Build a release artifact and its SHA-256 checksum on Windows:
-
-```powershell
-.\scripts\package.ps1
-```
-
-On Linux or macOS:
-
-```sh
-sh ./scripts/package.sh
-```
-
-Artifacts are written below `dist/<platform>/`. A packaged MonAgent copies that
-directory into `Server/bin/<platform>/`; the Server then starts the executable
-as a private stdio sidecar. `MON_AGENT_RUNTIME_PATH` overrides bundled lookup.
+公开 API 应保持宿主无关：HTTP、SQLite、模型供应商凭据、Mon Core、连接器和 UI 交互由 `Server` 拥有。

@@ -1,7 +1,7 @@
 use mon_agent_core::{ContentBlock, Tool, ToolCall, ToolCallContext, ToolDefinition, event_channel};
 use mon_agent_tools::{
     ApplyPatchTool, BashTool, EditTool, FindTool, GetDiffTool, GrepTool, LsTool, NativeToolConfig, PowerShellTool,
-    ReadTool, WriteStdinTool, WriteTool,
+    ProcessSandbox, ReadTool, WriteStdinTool, WriteTool,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -14,6 +14,8 @@ fn context() -> ToolCallContext {
     ToolCallContext {
         cancellation: CancellationToken::new(),
         events,
+        session_id: None,
+        metadata: json!({}),
     }
 }
 
@@ -203,7 +205,7 @@ async fn workspace_escape_and_cancellation_are_rejected() {
 #[tokio::test]
 async fn bash_reports_success_and_structured_failures() {
     let root = TempDir::new().expect("tempdir");
-    let config = NativeToolConfig::new(root.path());
+    let config = NativeToolConfig::new(root.path()).with_process_sandbox(ProcessSandbox::Direct);
     let bash = BashTool::new(definition("bash"), config);
     let result = bash
         .execute(&call("bash", json!({ "command": "printf native-shell" })), context())
@@ -229,7 +231,10 @@ async fn bash_reports_success_and_structured_failures() {
 #[tokio::test]
 async fn powershell_preserves_variables_and_utf8_output() {
     let root = TempDir::new().expect("tempdir");
-    let powershell = PowerShellTool::new(definition("powershell"), NativeToolConfig::new(root.path()));
+    let powershell = PowerShellTool::new(
+        definition("powershell"),
+        NativeToolConfig::new(root.path()).with_process_sandbox(ProcessSandbox::Direct),
+    );
     let result = powershell
         .execute(
             &call(
@@ -262,7 +267,7 @@ async fn powershell_preserves_variables_and_utf8_output() {
 #[tokio::test]
 async fn write_stdin_resumes_a_yielded_process_session() {
     let root = TempDir::new().expect("tempdir");
-    let config = NativeToolConfig::new(root.path());
+    let config = NativeToolConfig::new(root.path()).with_process_sandbox(ProcessSandbox::Direct);
     let bash = BashTool::new(definition("bash"), config.clone());
     let input = WriteStdinTool::new(definition("write_stdin"), config);
     let started = bash
@@ -370,7 +375,7 @@ async fn get_diff_reports_native_git_patch_and_line_counts() {
         )
         .await
         .expect("native diff succeeds");
-    assert_eq!(output_text(&result), "1 changed file(s)");
+    assert!(output_text(&result).starts_with("1 changed file(s)"));
     assert_eq!(result.details["kind"], "workspace_diff");
     assert_eq!(result.details["files"][0]["path"], "tracked.txt");
     assert_eq!(result.details["files"][0]["additions"], 2);
@@ -381,4 +386,50 @@ async fn get_diff_reports_native_git_patch_and_line_counts() {
             .expect("file patch")
             .contains("+second")
     );
+    assert!(result.details.get("patch").is_none());
+    assert_eq!(
+        result.structured_content.as_ref().expect("summary")["kind"],
+        "workspace_diff_summary"
+    );
+}
+
+#[tokio::test]
+async fn get_diff_bounds_large_model_and_review_payloads() {
+    let root = TempDir::new().expect("tempdir");
+    let git = |arguments: &[&str]| {
+        let status = Command::new("git")
+            .args(arguments)
+            .current_dir(root.path())
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git command failed: {arguments:?}");
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "tests@monagent.local"]);
+    git(&["config", "user.name", "MonAgent Tests"]);
+    fs::write(root.path().join("large.txt"), "before\n").expect("tracked fixture");
+    git(&["add", "large.txt"]);
+    git(&["commit", "-qm", "fixture"]);
+    fs::write(
+        root.path().join("large.txt"),
+        format!("{}\n", "changed\n".repeat(80_000)),
+    )
+    .expect("large modification");
+
+    let tool = GetDiffTool::new(definition("get_diff"), NativeToolConfig::new(root.path()));
+    let result = tool
+        .execute(&call("get_diff", json!({"path":".","max_chars":1000})), context())
+        .await
+        .expect("bounded diff succeeds");
+
+    assert!(output_text(&result).chars().count() < 1_200);
+    assert!(serde_json::to_string(&result.details).expect("details").chars().count() < 45_000);
+    assert!(
+        serde_json::to_string(result.structured_content.as_ref().expect("structured summary"))
+            .expect("structured JSON")
+            .chars()
+            .count()
+            < 10_000
+    );
+    assert_eq!(result.details["patchTruncated"], true);
 }

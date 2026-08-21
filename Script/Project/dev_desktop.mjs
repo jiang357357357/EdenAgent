@@ -157,6 +157,8 @@ desktopProc = spawnNpm(["--prefix", "frontend/desktop", "run", "dev"], {
     ...process.env,
     MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
     MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
+    MON_AGENT_SERVER_MODE: "external",
+    MON_AGENT_TOKEN_FILE: process.env.MON_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
   },
   detached: process.platform !== "win32",
 })

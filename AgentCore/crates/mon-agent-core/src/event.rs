@@ -33,6 +33,13 @@ pub enum AgentEvent {
         #[serde(rename = "assistantMessageEvent", skip_serializing_if = "Option::is_none")]
         assistant_message_event: Option<serde_json::Value>,
     },
+    /// Retract provider-visible provisional content before a safe stream retry.
+    /// The message is the empty replacement for the active assistant message.
+    StreamReset {
+        #[serde(serialize_with = "serialize_assistant_message")]
+        message: AssistantMessage,
+        reason: String,
+    },
     MessageEnd {
         message: Message,
     },
@@ -116,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn direct_assistant_event_fields_keep_the_python_role() {
+    fn direct_assistant_event_fields_keep_the_wire_role() {
         let event = AgentEvent::MessageUpdate {
             message: AssistantMessage::text("partial"),
             delta: "partial".to_owned(),
@@ -124,5 +131,17 @@ mod tests {
         };
         let value = serde_json::to_value(event).expect("event should serialize");
         assert_eq!(value["message"]["role"], "assistant");
+    }
+
+    #[test]
+    fn stream_reset_serializes_an_empty_assistant_replacement() {
+        let event = AgentEvent::StreamReset {
+            message: AssistantMessage::text(""),
+            reason: "incomplete stream".to_owned(),
+        };
+        let value = serde_json::to_value(event).expect("event should serialize");
+        assert_eq!(value["type"], "stream_reset");
+        assert_eq!(value["message"]["role"], "assistant");
+        assert_eq!(value["message"]["content"][0]["text"], "");
     }
 }

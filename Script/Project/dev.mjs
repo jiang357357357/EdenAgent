@@ -1,4 +1,5 @@
 import net from "node:net"
+import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync, rmSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -10,6 +11,7 @@ const config = loadMonConfig(root)
 const serverPort = Number(process.env.MON_AGENT_PORT ?? config.number("server", "PORT", 40092))
 const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
+const capabilityToken = process.env.MON_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
 
 rmSync(quitFlag, { force: true })
 
@@ -192,7 +194,7 @@ async function portPids(port) {
 async function processCommandLine(pid) {
   if (process.platform !== "win32") {
     try {
-      return readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ").trim()
+      return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").join(" ").trim()
     } catch {
       const result = await runCapture(["ps", "-p", String(pid), "-o", "command="], 3000).catch(() => ({
         stdout: "",
@@ -325,16 +327,21 @@ try {
   await ensurePortFree(webPort, "web")
 
   devLog(`启动 server，端口 ${serverPort}`)
-  const server = start("server", ["run", "dev:server"])
-  await waitFor(`http://127.0.0.1:${serverPort}/api/tools/status`, "server", server)
+  const server = start("server", ["run", "dev:server"], {
+    MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
+  })
+  await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server)
 
   devLog(`启动 web，端口 ${webPort}`)
-  const web = start("web", ["run", "dev:web"])
+  const web = start("web", ["run", "dev:web"], {
+    VITE_MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
+  })
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
   const desktop = start("desktop", ["run", "dev:desktop"], {
     ELECTRON_RUN_AS_NODE: undefined,
+    MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
     MON_AGENT_DEV_PARENT_PID: String(process.pid),
   })
 

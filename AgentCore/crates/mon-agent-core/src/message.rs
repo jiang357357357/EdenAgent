@@ -33,6 +33,8 @@ pub enum ContentBlock {
         name: String,
         #[serde(default)]
         arguments: Value,
+        #[serde(rename = "providerItemId", default, skip_serializing_if = "Option::is_none")]
+        provider_item_id: Option<String>,
     },
 }
 
@@ -145,7 +147,9 @@ impl AssistantMessage {
         self.content
             .iter()
             .filter_map(|block| match block {
-                ContentBlock::ToolCall { id, name, arguments } => Some(ToolCall {
+                ContentBlock::ToolCall {
+                    id, name, arguments, ..
+                } => Some(ToolCall {
                     id: id.clone(),
                     name: name.clone(),
                     arguments: arguments.clone(),
@@ -230,7 +234,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn assistant_message_matches_python_wire_shape() {
+    fn assistant_message_matches_wire_shape() {
         let value = serde_json::to_value(Message::Assistant(AssistantMessage::text("hello")))
             .expect("message should serialize");
         assert_eq!(value["role"], "assistant");
@@ -245,6 +249,7 @@ mod tests {
             id: "call_1".to_owned(),
             name: "read".to_owned(),
             arguments: serde_json::json!({"path": "README.md"}),
+            provider_item_id: None,
         })
         .expect("content should serialize");
         assert_eq!(value["type"], "toolCall");

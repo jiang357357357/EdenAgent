@@ -2,8 +2,8 @@ use crate::message::empty_object;
 use crate::{AgentContext, AssistantMessage, ContentBlock, EventEmitter, ToolCall, ToolErrorInfo};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
+use serde_json::{Value, json};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub struct ToolDefinition {
     pub name: String,
     pub label: String,
     pub description: String,
-    #[serde(default)]
+    #[serde(default = "empty_tool_parameters_schema")]
     pub parameters: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<Value>,
@@ -33,6 +33,10 @@ pub struct ToolDefinition {
     pub version: String,
     #[serde(default = "default_namespace")]
     pub namespace: String,
+    /// Runtime profiles in which this tool may be advertised and executed.
+    /// An empty list means the host has not imposed a profile restriction.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub profiles: Vec<String>,
     #[serde(default)]
     pub execution_mode: ToolExecutionMode,
     #[serde(default)]
@@ -55,15 +59,28 @@ impl ToolDefinition {
             label: name.clone(),
             name,
             description: description.into(),
-            parameters: empty_object(),
+            parameters: empty_tool_parameters_schema(),
             output_schema: None,
             source: default_source(),
             version: default_version(),
             namespace: default_namespace(),
+            profiles: Vec::new(),
             execution_mode: ToolExecutionMode::Parallel,
             exposure: ToolExposure::Direct,
         }
     }
+}
+
+/// Return the canonical input schema for a function tool that accepts no
+/// arguments. Function tools always receive a JSON object, even when that
+/// object has no properties.
+#[must_use]
+pub fn empty_tool_parameters_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+    })
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -110,6 +127,8 @@ pub struct PermissionRequest {
 pub struct ToolCallContext {
     pub cancellation: CancellationToken,
     pub events: EventEmitter,
+    pub session_id: Option<String>,
+    pub metadata: Value,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -164,12 +183,27 @@ pub struct BeforeToolCall {
     pub context: AgentContext,
 }
 
+/// A reloadable collection of tools whose definitions and implementations may
+/// change while the host remains running. Static registry entries always win
+/// name collisions, so a dynamic source can never replace a host tool.
+pub trait DynamicToolSource: Send + Sync {
+    fn get(&self, name: &str) -> Option<Arc<dyn Tool>>;
+    fn direct_definitions(&self) -> Vec<ToolDefinition>;
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BeforeToolCallResult {
+    pub cached_output: Option<ToolOutput>,
+    pub metadata: Value,
+}
+
 #[derive(Clone, Debug)]
 pub struct AfterToolCall {
     pub assistant_message: AssistantMessage,
     pub call: ToolCall,
     pub output: ToolOutput,
     pub is_error: bool,
+    pub error: Option<ToolErrorInfo>,
     pub context: AgentContext,
 }
 
@@ -182,8 +216,12 @@ pub struct AfterToolCallResult {
 
 #[async_trait]
 pub trait ToolHooks: Send + Sync {
-    async fn before(&self, _context: BeforeToolCall, _cancellation: CancellationToken) -> Result<(), ToolFailure> {
-        Ok(())
+    async fn before(
+        &self,
+        _context: BeforeToolCall,
+        _cancellation: CancellationToken,
+    ) -> Result<BeforeToolCallResult, ToolFailure> {
+        Ok(BeforeToolCallResult::default())
     }
 
     async fn after(
@@ -194,7 +232,7 @@ pub trait ToolHooks: Send + Sync {
         Ok(AfterToolCallResult {
             output: context.output,
             is_error: context.is_error,
-            error: None,
+            error: context.error,
         })
     }
 }
@@ -209,6 +247,9 @@ impl ToolHooks for NoopToolHooks {}
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
     order: Vec<String>,
+    dynamic_sources: Vec<Arc<dyn DynamicToolSource>>,
+    allowed: Option<HashSet<String>>,
+    excluded: HashSet<String>,
 }
 
 impl ToolRegistry {
@@ -224,17 +265,91 @@ impl ToolRegistry {
         self.tools.insert(name, tool)
     }
 
+    pub fn register_dynamic_source(&mut self, source: Arc<dyn DynamicToolSource>) {
+        self.dynamic_sources.push(source);
+    }
+
     pub fn get(&self, name: &str) -> Option<Arc<dyn Tool>> {
-        self.tools.get(name).cloned()
+        if !self.allows(name) {
+            return None;
+        }
+        self.tools
+            .get(name)
+            .cloned()
+            .or_else(|| self.dynamic_sources.iter().find_map(|source| source.get(name)))
+    }
+
+    #[must_use]
+    pub fn without<I, S>(&self, names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let excluded = names
+            .into_iter()
+            .map(|name| name.as_ref().to_owned())
+            .collect::<std::collections::HashSet<_>>();
+        let mut filtered = Self::new();
+        for name in &self.order {
+            if !excluded.contains(name) {
+                if let Some(tool) = self.tools.get(name) {
+                    filtered.register(Arc::clone(tool));
+                }
+            }
+        }
+        filtered.dynamic_sources = self.dynamic_sources.clone();
+        filtered.allowed = self.allowed.clone();
+        filtered.excluded = self.excluded.union(&excluded).cloned().collect();
+        filtered
+    }
+
+    /// Return a snapshot view that exposes only the named tools, including
+    /// tools supplied later by reloadable dynamic sources.
+    #[must_use]
+    pub fn only<I, S>(&self, names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let requested = names
+            .into_iter()
+            .map(|name| name.as_ref().to_owned())
+            .collect::<HashSet<_>>();
+        let mut filtered = self.clone();
+        filtered.allowed = Some(match &self.allowed {
+            Some(current) => current.intersection(&requested).cloned().collect(),
+            None => requested,
+        });
+        filtered
     }
 
     pub fn direct_definitions(&self) -> Vec<ToolDefinition> {
-        self.order
+        let mut definitions = self
+            .order
             .iter()
             .filter_map(|name| self.tools.get(name))
             .map(|tool| tool.definition())
-            .filter(|definition| definition.exposure == ToolExposure::Direct)
-            .collect()
+            .filter(|definition| definition.exposure == ToolExposure::Direct && self.allows(&definition.name))
+            .collect::<Vec<_>>();
+        let mut names = definitions
+            .iter()
+            .map(|definition| definition.name.clone())
+            .collect::<HashSet<_>>();
+        for source in &self.dynamic_sources {
+            for definition in source.direct_definitions() {
+                if definition.exposure == ToolExposure::Direct
+                    && self.allows(&definition.name)
+                    && names.insert(definition.name.clone())
+                {
+                    definitions.push(definition);
+                }
+            }
+        }
+        definitions
+    }
+
+    fn allows(&self, name: &str) -> bool {
+        !self.excluded.contains(name) && self.allowed.as_ref().is_none_or(|allowed| allowed.contains(name))
     }
 }
 
@@ -252,4 +367,29 @@ fn default_namespace() -> String {
 
 fn default_success() -> bool {
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn direct_tools_use_a_strict_empty_object_schema() {
+        let definition = ToolDefinition::direct("list_items", "List items");
+        assert_eq!(definition.parameters, empty_tool_parameters_schema());
+        assert_eq!(definition.parameters["type"], "object");
+        assert_eq!(definition.parameters["properties"], json!({}));
+        assert_eq!(definition.parameters["additionalProperties"], false);
+    }
+
+    #[test]
+    fn deserialized_tools_without_parameters_receive_the_strict_default() {
+        let definition: ToolDefinition = serde_json::from_value(json!({
+            "name":"list_items",
+            "label":"list_items",
+            "description":"List items"
+        }))
+        .expect("tool definition");
+        assert_eq!(definition.parameters, empty_tool_parameters_schema());
+    }
 }

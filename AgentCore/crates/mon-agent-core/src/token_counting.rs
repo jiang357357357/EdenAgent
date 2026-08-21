@@ -1,4 +1,4 @@
-use crate::{ContentBlock, Message, UserContent};
+use crate::{ContentBlock, Message, ToolDefinition, UserContent};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tiktoken_rs::{CoreBPE, bpe_for_model, o200k_base_singleton};
@@ -117,6 +117,48 @@ pub struct ContextTokenEstimate {
     pub last_usage_index: Option<usize>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptTokenBreakdown {
+    pub identity: usize,
+    pub system: usize,
+    pub skills: usize,
+    pub tools: usize,
+    pub history: usize,
+    pub total: usize,
+}
+
+#[must_use]
+pub fn estimate_prompt_token_breakdown(
+    system_prompt: &str,
+    identity_context: &str,
+    skill_context: &str,
+    tools: &[ToolDefinition],
+    messages: &[Message],
+    model_id: Option<&str>,
+) -> PromptTokenBreakdown {
+    let identity = count_text_tokens(identity_context, model_id);
+    let skills = count_text_tokens(skill_context, model_id);
+    let all_system = count_text_tokens(system_prompt, model_id);
+    let system = all_system.saturating_sub(identity).saturating_sub(skills);
+    let tools = count_json_tokens(
+        &serde_json::to_value(tools).unwrap_or_else(|_| Value::Array(Vec::new())),
+        model_id,
+    );
+    let history = messages
+        .iter()
+        .map(|message| estimate_message_tokens(message, model_id))
+        .sum();
+    PromptTokenBreakdown {
+        identity,
+        system,
+        skills,
+        tools,
+        history,
+        total: all_system.saturating_add(tools).saturating_add(history),
+    }
+}
+
 fn assistant_usage(message: &Message) -> Option<usize> {
     let Message::Assistant(assistant) = message else {
         return None;
@@ -173,7 +215,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn o200k_counts_match_python_tiktoken_fixtures() {
+    fn o200k_counts_match_reference_tiktoken_fixtures() {
         assert_eq!(count_text_tokens("hello", None), 1);
         assert_eq!(count_text_tokens("你好，世界", None), 3);
         assert_eq!(count_text_tokens("function main() { return 42; }", None), 9);
@@ -194,5 +236,27 @@ mod tests {
         assert_eq!(estimate.usage_tokens, 100);
         assert_eq!(estimate.trailing_tokens, 1);
         assert_eq!(estimate.last_usage_index, Some(1));
+    }
+
+    #[test]
+    fn prompt_breakdown_accounts_for_all_cache_components() {
+        let tools = vec![ToolDefinition::direct("read", "Read a file")];
+        let breakdown = estimate_prompt_token_breakdown(
+            "identity system skills",
+            "identity",
+            "skills",
+            &tools,
+            &[Message::user("history")],
+            None,
+        );
+        assert!(breakdown.identity > 0);
+        assert!(breakdown.system > 0);
+        assert!(breakdown.skills > 0);
+        assert!(breakdown.tools > 0);
+        assert!(breakdown.history > 0);
+        assert_eq!(
+            breakdown.total,
+            breakdown.identity + breakdown.system + breakdown.skills + breakdown.tools + breakdown.history
+        );
     }
 }
