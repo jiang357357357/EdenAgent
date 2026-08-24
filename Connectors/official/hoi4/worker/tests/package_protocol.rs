@@ -4,11 +4,7 @@ use mon_agent_connector_protocol::{PublishedEvent, method};
 use mon_agent_connectors::{ConnectorService, ConnectorServiceConfig};
 use mon_agent_store::Store;
 use serde_json::{Value, json};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{fs, path::Path, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 #[tokio::test]
@@ -105,6 +101,8 @@ fn path_text(path: &Path) -> String {
 async fn server_supervisor_persists_worker_events_and_routes_queries() {
     let directory = tempfile::tempdir().expect("tempdir");
     let packages_root = directory.path().join("packages");
+    let manifest_root = directory.path().join("manifests");
+    fs::create_dir_all(&manifest_root).expect("empty compatibility manifest directory");
     install_test_package(&packages_root);
     let log_path = directory.path().join("game.log");
     tokio::fs::write(&log_path, "HOI4 startup\n")
@@ -126,8 +124,7 @@ async fn server_supervisor_persists_worker_events_and_routes_queries() {
     let service = ConnectorService::with_config(
         store.clone(),
         ConnectorServiceConfig {
-            manifest_root: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../../Server/connectors/manifests"),
+            manifest_root,
             package_root: packages_root,
             package_policy: LoadPolicy::Development,
             connector_data_root: directory.path().join("runtime"),
