@@ -3,7 +3,7 @@
 The Victoria 3 integration runs as an isolated Connector Worker. Build and stage it with:
 
 ```bash
-cargo build -p mon-agent-connector-victoria3
+cargo build -p eden-agent-connector-victoria3
 node Script/Project/package_connector.mjs victoria3 --profile debug
 ```
 

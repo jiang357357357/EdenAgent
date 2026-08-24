@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 
-const baseUrl = process.env.MON_AGENT_BASE_URL || "http://127.0.0.1:40092"
-const tokenFile = process.env.MON_AGENT_TOKEN_FILE || "Data/server-capability.token"
+const baseUrl = process.env.EDEN_AGENT_BASE_URL || "http://127.0.0.1:40092"
+const tokenFile = process.env.EDEN_AGENT_TOKEN_FILE || "Data/server-capability.token"
 const connectorKey = process.argv[2]
 let completed = false
 
@@ -11,7 +11,7 @@ if (!connectorKey) {
 
 const token = (await readFile(tokenFile, "utf8")).trim()
 const url = new URL("/rpc", baseUrl.replace(/^http/, "ws"))
-const socket = new WebSocket(url, ["mon-agent-rpc-v2", `mon-agent-token.${token}`])
+const socket = new WebSocket(url, ["eden-agent-rpc-v2", `eden-agent-token.${token}`])
 const timeout = setTimeout(() => {
   console.error("connector catalog RPC timed out")
   process.exit(1)

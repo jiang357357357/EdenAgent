@@ -1,12 +1,12 @@
 <div align="center">
 
-# MonAgent
+# Eden Agent
 
 **A local-first, persistent, embeddable agent runtime written in Rust**
 
 React / Vite client · Electron desktop app · WebSocket JSON-RPC · SQLite
 
-[![CI](https://github.com/jiang357357357/MonAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/MonAgent/actions/workflows/ci.yml)
+[![CI](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml)
 ![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-dea584?logo=rust&logoColor=white)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.8.0-e67700)
@@ -17,11 +17,11 @@ React / Vite client · Electron desktop app · WebSocket JSON-RPC · SQLite
 </div>
 
 > [!IMPORTANT]
-> MonAgent is under active development, and its protocols and configuration formats may still change. The current source is available for noncommercial use under PolyForm Noncommercial 1.0.0. This is not an OSI-approved open-source license; commercial use requires a separate license.
+> Eden Agent is under active development, and its protocols and configuration formats may still change. The current source is available for noncommercial use under PolyForm Noncommercial 1.0.0. This is not an OSI-approved open-source license; commercial use requires a separate license.
 
 ## Overview
 
-MonAgent, whose desktop product is named Eden Agent, runs the agent loop, tool execution, persistence, and desktop experience locally. The Rust Server is the only backend process. The frontend talks to it exclusively through a generated WebSocket JSON-RPC client and Blob endpoints—there is no Python sidecar or legacy native bridge.
+Eden Agent runs the agent loop, tool execution, persistence, and desktop experience locally. The Rust Server is the only backend process. The frontend talks to it exclusively through a generated WebSocket JSON-RPC client and Blob endpoints—there is no Python sidecar or legacy native bridge.
 
 ### Capabilities
 
@@ -57,8 +57,8 @@ The Server persists events before broadcasting them. `AgentCore` remains host-in
 | Path | Purpose |
 | --- | --- |
 | [`AgentCore`](AgentCore) | Host-independent Rust library crates for domain types, the agent loop, context, and tool execution |
-| [`Server`](https://github.com/jiang357357357/MonAgentServer) | Rust host-service submodule for protocol, storage, models, permissions, and extensions |
-| [`frontend`](https://github.com/jiang357357357/MonAgentFrontend) | React/Vite client and Electron desktop-shell submodule |
+| [`Server`](https://github.com/jiang357357357/EdenAgentServer) | Rust host-service submodule for protocol, storage, models, permissions, and extensions |
+| [`frontend`](https://github.com/jiang357357357/EdenAgentFrontend) | React/Vite client and Electron desktop-shell submodule |
 | [`Connectors`](Connectors) | Official installable connectors and workers |
 | [`Script`](Script) | Development launchers, configuration readers, packaging, and migration tools |
 | [`文档`](文档) | Design notes, runbooks, and acceptance material |
@@ -75,8 +75,8 @@ The Server persists events before broadcasting them. `AgentCore` remains host-in
 ### Clone and run
 
 ```bash
-git clone --recurse-submodules https://github.com/jiang357357357/MonAgent.git
-cd MonAgent
+git clone --recurse-submodules https://github.com/jiang357357357/EdenAgent.git
+cd EdenAgent
 npm ci
 npm --prefix frontend ci
 cp .monconfig.example .monconfig
@@ -111,7 +111,7 @@ To migrate existing local asset paths:
 node Script/Project/MigrateCharacterAssets.mjs ../AgentAssets
 ```
 
-Do not publish an asset repository until the origin and redistribution rights of every file have been verified. Third-party character, Spine, voice, model, game, and trademark materials are not covered by the MonAgent software license.
+Do not publish an asset repository until the origin and redistribution rights of every file have been verified. Third-party character, Spine, voice, model, game, and trademark materials are not covered by the Eden Agent software license.
 
 ## Development and verification
 
@@ -156,6 +156,6 @@ Current versions are source-available for noncommercial use under the [PolyForm 
 
 <div align="center">
 
-If MonAgent is useful to you, consider starring the repository, opening an Issue, or contributing an improvement.
+If Eden Agent is useful to you, consider starring the repository, opening an Issue, or contributing an improvement.
 
 </div>

@@ -7,7 +7,7 @@ import { loadMonConfig } from "./monconfig.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
-const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
+const webPort = Number(process.env.EDEN_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
 
 await rm(quitFlag, { force: true }).catch(() => {})
@@ -152,10 +152,10 @@ if (await isWebReady()) {
 
 const desktopEnvironment = {
   ...process.env,
-  MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
-  MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
-  MON_AGENT_SERVER_MODE: "external",
-  MON_AGENT_TOKEN_FILE: process.env.MON_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
+  EDEN_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
+  EDEN_AGENT_DEV_PARENT_PID: process.env.EDEN_AGENT_DEV_PARENT_PID || String(process.pid),
+  EDEN_AGENT_SERVER_MODE: "external",
+  EDEN_AGENT_TOKEN_FILE: process.env.EDEN_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
 }
 // Electron switches into plain Node mode when this inherited variable is set.
 // The standalone desktop launcher must clear it just like the full dev launcher.

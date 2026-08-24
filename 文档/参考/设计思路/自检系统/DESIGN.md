@@ -34,7 +34,7 @@
 
 ## 二、数据模型
 
-### 2.1 自检状态（持久化到 .mon-agent/check-state.json）
+### 2.1 自检状态（持久化到 .eden-agent/check-state.json）
 
 ```typescript
 interface CheckState {
@@ -90,10 +90,10 @@ SYSTEM: 你是苏岚。刚完成了一次自检。请用 JSON 回复：
 ## 三、文件结构
 
 ```
-packages/mon-agent/src/session/
+packages/eden-agent/src/session/
 ├── check/
 │   ├── index.ts          ← 自检模块入口（Effect Service）
-│   ├── state.ts          ← CheckState 读写（.mon-agent/check-state.json）
+│   ├── state.ts          ← CheckState 读写（.eden-agent/check-state.json）
 │   ├── scheduler.ts      ← 后台循环（定时检查是否到预约时间）
 │   ├── run-check.ts      ← 执行一次自检（组装 prompt → 调 LLM → 解析结果）
 │   ├── checklist.ts      ← 检查项注册表（内置 + 可扩展）

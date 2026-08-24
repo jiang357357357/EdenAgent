@@ -1,8 +1,8 @@
-use mon_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
-use mon_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
-use mon_agent_connector_protocol::{PublishedEvent, method};
-use mon_agent_connectors::{ConnectorService, ConnectorServiceConfig};
-use mon_agent_store::Store;
+use eden_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
+use eden_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
+use eden_agent_connector_protocol::{PublishedEvent, method};
+use eden_agent_connectors::{ConnectorService, ConnectorServiceConfig};
+use eden_agent_store::Store;
 use serde_json::{Value, json};
 use std::{fs, path::Path, time::Duration};
 use tokio::io::AsyncWriteExt;
@@ -12,14 +12,14 @@ async fn worker_observes_log_and_answers_generic_query() {
     let directory = tempfile::tempdir().expect("tempdir");
     let package_root = directory.path().join("package");
     let worker_relative = if cfg!(windows) {
-        "workers/windows-x64/mon-agent-connector-hoi4.exe"
+        "workers/windows-x64/eden-agent-connector-hoi4.exe"
     } else {
-        "workers/linux-x64/mon-agent-connector-hoi4"
+        "workers/linux-x64/eden-agent-connector-hoi4"
     };
     let worker_target = package_root.join(worker_relative);
     fs::create_dir_all(worker_target.parent().expect("worker parent")).expect("worker directory");
     fs::copy(
-        env!("CARGO_BIN_EXE_mon-agent-connector-hoi4"),
+        env!("CARGO_BIN_EXE_eden-agent-connector-hoi4"),
         &worker_target,
     )
     .expect("copy worker");
@@ -62,7 +62,7 @@ async fn worker_observes_log_and_answers_generic_query() {
         .await
         .expect("open log");
     file.write_all(
-        b"MONAGENT_HOI4|1|HELLO|bridge_version=0.1.0|mode=observe\nMONAGENT_HOI4|1|SNAPSHOT|date=1939.9.1|country_tag=GER|political_power=125.5|at_war=1\n",
+        b"EDENAGENT_HOI4|1|HELLO|bridge_version=0.1.0|mode=observe\nEDENAGENT_HOI4|1|SNAPSHOT|date=1939.9.1|country_tag=GER|political_power=125.5|at_war=1\n",
     )
     .await
     .expect("append bridge lines");
@@ -154,7 +154,7 @@ async fn server_supervisor_persists_worker_events_and_routes_queries() {
         .await
         .expect("open log");
     file.write_all(
-        b"MONAGENT_HOI4|1|HELLO|bridge_version=0.1.0|mode=observe\nMONAGENT_HOI4|1|SNAPSHOT|date=1939.9.1|country_tag=GER|political_power=125.5\n",
+        b"EDENAGENT_HOI4|1|HELLO|bridge_version=0.1.0|mode=observe\nEDENAGENT_HOI4|1|SNAPSHOT|date=1939.9.1|country_tag=GER|political_power=125.5\n",
     )
     .await
     .expect("append bridge lines");
@@ -210,14 +210,14 @@ async fn server_supervisor_persists_worker_events_and_routes_queries() {
 fn install_test_package(packages_root: &Path) {
     let package_root = packages_root.join("hoi4");
     let worker_relative = if cfg!(windows) {
-        "workers/windows-x64/mon-agent-connector-hoi4.exe"
+        "workers/windows-x64/eden-agent-connector-hoi4.exe"
     } else {
-        "workers/linux-x64/mon-agent-connector-hoi4"
+        "workers/linux-x64/eden-agent-connector-hoi4"
     };
     let worker_target = package_root.join(worker_relative);
     fs::create_dir_all(worker_target.parent().expect("worker parent")).expect("worker directory");
     fs::copy(
-        env!("CARGO_BIN_EXE_mon-agent-connector-hoi4"),
+        env!("CARGO_BIN_EXE_eden-agent-connector-hoi4"),
         &worker_target,
     )
     .expect("copy worker");

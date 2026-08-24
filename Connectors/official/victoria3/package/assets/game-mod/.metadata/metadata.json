@@ -1,9 +1,9 @@
 {
-  "name": "MonAgent Victoria 3 Observer Bridge",
-  "id": "monagent.victoria3.observer",
+  "name": "Eden Agent Victoria 3 Observer Bridge",
+  "id": "edenagent.victoria3.observer",
   "version": "0.1.0",
   "supported_game_version": "1.13.*",
-  "short_description": "Read-only telemetry bridge for the local MonAgent service.",
+  "short_description": "Read-only telemetry bridge for the local Eden Agent service.",
   "tags": ["Utilities"],
   "relationships": [],
   "game_custom_data": { "multiplayer_synchronized": true }

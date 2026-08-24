@@ -1,4 +1,4 @@
-# MonAgent Web 前端 — 设计灵感
+# Eden Agent Web 前端 — 设计灵感
 
 ---
 

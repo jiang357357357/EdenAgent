@@ -1,8 +1,8 @@
-use mon_agent_connector_protocol::{
+use eden_agent_connector_protocol::{
     CapabilityCall, InitializeParams, InitializeResult, PublishedEvent, RpcNotification,
     RpcRequest, RpcResponse, WireMessage, WorkerStatus, method, read_message, write_message,
 };
-use mon_agent_hoi4::{Observation, Observer, ObserverConfig, ObserverHandle};
+use eden_agent_hoi4::{Observation, Observer, ObserverConfig, ObserverHandle};
 use serde_json::{Value, json};
 use std::{process::ExitCode, sync::Arc};
 use tokio::{
@@ -108,12 +108,12 @@ async fn initialize(
     }
     let params: InitializeParams =
         serde_json::from_value(params).map_err(|error| ("invalid_params", error.to_string()))?;
-    if params.protocol_version != mon_agent_connector_protocol::PROTOCOL_VERSION {
+    if params.protocol_version != eden_agent_connector_protocol::PROTOCOL_VERSION {
         return Err((
             "unsupported_protocol",
             format!(
                 "worker supports protocol {}, host requested {}",
-                mon_agent_connector_protocol::PROTOCOL_VERSION,
+                eden_agent_connector_protocol::PROTOCOL_VERSION,
                 params.protocol_version
             ),
         ));
@@ -139,7 +139,7 @@ async fn initialize(
     });
 
     serde_json::to_value(InitializeResult {
-        protocol_version: mon_agent_connector_protocol::PROTOCOL_VERSION,
+        protocol_version: eden_agent_connector_protocol::PROTOCOL_VERSION,
         worker_version: WORKER_VERSION.to_owned(),
         capabilities: vec![
             "bridge_ready".to_owned(),

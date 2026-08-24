@@ -6,10 +6,10 @@ $ErrorActionPreference = "Stop"
 
 $agentRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
 $escapedRoot = $agentRoot.Path.Replace("'", "''")
-$serverPort = if ($env:MON_AGENT_PORT) { [int]$env:MON_AGENT_PORT } else { 40092 }
-$webPort = if ($env:MON_AGENT_WEB_PORT) { [int]$env:MON_AGENT_WEB_PORT } else { 40091 }
+$serverPort = if ($env:EDEN_AGENT_PORT) { [int]$env:EDEN_AGENT_PORT } else { 40092 }
+$webPort = if ($env:EDEN_AGENT_WEB_PORT) { [int]$env:EDEN_AGENT_WEB_PORT } else { 40091 }
 
-function Test-MonAgentDevProcess {
+function Test-EdenAgentDevProcess {
   param(
     [int]$ProcessId
   )
@@ -23,8 +23,8 @@ function Test-MonAgentDevProcess {
   $rootPattern = [regex]::Escape($agentRoot.Path)
   return (
     $commandLine -match $rootPattern -or
-    $commandLine -match 'mon-agent-server' -or
-    $commandLine -match 'cargo.+mon-agent-server' -or
+    $commandLine -match 'eden-agent-server' -or
+    $commandLine -match 'cargo.+eden-agent-server' -or
     $commandLine -match 'frontend[\\/]web[\\/]node_modules[\\/]vite' -or
     $commandLine -match 'npm run dev'
   )
@@ -44,7 +44,7 @@ function Stop-ProcessTree {
   & taskkill.exe /PID $ProcessId /T /F | Out-Null
 }
 
-function Clear-MonAgentDevProcesses {
+function Clear-EdenAgentDevProcesses {
   $ports = @([int]$serverPort, [int]$webPort)
   $owners = Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty OwningProcess -Unique
@@ -54,10 +54,10 @@ function Clear-MonAgentDevProcesses {
       continue
     }
 
-    if (Test-MonAgentDevProcess -ProcessId $owner) {
+    if (Test-EdenAgentDevProcess -ProcessId $owner) {
       Stop-ProcessTree -ProcessId $owner
     } else {
-      Write-Warning "Port is owned by a non-MonAgent process and was not stopped automatically: PID $owner"
+      Write-Warning "Port is owned by a non-Eden Agent process and was not stopped automatically: PID $owner"
     }
   }
 
@@ -73,11 +73,11 @@ function Clear-MonAgentDevProcesses {
   }
 }
 
-Clear-MonAgentDevProcesses
+Clear-EdenAgentDevProcesses
 
 if ($Foreground) {
   Set-Location -LiteralPath $agentRoot.Path
-  Write-Host "MonAgent foreground dev starting..." -ForegroundColor Cyan
+  Write-Host "Eden Agent foreground dev starting..." -ForegroundColor Cyan
   Write-Host "Root:   $($agentRoot.Path)"
   Write-Host "Web:    http://127.0.0.1:$webPort/"
   Write-Host "Server: http://127.0.0.1:$serverPort/"
@@ -106,7 +106,7 @@ $process = Start-Process -FilePath "powershell.exe" -ArgumentList @(
   $command
 ) -WorkingDirectory $agentRoot.Path -WindowStyle Normal -PassThru
 
-Write-Host "MonAgent development services started in separate terminals." -ForegroundColor Green
+Write-Host "Eden Agent development services started in separate terminals." -ForegroundColor Green
 Write-Host "PID:    $($process.Id)"
 Write-Host "Root:   $($agentRoot.Path)"
 Write-Host "Web:    http://127.0.0.1:$webPort/"

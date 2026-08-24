@@ -1,12 +1,12 @@
 <div align="center">
 
-# MonAgent
+# Eden Agent
 
 **本地优先、可持久化、可嵌入的 Rust 智能体运行时**
 
 React / Vite 客户端 · Electron 桌面端 · WebSocket JSON-RPC · SQLite
 
-[![CI](https://github.com/jiang357357357/MonAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/MonAgent/actions/workflows/ci.yml)
+[![CI](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml)
 ![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-dea584?logo=rust&logoColor=white)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.8.0-e67700)
@@ -17,11 +17,11 @@ React / Vite 客户端 · Electron 桌面端 · WebSocket JSON-RPC · SQLite
 </div>
 
 > [!IMPORTANT]
-> MonAgent 正在持续开发，协议与配置格式仍可能变化。当前代码以 PolyForm Noncommercial 1.0.0 提供非商业使用，并非 OSI 定义的开源许可证；商业使用需要单独授权。
+> Eden Agent 正在持续开发，协议与配置格式仍可能变化。当前代码以 PolyForm Noncommercial 1.0.0 提供非商业使用，并非 OSI 定义的开源许可证；商业使用需要单独授权。
 
 ## 项目简介
 
-MonAgent（桌面产品名 Eden Agent）把智能体循环、工具调用、持久化和桌面体验放在本地运行。Rust Server 是唯一后端进程；前端只通过生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问它，不依赖 Python sidecar 或旧原生桥接层。
+Eden Agent 把智能体循环、工具调用、持久化和桌面体验放在本地运行。Rust Server 是唯一后端进程；前端只通过生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问它，不依赖 Python sidecar 或旧原生桥接层。
 
 ### 核心能力
 
@@ -57,8 +57,8 @@ flowchart LR
 | 路径 | 说明 |
 | --- | --- |
 | [`AgentCore`](AgentCore) | 宿主无关的 Rust library crates，包含领域类型、智能体循环、上下文与工具执行 |
-| [`Server`](https://github.com/jiang357357357/MonAgentServer) | Rust 宿主服务子模块，负责协议、存储、模型、权限及扩展系统 |
-| [`frontend`](https://github.com/jiang357357357/MonAgentFrontend) | React/Vite 客户端与 Electron 桌面壳子模块 |
+| [`Server`](https://github.com/jiang357357357/EdenAgentServer) | Rust 宿主服务子模块，负责协议、存储、模型、权限及扩展系统 |
+| [`frontend`](https://github.com/jiang357357357/EdenAgentFrontend) | React/Vite 客户端与 Electron 桌面壳子模块 |
 | [`Connectors`](Connectors) | 官方可安装连接器及其 worker |
 | [`Script`](Script) | 开发启动、配置读取、打包与迁移工具 |
 | [`文档`](文档) | 设计说明、运行手册与验收资料 |
@@ -75,8 +75,8 @@ flowchart LR
 ### 获取并启动
 
 ```bash
-git clone --recurse-submodules https://github.com/jiang357357357/MonAgent.git
-cd MonAgent
+git clone --recurse-submodules https://github.com/jiang357357357/EdenAgent.git
+cd EdenAgent
 npm ci
 npm --prefix frontend ci
 cp .monconfig.example .monconfig
@@ -111,7 +111,7 @@ npm run dev
 node Script/Project/MigrateCharacterAssets.mjs ../AgentAssets
 ```
 
-在确认每个文件的来源及再分发权之前，请勿公开资源仓库。第三方角色、Spine、语音、模型、游戏内容和商标不在 MonAgent 软件许可证的授权范围内。
+在确认每个文件的来源及再分发权之前，请勿公开资源仓库。第三方角色、Spine、语音、模型、游戏内容和商标不在 Eden Agent 软件许可证的授权范围内。
 
 ## 开发与验证
 
@@ -156,6 +156,6 @@ GitHub Actions 会在每次推送和拉取请求中执行同样的核心检查�
 
 <div align="center">
 
-如果 MonAgent 对你有帮助，欢迎 Star、提交 Issue 或参与改进。
+如果 Eden Agent 对你有帮助，欢迎 Star、提交 Issue 或参与改进。
 
 </div>

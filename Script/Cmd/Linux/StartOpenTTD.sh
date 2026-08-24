@@ -8,9 +8,9 @@ OPEN_TTD_BRIDGE="${AGENT_ROOT}/Server/connectors/openttd_bridge"
 OPEN_TTD_ROOT="${MON_OPENTTD_ROOT:-${HOME}/.local/opt/openttd-15.3}"
 OPEN_TTD_BIN="${MON_OPENTTD_BIN:-${OPEN_TTD_ROOT}/openttd}"
 OPEN_TTD_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/openttd"
-OPEN_TTD_SAVE="${MON_OPENTTD_SAVE:-${OPEN_TTD_DATA}/save/monagent-route.sav}"
+OPEN_TTD_SAVE="${MON_OPENTTD_SAVE:-${OPEN_TTD_DATA}/save/edenagent-route.sav}"
 OPEN_TTD_HOST="${MON_OPENTTD_HOST:-127.0.0.1}"
-OPEN_TTD_RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/monagent-openttd"
+OPEN_TTD_RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/edenagent-openttd"
 OPEN_TTD_REGISTRY="${MON_OPENTTD_INSTANCE_REGISTRY:-${OPEN_TTD_RUNTIME}/active-instance.json}"
 OPEN_TTD_LOCK="${OPEN_TTD_RUNTIME}/launcher.lock"
 OPEN_TTD_LOG="${OPEN_TTD_RUNTIME}/server.log"
@@ -60,7 +60,7 @@ stop_managed_instance() {
   node "${HELPER}" remove-if-matches "${OPEN_TTD_REGISTRY}" "${expected_id}" "${expected_pid}"
   local config_name
   config_name="$(basename -- "${expected_config}")"
-  if [[ "$(dirname -- "${expected_config}")" == "${OPEN_TTD_DATA}" && "${config_name}" == .monagent-instance-*.cfg ]]; then rm -f -- "${expected_config}"; fi
+  if [[ "$(dirname -- "${expected_config}")" == "${OPEN_TTD_DATA}" && "${config_name}" == .edenagent-instance-*.cfg ]]; then rm -f -- "${expected_config}"; fi
 }
 
 if [[ "${mode}" == "auto" ]]; then
@@ -94,7 +94,7 @@ fi
 
 [[ -f "${OPEN_TTD_BASE_CONFIG}" ]] || { echo "OpenTTD base config not found: ${OPEN_TTD_BASE_CONFIG}" >&2; exit 1; }
 instance_id="$(node "${HELPER}" uuid)"
-instance_config="${OPEN_TTD_DATA}/.monagent-instance-${instance_id}.cfg"
+instance_config="${OPEN_TTD_DATA}/.edenagent-instance-${instance_id}.cfg"
 instance_control=""
 child_pid=""
 registered=""
@@ -113,7 +113,7 @@ cleanup() {
 trap cleanup EXIT
 
 for name in "${OPEN_TTD_CONTENT_DIRS[@]}"; do mkdir -p "${OPEN_TTD_DATA}/${name}"; done
-migration_marker="${OPEN_TTD_DATA}/.monagent-runtime-content-migrated-v1"
+migration_marker="${OPEN_TTD_DATA}/.edenagent-runtime-content-migrated-v1"
 if [[ ! -f "${migration_marker}" && -d "${OPEN_TTD_RUNTIME}/instances" ]]; then
   for name in "${OPEN_TTD_CONTENT_DIRS[@]}"; do
     while IFS= read -r -d '' source; do

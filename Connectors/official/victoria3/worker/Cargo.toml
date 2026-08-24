@@ -1,5 +1,5 @@
 [package]
-name = "mon-agent-connector-victoria3"
+name = "eden-agent-connector-victoria3"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,14 +7,14 @@ license.workspace = true
 publish = false
 
 [dependencies]
-mon-agent-connector-protocol = { path = "../../../../Server/crates/mon-agent-connector-protocol" }
-mon-agent-victoria3 = { path = "../../../../Server/crates/mon-agent-victoria3" }
+eden-agent-connector-protocol = { path = "../../../../Server/crates/eden-agent-connector-protocol" }
+eden-agent-victoria3 = { path = "../../../../Server/crates/eden-agent-victoria3" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-mon-agent-connector-host = { path = "../../../../Server/crates/mon-agent-connector-host" }
-mon-agent-connector-package = { path = "../../../../Server/crates/mon-agent-connector-package" }
+eden-agent-connector-host = { path = "../../../../Server/crates/eden-agent-connector-host" }
+eden-agent-connector-package = { path = "../../../../Server/crates/eden-agent-connector-package" }
 tempfile.workspace = true

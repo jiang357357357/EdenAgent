@@ -1,10 +1,10 @@
 # 设置控制中心：设计 QA
 
-> 历史证据说明（2026-08-19）：本文件汇总的是界面设计迭代记录，其中标注“Python server”“Python AgentCore chain”或旧 REST 路由的运行结果均发生在全 Rust 迁移之前，只能作为视觉/交互历史基线，不能证明当前 Rust Server 已通过验收。当前运行时事实、迁移状态和待复验项分别以 `文档/技术/MonAgent 全 Rust 完整功能迁移计划.md`、`文档/技术/MonAgent 归档行为验收矩阵.md` 为准；收到明确“构建”指令后，相关界面必须重新对 Rust JSON-RPC 链路执行验证。
+> 历史证据说明（2026-08-19）：本文件汇总的是界面设计迭代记录，其中标注“Python server”“Python AgentCore chain”或旧 REST 路由的运行结果均发生在全 Rust 迁移之前，只能作为视觉/交互历史基线，不能证明当前 Rust Server 已通过验收。当前运行时事实、迁移状态和待复验项分别以 `文档/技术/Eden Agent 全 Rust 完整功能迁移计划.md`、`文档/技术/Eden Agent 归档行为验收矩阵.md` 为准；收到明确“构建”指令后，相关界面必须重新对 Rust JSON-RPC 链路执行验证。
 
 ## Evidence
 
-- Source visual truth: `文档/参考/设计思路/桌宠设置/01-MonAgent设置-控制中心.png`
+- Source visual truth: `文档/参考/设计思路/桌宠设置/01-Eden Agent设置-控制中心.png`
 - Rendered implementation: `.artifacts/design-qa/settings-implementation-final-v2-1586x992.png`
 - Full-view comparison: `.artifacts/design-qa/settings-final-v2-comparison-full.png`
 - Focused left/preview comparison: `.artifacts/design-qa/settings-final-v2-comparison-left.png`
@@ -26,7 +26,7 @@
   Evidence: the concept includes startup and tray behavior and a 50–200% range; the implementation exposes supported settings (`窗口置顶`, `透明背景`, `显示聊天框`) and the existing 70–140% product range.
   Impact: labels and slider marks do not match pixel-for-pixel.
   Resolution: accepted as an intentional functional constraint; no non-working switches were introduced.
-- [P3] The footer uses the existing navy MonAgent logo rather than the orange concept mark.
+- [P3] The footer uses the existing navy Eden Agent logo rather than the orange concept mark.
   Location: sidebar footer.
   Resolution: accepted because the implementation must preserve the real brand asset.
 
@@ -110,7 +110,7 @@ final result: passed
 
 ## Required Fidelity Surfaces
 
-- Typography and hierarchy: custom MonAgent title bar, serif display names, neutral Chinese interface text, muted metadata and orange current/selected accents follow the source.
+- Typography and hierarchy: custom Eden Agent title bar, serif display names, neutral Chinese interface text, muted metadata and orange current/selected accents follow the source.
 - Layout: 28% assistant sidebar, back/search header, recent/all sections, selected leading rule, information table, notice card, primary action, secondary settings link and right-aligned full-body standee match the source composition.
 - Assets: avatars and standees come from the actual Core assistant records. The background is a generated raster paper asset; Lucide supplies all visible interface icons.
 - Interaction and accessibility: search is labeled, assistant rows expose listbox/option semantics, selected state is announced, window controls have accessible names, focus states are visible and the switch action reports loading, success and error states.
@@ -146,7 +146,7 @@ final result: passed
 
 ## Implementation Checklist
 
-- [x] Match the selected first design direction with real MonAgent visual tokens.
+- [x] Match the selected first design direction with real Eden Agent visual tokens.
 - [x] Connect settings `更换` to a dedicated assistant-switcher page.
 - [x] Load, search and select live assistant records.
 - [x] Persist the selected default assistant through the desktop Core bridge.
@@ -190,7 +190,7 @@ final result: passed
 
 - Fonts and typography: the ring uses the existing neutral UI font, medium tabular numerals, and the tooltip follows the concept's compact two-column hierarchy. Labels remain muted and values retain stronger contrast without wrapping.
 - Spacing and layout rhythm: the Token ring and send button share one right-edge vertical axis with a compact gap. The tooltip is right-aligned above the ring and stays inside the composer. Existing microphone, model selector, permission mode, and attachment controls retain their spacing at 1920 × 936 and 1366 × 768.
-- Colors and visual tokens: the ring reuses the product's stone border and orange accent, the tooltip uses the existing card/border/text tokens, and the active send button keeps MonAgent orange. The disabled send state remains visually distinct.
+- Colors and visual tokens: the ring reuses the product's stone border and orange accent, the tooltip uses the existing card/border/text tokens, and the active send button keeps Eden Agent orange. The disabled send state remains visually distinct.
 - Image quality and asset fidelity: the feature introduces no new raster imagery or CSS illustration. The ring and send affordance use Lucide icons already present in the project; the actual assistant asset remains untouched.
 - Copy and content: tooltip copy matches the selected three-row design: `本次输入`, `会话上下文`, and `可用上限`. Counts are localized and derived from live input, ordered message content, and runtime model metadata.
 - Icons and surfaces: icon stroke weight, circular controls, border radius, and subtle card elevation are consistent with the existing composer and the selected design.
@@ -257,12 +257,12 @@ final result: passed
 - Focused region comparison evidence: `artifacts/design-qa/question-decision-overlay-comparison-focus-final.png`
 - Viewport: source 1750 × 894; Electron implementation normalized from 1920 × 981 content to 1750 × 894 for comparison.
 - State: authenticated desktop chat, one real `ask_user` request, single choice, no selection, optional supplement empty.
-- Capture method: running Electron renderer captured from the active MonAgent window; source and normalized implementation were joined into the same full and focused comparison images.
+- Capture method: running Electron renderer captured from the active Eden Agent window; source and normalized implementation were joined into the same full and focused comparison images.
 
 ## Findings
 
 - No actionable P0, P1, or P2 mismatch remains in the final comparison.
-- [P3] The implementation uses MonAgent's existing `#d97706` accent token, which is slightly darker than the generated concept's orange.
+- [P3] The implementation uses Eden Agent's existing `#d97706` accent token, which is slightly darker than the generated concept's orange.
   Location: confirmation button and selected state.
   Resolution: accepted to preserve the product design system and consistency with the chat header controls.
 - [P3] The live background contains the current conversation and active character action rather than the concept's empty-chat copy and neutral standee.
@@ -322,7 +322,7 @@ final result: passed
 
 ## Follow-up Polish
 
-- A future pass can tune the accent token globally if MonAgent adopts the concept's brighter orange across the whole product; this component intentionally does not introduce a one-off hue.
+- A future pass can tune the accent token globally if Eden Agent adopts the concept's brighter orange across the whole product; this component intentionally does not introduce a one-off hue.
 
 final result: passed
 
@@ -350,7 +350,7 @@ final result: passed
 
 ## Required Fidelity Surfaces
 
-- Fonts and typography: serif display titles and memo names reproduce the paper-workspace character; sans-serif controls and metadata keep the existing MonAgent type system.
+- Fonts and typography: serif display titles and memo names reproduce the paper-workspace character; sans-serif controls and metadata keep the existing Eden Agent type system.
 - Spacing and layout rhythm: the implementation matches the reference's approximately 32/68 master-detail split, compact left controls, grouped timeline rows, large reading field, and metadata cadence.
 - Colors and visual tokens: warm paper white, stone text, faint neutral borders, pale amber selection, and orange action accents use existing project tokens and assets.
 - Image quality and asset fidelity: the existing high-resolution memo background and diary paper texture are reused. All interface symbols use the project's Lucide dependency; no placeholder, emoji, CSS illustration, handcrafted SVG, or fake asset was introduced.
@@ -423,7 +423,7 @@ final result: passed
 - Typography: compact sans-serif directory metadata, serif date/title/body reading hierarchy, muted author metadata, and reference-scale body leading.
 - Layout rhythm: seamless 31.8vw / flexible split, flat directory tree, fixed header, full-height paper reader, dashed separators, and compact footer metadata.
 - Colors and visual tokens: warm paper canvas, white directory pane, orange selection/accent, emerald completion badge, stone borders, and restrained shadows.
-- Asset fidelity: the existing high-resolution MonAgent paper background and Lucide icon library are reused; no placeholder, emoji, handcrafted SVG, or CSS illustration was introduced.
+- Asset fidelity: the existing high-resolution Eden Agent paper background and Lucide icon library are reused; no placeholder, emoji, handcrafted SVG, or CSS illustration was introduced.
 - Responsiveness and overflow: the page uses viewport-relative sizing, independent directory/reader scrolling, stable scrollbar gutters, truncation for long row titles, and no minimum page dimensions.
 
 ## Functional Verification
@@ -484,7 +484,7 @@ final result: passed
 - No actionable P0, P1, or P2 mismatch remains.
 - [P3] Live content length differs from the reference because the implementation renders the currently selected self-awake record instead of mock copy; the report hierarchy and overflow behavior remain equivalent.
 - [P3] The current capture shows newer retry/startup events and a later next-wake timestamp. These are dynamic backend values and are intentionally preserved.
-- [P3] The implementation uses the existing MonAgent background texture at very low contrast; the reference is nearly white. The resulting hierarchy remains visually equivalent without replacing the product asset.
+- [P3] The implementation uses the existing Eden Agent background texture at very low contrast; the reference is nearly white. The resulting hierarchy remains visually equivalent without replacing the product asset.
 
 ## Required Fidelity Surfaces
 
@@ -542,7 +542,7 @@ final result: passed
 - No actionable P0, P1, or P2 mismatch remains in the final comparison.
 - [P3] The selected record copy and the number of records per date differ from the concept because the implementation renders current server data rather than mock rows. The table density, grouping, hierarchy, and column geometry remain faithful.
 - [P3] The native Electron title bar is slightly taller than the concept title bar. The product window chrome is preserved; the application header below it matches the reference hierarchy and keeps the main 34/66 split aligned.
-- [P3] The concept shows a custom abstract app mark, while the implementation uses MonAgent's existing Lucide spark identity to stay within the established product icon system.
+- [P3] The concept shows a custom abstract app mark, while the implementation uses Eden Agent's existing Lucide spark identity to stay within the established product icon system.
 
 ## Required Fidelity Surfaces
 
@@ -613,7 +613,7 @@ final result: passed
   Location: chat-page bottom composer while recording.
   Evidence: the source image is available and the implementation builds, but the current tool session cannot open or capture the live microphone state from the existing Electron renderer.
   Impact: spacing, live transcript wrapping, and action alignment have not been visually certified at runtime.
-  Fix: activate microphone input in the existing MonAgent chat window, capture the composer at its normal viewport, and compare that capture beside the source image.
+  Fix: activate microphone input in the existing Eden Agent chat window, capture the composer at its normal viewport, and compare that capture beside the source image.
 
 ## Required Fidelity Surfaces
 
@@ -671,7 +671,7 @@ final result: blocked
 
 - Fonts and typography: neutral system Chinese sans-serif, compact 14–19px equivalent scale, two-line truncation for long live responses, readable 1.5 line height, and persisted font scaling supported.
 - Spacing and layout rhythm: compact rounded conversation panel, three recent segments, stable composer row, separate attention strip, and close action aligned at the top-right.
-- Colors and visual tokens: charcoal translucent surface, white/stone text, subtle white borders, and MonAgent orange for the user bubble and send/allow actions.
+- Colors and visual tokens: charcoal translucent surface, white/stone text, subtle white borders, and Eden Agent orange for the user bubble and send/allow actions.
 - Image quality and asset fidelity: the real Core avatar is used when available; the real standing image is cropped as a circular fallback. Lucide icons provide the close, smile, info, loading, and send affordances.
 - Copy and content: live conversation replaces mock copy; placeholders and permission labels match the source intent.
 

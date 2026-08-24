@@ -1,0 +1,16 @@
+[package]
+name = "eden-agent-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+schemars.workspace = true
+serde.workspace = true
+ts-rs.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

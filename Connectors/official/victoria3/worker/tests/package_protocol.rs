@@ -1,6 +1,6 @@
-use mon_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
-use mon_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
-use mon_agent_connector_protocol::{PublishedEvent, method};
+use eden_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
+use eden_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
+use eden_agent_connector_protocol::{PublishedEvent, method};
 use serde_json::{Value, json};
 use std::{fs, path::Path, time::Duration};
 use tokio::io::AsyncWriteExt;
@@ -10,14 +10,14 @@ async fn package_worker_observes_snapshots_and_keeps_control_disabled_by_default
     let directory = tempfile::tempdir().expect("tempdir");
     let package_root = directory.path().join("package");
     let worker_relative = if cfg!(windows) {
-        "workers/windows-x64/mon-agent-connector-victoria3.exe"
+        "workers/windows-x64/eden-agent-connector-victoria3.exe"
     } else {
-        "workers/linux-x64/mon-agent-connector-victoria3"
+        "workers/linux-x64/eden-agent-connector-victoria3"
     };
     let worker_target = package_root.join(worker_relative);
     fs::create_dir_all(worker_target.parent().expect("worker parent")).expect("worker directory");
     fs::copy(
-        env!("CARGO_BIN_EXE_mon-agent-connector-victoria3"),
+        env!("CARGO_BIN_EXE_eden-agent-connector-victoria3"),
         &worker_target,
     )
     .expect("copy worker");
@@ -60,7 +60,7 @@ async fn package_worker_observes_snapshots_and_keeps_control_disabled_by_default
         .await
         .expect("open log");
     file.write_all(
-        b"[MONAGENT]|1|HELLO|bridge_version=0.1.0|mode=observe\n[MONAGENT]|1|SNAPSHOT|date=1842.3.15|country_id=CHI|country_name=Great Qing\n",
+        b"[EDENAGENT]|1|HELLO|bridge_version=0.1.0|mode=observe\n[EDENAGENT]|1|SNAPSHOT|date=1842.3.15|country_id=CHI|country_name=Great Qing\n",
     )
     .await
     .expect("append bridge lines");

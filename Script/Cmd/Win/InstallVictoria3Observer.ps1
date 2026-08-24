@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $agentRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")).Path
 $source = Join-Path $agentRoot "Server\connectors\victoria3_bridge\mod"
 $modRoot = Join-Path $VictoriaUserRoot "mod"
-$target = Join-Path $modRoot "monagent_victoria3_observer"
+$target = Join-Path $modRoot "edenagent_victoria3_observer"
 
 if (-not (Test-Path -LiteralPath (Join-Path $source ".metadata\metadata.json"))) {
   throw "Victoria 3 observer source is incomplete: $source"
@@ -35,4 +35,4 @@ New-Item -ItemType Junction -Path $target -Target $source | Out-Null
 Write-Host "Installed Victoria 3 observer bridge:"
 Write-Host "  Source: $source"
 Write-Host "  Mod:    $target"
-Write-Host "Enable 'MonAgent Victoria 3 Observer Bridge' in a Victoria 3 launcher playset."
+Write-Host "Enable 'Eden Agent Victoria 3 Observer Bridge' in a Victoria 3 launcher playset."

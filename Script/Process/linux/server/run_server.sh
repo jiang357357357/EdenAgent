@@ -23,4 +23,4 @@ RUNTIME_EXPORTS="$(node "$RUNTIME_ENV_LOADER" --shell "$PROJECT_ROOT")"
 eval "$RUNTIME_EXPORTS"
 unset RUNTIME_EXPORTS
 
-exec cargo run -p mon-agent-server
+exec cargo run -p eden-agent-server

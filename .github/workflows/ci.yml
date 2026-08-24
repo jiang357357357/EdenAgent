@@ -1,4 +1,4 @@
-name: MonAgent CI
+name: Eden Agent CI
 
 on:
   push:

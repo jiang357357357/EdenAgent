@@ -31,7 +31,7 @@ function readRegistry(file) {
     if (!path.isAbsolute(String(value.launch_target ?? ""))) throw new Error("launch_target must be absolute")
     return value
   } catch (error) {
-    fail(`No valid MonAgent OpenTTD instance at ${file}: ${error.message}`)
+    fail(`No valid Eden Agent OpenTTD instance at ${file}: ${error.message}`)
   }
 }
 
@@ -127,10 +127,10 @@ function installBridge(sourceRoot, dataRoot) {
   if (!path.isAbsolute(dataRoot ?? "")) fail("OpenTTD data root must be absolute")
   const sourceBase = fs.realpathSync(sourceRoot)
   const copies = [
-    ["game", "MonAgentBridge", "info.nut"],
-    ["game", "MonAgentBridge", "main.nut"],
-    ["ai", "MonAgentCompany", "info.nut"],
-    ["ai", "MonAgentCompany", "main.nut"],
+    ["game", "EdenAgentBridge", "info.nut"],
+    ["game", "EdenAgentBridge", "main.nut"],
+    ["ai", "EdenAgentCompany", "info.nut"],
+    ["ai", "EdenAgentCompany", "main.nut"],
   ]
   const installed = []
   for (const [kind, packageName, fileName] of copies) {

@@ -3,7 +3,7 @@
 Build and stage the isolated Admin Port Worker with:
 
 ```bash
-cargo build -p mon-agent-connector-openttd
+cargo build -p eden-agent-connector-openttd
 node Script/Project/package_connector.mjs openttd --profile debug
 ```
 

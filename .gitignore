@@ -1,7 +1,7 @@
 node_modules/
 dist/
 target/
-.mon-agent/
+.eden-agent/
 .artifacts/
 temp_web/
 temp_web_eve/
@@ -16,7 +16,7 @@ Thumbs.db
 # Local external reference repositories
 /文档/参考/项目/
 
-# 本地阅读用外部参考仓库，体积较大，不进入 MonAgent 源码仓库。
+# 本地阅读用外部参考仓库，体积较大，不进入 Eden Agent 源码仓库。
 文档/参考/Claude-Code/
 文档/参考/codex-cli/
 文档/参考/codex/

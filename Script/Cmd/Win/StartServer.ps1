@@ -17,8 +17,8 @@ foreach ($property in $runtimeEnvironment.PSObject.Properties) {
 }
 
 if ($Release) {
-  & cargo run --release -p mon-agent-server
+  & cargo run --release -p eden-agent-server
 } else {
-  & cargo run -p mon-agent-server
+  & cargo run -p eden-agent-server
 }
 exit $LASTEXITCODE

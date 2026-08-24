@@ -1,5 +1,5 @@
 [package]
-name = "mon-agent-connector-hoi4"
+name = "eden-agent-connector-hoi4"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,16 +7,16 @@ license.workspace = true
 publish = false
 
 [dependencies]
-mon-agent-connector-protocol = { path = "../../../../Server/crates/mon-agent-connector-protocol" }
-mon-agent-hoi4 = { path = "../../../../Server/crates/mon-agent-hoi4" }
+eden-agent-connector-protocol = { path = "../../../../Server/crates/eden-agent-connector-protocol" }
+eden-agent-hoi4 = { path = "../../../../Server/crates/eden-agent-hoi4" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-mon-agent-connector-host = { path = "../../../../Server/crates/mon-agent-connector-host" }
-mon-agent-connector-package = { path = "../../../../Server/crates/mon-agent-connector-package" }
-mon-agent-connectors = { path = "../../../../Server/crates/mon-agent-connectors" }
-mon-agent-store = { path = "../../../../Server/crates/mon-agent-store" }
+eden-agent-connector-host = { path = "../../../../Server/crates/eden-agent-connector-host" }
+eden-agent-connector-package = { path = "../../../../Server/crates/eden-agent-connector-package" }
+eden-agent-connectors = { path = "../../../../Server/crates/eden-agent-connectors" }
+eden-agent-store = { path = "../../../../Server/crates/eden-agent-store" }
 tempfile.workspace = true
