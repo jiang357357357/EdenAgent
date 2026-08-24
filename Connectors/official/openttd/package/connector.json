@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "id": "openttd",
   "name": "本地 OpenTTD",
-  "description": "隔离 Worker 直连 OpenTTD Admin Port，并通过 MonAgentBridge 执行结构化操作。",
+  "description": "隔离 Worker 直连 OpenTTD Admin Port，并通过 EdenAgentBridge 执行结构化操作。",
   "version": "1.0.0",
   "protocolVersion": 1,
   "icon": "gamepad",
   "entrypoints": {
-    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-openttd.exe", "args": [] },
-    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-openttd", "args": [] },
-    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-openttd", "args": [] },
-    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-openttd", "args": [] }
+    "windows-x64": { "path": "workers/windows-x64/eden-agent-connector-openttd.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/eden-agent-connector-openttd", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/eden-agent-connector-openttd", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/eden-agent-connector-openttd", "args": [] }
   },
   "settingsSchema": {
     "type": "object",

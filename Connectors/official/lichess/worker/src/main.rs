@@ -1,8 +1,8 @@
-use futures::StreamExt;
-use mon_agent_connector_protocol::{
+use eden_agent_connector_protocol::{
     CapabilityCall, InitializeParams, InitializeResult, PublishedEvent, RpcNotification,
     RpcRequest, RpcResponse, WireMessage, WorkerStatus, method, read_message, write_message,
 };
+use futures::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -103,7 +103,7 @@ async fn initialize(
     }
     let params: InitializeParams =
         serde_json::from_value(params).map_err(|error| ("invalid_params", error.to_string()))?;
-    if params.protocol_version != mon_agent_connector_protocol::PROTOCOL_VERSION {
+    if params.protocol_version != eden_agent_connector_protocol::PROTOCOL_VERSION {
         return Err((
             "unsupported_protocol",
             "unsupported connector protocol version".to_owned(),
@@ -151,7 +151,7 @@ async fn initialize(
     }
     let client = Client::builder()
         .connect_timeout(Duration::from_secs(15))
-        .user_agent("MonAgent-Lichess-Worker/1")
+        .user_agent("Eden Agent-Lichess-Worker/1")
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| ("client_error", error.to_string()))?;
@@ -194,7 +194,7 @@ async fn initialize(
         stream_task,
     });
     serde_json::to_value(InitializeResult {
-        protocol_version: mon_agent_connector_protocol::PROTOCOL_VERSION,
+        protocol_version: eden_agent_connector_protocol::PROTOCOL_VERSION,
         worker_version: WORKER_VERSION.to_owned(),
         capabilities: vec![
             "challenge".to_owned(),

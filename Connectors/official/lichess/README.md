@@ -3,7 +3,7 @@
 Build and stage the isolated Worker with:
 
 ```bash
-cargo build -p mon-agent-connector-lichess
+cargo build -p eden-agent-connector-lichess
 node Script/Project/package_connector.mjs lichess --profile debug
 ```
 

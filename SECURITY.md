@@ -8,7 +8,7 @@ Include affected versions, reproduction steps, expected impact and any suggested
 
 ## Secrets and local configuration
 
-- Keep `.env`, `.monconfig`, `Data/`, `.mon-agent/` and generated capability tokens out of Git.
+- Keep `.env`, `.monconfig`, `Data/`, `.eden-agent/` and generated capability tokens out of Git.
 - Commit `.monconfig.example` only with empty credentials and generic location values.
 - Treat any credential that has entered Git history as compromised: revoke or rotate it before publishing a replacement repository.
 - Character and model assets belong in a separately governed resource repository, not the source repository.

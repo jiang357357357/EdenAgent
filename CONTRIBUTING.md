@@ -1,8 +1,8 @@
-# Contributing to MonAgent
+# Contributing to Eden Agent
 
 By intentionally submitting code, documentation or other material to this repository as a contribution, you represent that you have the right to submit it and agree to the following contribution terms.
 
-You grant the MonAgent project maintainers and applicable copyright holders a perpetual, worldwide, non-exclusive, irrevocable, royalty-free copyright license to use, reproduce, modify, prepare derivative works of, publicly display, publicly perform, distribute, sublicense and relicense your contribution, including under:
+You grant the Eden Agent project maintainers and applicable copyright holders a perpetual, worldwide, non-exclusive, irrevocable, royalty-free copyright license to use, reproduce, modify, prepare derivative works of, publicly display, publicly perform, distribute, sublicense and relicense your contribution, including under:
 
 - the PolyForm Noncommercial License 1.0.0;
 - separate commercial licenses; and

@@ -589,6 +589,512 @@ dependencies = [
 ]
 
 [[package]]
+name = "eden-agent-api"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-domain",
+ "schemars",
+ "serde",
+ "serde_json",
+ "ts-rs",
+]
+
+[[package]]
+name = "eden-agent-app"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "eden-agent-blob",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-environment",
+ "eden-agent-store",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-blob"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-domain",
+ "eden-agent-store",
+ "hex",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-connector-hoi4"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-connector-host",
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "eden-agent-connectors",
+ "eden-agent-hoi4",
+ "eden-agent-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-connector-host"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "eden-agent-connector-lichess"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-connector-host",
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "shakmaty",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-connector-openttd"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-connector-host",
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "eden-agent-connectors",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-connector-package"
+version = "1.8.0"
+dependencies = [
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "eden-agent-connector-protocol"
+version = "1.8.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "eden-agent-connector-victoria3"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-connector-host",
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "eden-agent-victoria3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-connectors"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-connector-host",
+ "eden-agent-connector-package",
+ "eden-agent-connector-protocol",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "eden-agent-core"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-domain",
+ "futures",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tiktoken-rs",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-core-sync"
+version = "1.8.0"
+dependencies = [
+ "chrono",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "hex",
+ "reqwest 0.12.28",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-domain"
+version = "1.8.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "ts-rs",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-environment"
+version = "1.8.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "serde_json",
+]
+
+[[package]]
+name = "eden-agent-hoi4"
+version = "1.8.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-host"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "eden-agent-blob",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-environment",
+ "eden-agent-store",
+ "futures",
+ "mime_guess",
+ "regex",
+ "reqwest 0.12.28",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-interaction"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "eden-agent-blob",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-market"
+version = "1.8.0"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "eden-agent-plugins",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "zip",
+]
+
+[[package]]
+name = "eden-agent-mcp"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-core",
+ "eden-agent-tools",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "eden-agent-multiagent"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-plugins"
+version = "1.8.0"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-provider"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-core",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "eden-agent-sandbox"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "globset",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-server"
+version = "1.8.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64",
+ "chrono",
+ "clap",
+ "eden-agent-api",
+ "eden-agent-app",
+ "eden-agent-blob",
+ "eden-agent-connector-package",
+ "eden-agent-connectors",
+ "eden-agent-core",
+ "eden-agent-core-sync",
+ "eden-agent-host",
+ "eden-agent-interaction",
+ "eden-agent-market",
+ "eden-agent-mcp",
+ "eden-agent-multiagent",
+ "eden-agent-plugins",
+ "eden-agent-provider",
+ "eden-agent-sandbox",
+ "eden-agent-skills",
+ "eden-agent-store",
+ "eden-agent-tools",
+ "eden-agent-workspace",
+ "futures",
+ "http",
+ "reqwest 0.12.28",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite 0.27.0",
+ "tokio-util",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-skills"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "eden-agent-core",
+ "eden-agent-tools",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-store"
+version = "1.8.0"
+dependencies = [
+ "eden-agent-domain",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "eden-agent-tools"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "eden-agent-core",
+ "globset",
+ "ignore",
+ "libc",
+ "mime_guess",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "similar",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "eden-agent-victoria3"
+version = "1.8.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "eden-agent-workspace"
+version = "1.8.0"
+dependencies = [
+ "async-trait",
+ "eden-agent-core",
+ "eden-agent-domain",
+ "eden-agent-store",
+ "eden-agent-tools",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "either"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1356,512 +1862,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mon-agent-api"
-version = "1.8.0"
-dependencies = [
- "mon-agent-domain",
- "schemars",
- "serde",
- "serde_json",
- "ts-rs",
-]
-
-[[package]]
-name = "mon-agent-app"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "base64",
- "chrono",
- "mon-agent-blob",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-environment",
- "mon-agent-store",
- "regex",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-blob"
-version = "1.8.0"
-dependencies = [
- "hex",
- "mon-agent-domain",
- "mon-agent-store",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-connector-hoi4"
-version = "1.8.0"
-dependencies = [
- "mon-agent-connector-host",
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "mon-agent-connectors",
- "mon-agent-hoi4",
- "mon-agent-store",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-connector-host"
-version = "1.8.0"
-dependencies = [
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "mon-agent-connector-lichess"
-version = "1.8.0"
-dependencies = [
- "futures",
- "mon-agent-connector-host",
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "shakmaty",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-connector-openttd"
-version = "1.8.0"
-dependencies = [
- "mon-agent-connector-host",
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "mon-agent-connectors",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-connector-package"
-version = "1.8.0"
-dependencies = [
- "hex",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "mon-agent-connector-protocol"
-version = "1.8.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "mon-agent-connector-victoria3"
-version = "1.8.0"
-dependencies = [
- "mon-agent-connector-host",
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "mon-agent-victoria3",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-connectors"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "libc",
- "mon-agent-connector-host",
- "mon-agent-connector-package",
- "mon-agent-connector-protocol",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-store",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mon-agent-core"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "futures",
- "mon-agent-domain",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tiktoken-rs",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-core-sync"
-version = "1.8.0"
-dependencies = [
- "chrono",
- "hex",
- "mon-agent-domain",
- "mon-agent-store",
- "reqwest 0.12.28",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-domain"
-version = "1.8.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
- "ts-rs",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-environment"
-version = "1.8.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "serde_json",
-]
-
-[[package]]
-name = "mon-agent-hoi4"
-version = "1.8.0"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-host"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64",
- "chrono",
- "futures",
- "mime_guess",
- "mon-agent-blob",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-environment",
- "mon-agent-store",
- "regex",
- "reqwest 0.12.28",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-interaction"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "base64",
- "mon-agent-blob",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-store",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-market"
-version = "1.8.0"
-dependencies = [
- "base64",
- "ed25519-dalek",
- "mon-agent-plugins",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "zip",
-]
-
-[[package]]
-name = "mon-agent-mcp"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "mon-agent-core",
- "mon-agent-tools",
- "rmcp",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "mon-agent-multiagent"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-store",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-plugins"
-version = "1.8.0"
-dependencies = [
- "base64",
- "ed25519-dalek",
- "hex",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-provider"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "futures",
- "mon-agent-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "mon-agent-sandbox"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "globset",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-store",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-server"
-version = "1.8.0"
-dependencies = [
- "anyhow",
- "axum",
- "base64",
- "chrono",
- "clap",
- "futures",
- "http",
- "mon-agent-api",
- "mon-agent-app",
- "mon-agent-blob",
- "mon-agent-connector-package",
- "mon-agent-connectors",
- "mon-agent-core",
- "mon-agent-core-sync",
- "mon-agent-host",
- "mon-agent-interaction",
- "mon-agent-market",
- "mon-agent-mcp",
- "mon-agent-multiagent",
- "mon-agent-plugins",
- "mon-agent-provider",
- "mon-agent-sandbox",
- "mon-agent-skills",
- "mon-agent-store",
- "mon-agent-tools",
- "mon-agent-workspace",
- "reqwest 0.12.28",
- "schemars",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-tungstenite 0.27.0",
- "tokio-util",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-skills"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "base64",
- "mon-agent-core",
- "mon-agent-tools",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-store"
-version = "1.8.0"
-dependencies = [
- "mon-agent-domain",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mon-agent-tools"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "base64",
- "globset",
- "ignore",
- "libc",
- "mime_guess",
- "mon-agent-core",
- "regex",
- "serde",
- "serde_json",
- "serde_yaml",
- "similar",
- "tempfile",
- "tokio",
- "tokio-util",
- "unicode-normalization",
-]
-
-[[package]]
-name = "mon-agent-victoria3"
-version = "1.8.0"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mon-agent-workspace"
-version = "1.8.0"
-dependencies = [
- "async-trait",
- "mon-agent-core",
- "mon-agent-domain",
- "mon-agent-store",
- "mon-agent-tools",
- "regex",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]

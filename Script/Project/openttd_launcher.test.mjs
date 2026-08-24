@@ -17,7 +17,7 @@ function run(arguments_, options = {}) {
 }
 
 function temporaryDirectory(t) {
-  const directory = mkdtempSync(path.join(os.tmpdir(), "monagent-openttd-"))
+  const directory = mkdtempSync(path.join(os.tmpdir(), "edenagent-openttd-"))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   return directory
 }
@@ -53,17 +53,17 @@ test("bridge installer copies managed GameScript and AI files idempotently witho
     writeFileSync(path.join(source, kind, "info.nut"), `${kind}-info`, "utf8")
     writeFileSync(path.join(source, kind, "main.nut"), `${kind}-main`, "utf8")
   }
-  const userFile = path.join(data, "game", "MonAgentBridge", "user-owned.txt")
+  const userFile = path.join(data, "game", "EdenAgentBridge", "user-owned.txt")
   mkdirSync(path.dirname(userFile), { recursive: true })
   writeFileSync(userFile, "preserve", "utf8")
 
   const first = run(["install-bridge", path.resolve(source), path.resolve(data)])
   assert.equal(first.status, 0, first.stderr)
   assert.equal(JSON.parse(first.stdout).installed.every((item) => item.changed), true)
-  assert.equal(readFileSync(path.join(data, "game", "MonAgentBridge", "info.nut"), "utf8"), "game-info")
-  assert.equal(readFileSync(path.join(data, "game", "MonAgentBridge", "main.nut"), "utf8"), "game-main")
-  assert.equal(readFileSync(path.join(data, "ai", "MonAgentCompany", "info.nut"), "utf8"), "ai-info")
-  assert.equal(readFileSync(path.join(data, "ai", "MonAgentCompany", "main.nut"), "utf8"), "ai-main")
+  assert.equal(readFileSync(path.join(data, "game", "EdenAgentBridge", "info.nut"), "utf8"), "game-info")
+  assert.equal(readFileSync(path.join(data, "game", "EdenAgentBridge", "main.nut"), "utf8"), "game-main")
+  assert.equal(readFileSync(path.join(data, "ai", "EdenAgentCompany", "info.nut"), "utf8"), "ai-info")
+  assert.equal(readFileSync(path.join(data, "ai", "EdenAgentCompany", "main.nut"), "utf8"), "ai-main")
 
   const second = run(["install-bridge", path.resolve(source), path.resolve(data)])
   assert.equal(second.status, 0, second.stderr)
@@ -218,7 +218,7 @@ test("Linux join modes stop the identity-matched managed server when the client 
     mkdirSync(install, { recursive: true })
     const binary = writeFakeOpenTtd(install)
     const environment = launcherEnvironment(root, binary)
-    const registry = path.join(environment.XDG_RUNTIME_DIR, "monagent-openttd", "active-instance.json")
+    const registry = path.join(environment.XDG_RUNTIME_DIR, "edenagent-openttd", "active-instance.json")
     const record = path.join(root, "client.jsonl")
     environment.MON_TEST_CLIENT_RECORD = record
     const server = spawn(binary, ["--fake-server"], { env: environment, stdio: "ignore" })
@@ -251,7 +251,7 @@ test("Linux dedicated mode stops the server and removes its registry and generat
   const binary = writeFakeOpenTtd(install)
   const environment = launcherEnvironment(root, binary)
   const config = path.join(environment.HOME, ".config", "openttd", "openttd.cfg")
-  const save = path.join(environment.XDG_DATA_HOME, "openttd", "save", "monagent-route.sav")
+  const save = path.join(environment.XDG_DATA_HOME, "openttd", "save", "edenagent-route.sav")
   const record = path.join(root, "client.jsonl")
   environment.MON_OPENTTD_CONFIG = config
   environment.MON_TEST_CLIENT_RECORD = record
@@ -266,8 +266,8 @@ test("Linux dedicated mode stops the server and removes its registry and generat
   assert.equal(clientArguments[0], "-n")
   assert.match(clientArguments[1], /^127\.0\.0\.1:\d+$/)
   const profile = path.join(environment.XDG_DATA_HOME, "openttd")
-  assert.equal(existsSync(path.join(environment.XDG_RUNTIME_DIR, "monagent-openttd", "active-instance.json")), false)
-  assert.deepEqual(readdirSync(profile).filter((name) => name.startsWith(".monagent-instance-")), [])
+  assert.equal(existsSync(path.join(environment.XDG_RUNTIME_DIR, "edenagent-openttd", "active-instance.json")), false)
+  assert.deepEqual(readdirSync(profile).filter((name) => name.startsWith(".edenagent-instance-")), [])
 })
 
 test("Linux host instances share persistent content and import legacy runtime content once", {
@@ -286,11 +286,11 @@ test("Linux host instances share persistent content and import legacy runtime co
   mkdirSync(path.dirname(config), { recursive: true })
   writeFileSync(config, "[network]\nserver_name = test\n", "utf8")
 
-  const legacyRoot = path.join(environment.XDG_RUNTIME_DIR, "monagent-openttd", "instances", "legacy")
+  const legacyRoot = path.join(environment.XDG_RUNTIME_DIR, "edenagent-openttd", "instances", "legacy")
   const legacyDownload = path.join(legacyRoot, "content_download", "newgrf", "legacy.tar")
-  const legacySave = path.join(legacyRoot, "save", "monagent-route.sav")
+  const legacySave = path.join(legacyRoot, "save", "edenagent-route.sav")
   const profile = path.join(environment.XDG_DATA_HOME, "openttd")
-  const persistentSave = path.join(profile, "save", "monagent-route.sav")
+  const persistentSave = path.join(profile, "save", "edenagent-route.sav")
   mkdirSync(path.dirname(legacyDownload), { recursive: true })
   mkdirSync(path.dirname(legacySave), { recursive: true })
   mkdirSync(path.dirname(persistentSave), { recursive: true })
@@ -314,8 +314,8 @@ test("Linux host instances share persistent content and import legacy runtime co
   assert.equal(readFileSync(legacyDownload.replace(legacyRoot, profile), "utf8"), "legacy")
   assert.equal(readFileSync(path.join(profile, "content_download", "newgrf", "downloaded.tar"), "utf8"), "persistent")
   assert.equal(readFileSync(persistentSave, "utf8"), "fresh")
-  assert.equal(existsSync(path.join(profile, ".monagent-runtime-content-migrated-v1")), true)
-  assert.equal(existsSync(path.join(environment.XDG_RUNTIME_DIR, "monagent-openttd", "active-instance.json")), false)
+  assert.equal(existsSync(path.join(profile, ".edenagent-runtime-content-migrated-v1")), true)
+  assert.equal(existsSync(path.join(environment.XDG_RUNTIME_DIR, "edenagent-openttd", "active-instance.json")), false)
   for (const name of ["ai", "baseset", "content_download", "game", "newgrf", "save", "scenario", "screenshot", "social_integration"])
     assert.equal(lstatSync(path.join(profile, name)).isSymbolicLink(), false, name)
 })
@@ -360,8 +360,8 @@ test("Linux launcher keeps content persistent and cleans only identity-matched r
   ]) {
     assert.match(source, new RegExp(`\\b${directory}\\b`))
   }
-  assert.match(source, /\.monagent-runtime-content-migrated-v1/)
-  assert.match(source, /\.monagent-instance-\$\{instance_id\}\.cfg/)
+  assert.match(source, /\.edenagent-runtime-content-migrated-v1/)
+  assert.match(source, /\.edenagent-instance-\$\{instance_id\}\.cfg/)
   assert.match(source, /remove-if-matches/)
   assert.match(source, /current\[6\].*OPEN_TTD_BIN/)
   assert.match(source, /stop_managed_instance "\$\{old_instance\[2\]\}"/)

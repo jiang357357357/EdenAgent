@@ -15,10 +15,10 @@ const localRuntimeConfig = createLocalRuntimeConfigStore({
   app: { isPackaged: false, getPath: () => path.join(root, "Data") },
   agentRoot: root,
 })
-const serverPort = Number(process.env.MON_AGENT_PORT ?? config.number("server", "PORT", 40092))
-const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
+const serverPort = Number(process.env.EDEN_AGENT_PORT ?? config.number("server", "PORT", 40092))
+const webPort = Number(process.env.EDEN_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
-const capabilityToken = process.env.MON_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
+const capabilityToken = process.env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
 
 rmSync(quitFlag, { force: true })
 
@@ -298,7 +298,7 @@ async function waitFor(url, label, child) {
 function assertPortFree(port, label) {
   return new Promise((resolve, reject) => {
     const probe = net.createServer()
-    probe.once("error", () => reject(new Error(`${label} 端口 ${port} 已被占用，请先退出旧的 MonAgent 进程或释放该端口。`)))
+    probe.once("error", () => reject(new Error(`${label} 端口 ${port} 已被占用，请先退出旧的 Eden Agent 进程或释放该端口。`)))
     probe.listen(port, "127.0.0.1", () => {
       probe.close(() => resolve())
     })
@@ -335,22 +335,22 @@ try {
 
   devLog(`启动 server，端口 ${serverPort}`)
   const server = start("server", ["run", "dev:server"], {
-    MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
     ...localRuntimeConfig.environment(),
   })
   await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server)
 
   devLog(`启动 web，端口 ${webPort}`)
   const web = start("web", ["run", "dev:web"], {
-    VITE_MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    VITE_EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
   })
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
 
   devLog("启动 desktop")
   const desktop = start("desktop", ["run", "dev:desktop"], {
     ELECTRON_RUN_AS_NODE: undefined,
-    MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
-    MON_AGENT_DEV_PARENT_PID: String(process.pid),
+    EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    EDEN_AGENT_DEV_PARENT_PID: String(process.pid),
   })
 
   devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")

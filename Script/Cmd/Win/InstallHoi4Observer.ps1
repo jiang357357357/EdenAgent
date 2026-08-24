@@ -7,8 +7,8 @@ $ErrorActionPreference = "Stop"
 $agentRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")).Path
 $source = Join-Path $agentRoot "Connectors\official\hoi4\package\assets\game-mod"
 $modRoot = Join-Path $Hoi4UserRoot "mod"
-$target = Join-Path $modRoot "monagent_hoi4_observer"
-$launcherDescriptor = Join-Path $modRoot "monagent_hoi4_observer.mod"
+$target = Join-Path $modRoot "edenagent_hoi4_observer"
+$launcherDescriptor = Join-Path $modRoot "edenagent_hoi4_observer.mod"
 
 if (-not (Test-Path -LiteralPath (Join-Path $source "descriptor.mod"))) {
   throw "HOI4 observer source is incomplete: $source"
@@ -37,7 +37,7 @@ version="0.1.0"
 tags={
   "Utilities"
 }
-name="MonAgent Hearts of Iron IV Observer Bridge"
+name="Eden Agent Hearts of Iron IV Observer Bridge"
 supported_version="1.19.*"
 path="$($target.Replace('\', '/'))"
 "@
@@ -48,4 +48,4 @@ Write-Host "Installed Hearts of Iron IV observer bridge:"
 Write-Host "  Source:     $source"
 Write-Host "  Mod:        $target"
 Write-Host "  Descriptor: $launcherDescriptor"
-Write-Host "Enable 'MonAgent Hearts of Iron IV Observer Bridge' in a launcher playset."
+Write-Host "Enable 'Eden Agent Hearts of Iron IV Observer Bridge' in a launcher playset."

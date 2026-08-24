@@ -7,7 +7,7 @@ const test = require("node:test")
 const { bashExports, createLocalRuntimeEnvironment } = require("./local_runtime_environment.cjs")
 
 test("loads the desktop runtime configuration for an external server", () => {
-  const agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mon-agent-runtime-"))
+  const agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "eden-agent-runtime-"))
   try {
     fs.mkdirSync(path.join(agentRoot, "Data"), { recursive: true })
     fs.writeFileSync(path.join(agentRoot, "Data", "local-runtime.json"), JSON.stringify({
@@ -24,17 +24,17 @@ test("loads the desktop runtime configuration for an external server", () => {
     }))
 
     const environment = createLocalRuntimeEnvironment(agentRoot, {})
-    assert.equal(environment.MON_AGENT_MODEL, "deepseek/deepseek-chat")
-    assert.equal(environment.MON_AGENT_BASE_URL, "https://api.deepseek.test/v1")
+    assert.equal(environment.EDEN_AGENT_MODEL, "deepseek/deepseek-chat")
+    assert.equal(environment.EDEN_AGENT_BASE_URL, "https://api.deepseek.test/v1")
     assert.equal(environment.DEEPSEEK_API_KEY, "test-key")
-    assert.equal(environment.MON_AGENT_MODEL_SUPPORTS_IMAGES, "false")
+    assert.equal(environment.EDEN_AGENT_MODEL_SUPPORTS_IMAGES, "false")
   } finally {
     fs.rmSync(agentRoot, { recursive: true, force: true })
   }
 })
 
 test("quotes shell values without allowing command substitution", () => {
-  const exports = bashExports({ MON_AGENT_MODEL: "custom/model", CUSTOM_API_KEY: "a'b$(touch nope)" })
-  assert.match(exports, /export MON_AGENT_MODEL='custom\/model'/)
+  const exports = bashExports({ EDEN_AGENT_MODEL: "custom/model", CUSTOM_API_KEY: "a'b$(touch nope)" })
+  assert.match(exports, /export EDEN_AGENT_MODEL='custom\/model'/)
   assert.match(exports, /export CUSTOM_API_KEY='a'\\''b\$\(touch nope\)'/)
 })

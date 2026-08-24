@@ -7,10 +7,10 @@
   "protocolVersion": 1,
   "icon": "gamepad",
   "entrypoints": {
-    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-victoria3.exe", "args": [] },
-    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-victoria3", "args": [] },
-    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-victoria3", "args": [] },
-    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-victoria3", "args": [] }
+    "windows-x64": { "path": "workers/windows-x64/eden-agent-connector-victoria3.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/eden-agent-connector-victoria3", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/eden-agent-connector-victoria3", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/eden-agent-connector-victoria3", "args": [] }
   },
   "settingsSchema": {
     "type": "object",
@@ -39,6 +39,6 @@
     "probe_control": { "type": "object", "title": "验证回程通道", "properties": {}, "additionalProperties": false }
   },
   "assets": [
-    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/monagent_victoria3_observer" }
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/edenagent_victoria3_observer" }
   ]
 }

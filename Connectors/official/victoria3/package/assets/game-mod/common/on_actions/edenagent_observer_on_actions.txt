@@ -1,0 +1,22 @@
+on_game_started_after_lobby = {
+	on_actions = { edenagent_observer_on_game_started }
+}
+
+on_monthly_pulse_country = {
+	on_actions = { edenagent_observer_on_monthly_country }
+}
+
+edenagent_observer_on_game_started = {
+	effect = {
+		edenagent_observer_emit_hello = yes
+		every_country = {
+			limit = { is_player = yes }
+			edenagent_observer_emit_snapshot = yes
+		}
+	}
+}
+
+edenagent_observer_on_monthly_country = {
+	trigger = { is_player = yes }
+	effect = { edenagent_observer_emit_snapshot = yes }
+}

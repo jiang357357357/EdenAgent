@@ -102,7 +102,7 @@ SETTING=value
 | `SCRIPT_` | 脚本路径 | `SCRIPT_START`, `SCRIPT_STOP` |
 | `AI_` | AI服务相关 | `AI_CHROMA_DIR`, `AI_MODEL_NAME` |
 | `RENDER_` | 渲染日志 | `RENDER_PANELS`, `RENDER_SVG_DIR` |
-| `MON_AGENT_SEARCH_` | Agent 搜索工具 | `MON_AGENT_SEARCH_TIMEOUT_MS` |
+| `EDEN_AGENT_SEARCH_` | Agent 搜索工具 | `EDEN_AGENT_SEARCH_TIMEOUT_MS` |
 
 ### 5.3 布尔值规范
 
@@ -124,23 +124,23 @@ PRODUCTION=off
 
 ---
 
-### 5.4 MonAgent 联网搜索与网页抓取变量
+### 5.4 Eden Agent 联网搜索与网页抓取变量
 
-MonAgent 使用可插拔的搜索 Provider。默认 `auto` 会优先选择已经配置密钥的结构化搜索 API，然后降级到无需账号的必应与 DuckDuckGo HTML 入口。搜索结果统一包含 `source_id`、标题、URL、摘要、来源域名，以及 Provider 能提供的发布时间和相关度。
+Eden Agent 使用可插拔的搜索 Provider。默认 `auto` 会优先选择已经配置密钥的结构化搜索 API，然后降级到无需账号的必应与 DuckDuckGo HTML 入口。搜索结果统一包含 `source_id`、标题、URL、摘要、来源域名，以及 Provider 能提供的发布时间和相关度。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `MON_AGENT_SEARCH_PROVIDER` | `auto` | Provider 或逗号分隔的优先顺序；支持 `auto`、`brave`、`exa`、`tavily`、`searxng`、`bing`、`duckduckgo` |
-| `MON_AGENT_SEARCH_TIMEOUT_MS` | `10000` | 单个搜索入口超时，范围 `1000`～`60000` 毫秒 |
-| `MON_AGENT_SEARCH_CACHE_TTL_SECONDS` | `120` | 进程内搜索缓存时间；设为 `0` 可关闭，最大 `3600` 秒 |
+| `EDEN_AGENT_SEARCH_PROVIDER` | `auto` | Provider 或逗号分隔的优先顺序；支持 `auto`、`brave`、`exa`、`tavily`、`searxng`、`bing`、`duckduckgo` |
+| `EDEN_AGENT_SEARCH_TIMEOUT_MS` | `10000` | 单个搜索入口超时，范围 `1000`～`60000` 毫秒 |
+| `EDEN_AGENT_SEARCH_CACHE_TTL_SECONDS` | `120` | 进程内搜索缓存时间；设为 `0` 可关闭，最大 `3600` 秒 |
 | `BRAVE_SEARCH_API_KEY` | 空 | Brave Search API 密钥；也兼容 `BRAVE_API_KEY` |
 | `EXA_API_KEY` | 空 | Exa Search API 密钥 |
 | `TAVILY_API_KEY` | 空 | Tavily Search API 密钥 |
-| `MON_AGENT_SEARXNG_URL` | 空 | 自建 SearXNG 根地址；也兼容 `SEARXNG_URL` |
-| `MON_AGENT_FETCH_TIMEOUT_MS` | `20000` | `web_fetch` 超时，范围 `1000`～`120000` 毫秒 |
-| `MON_AGENT_FETCH_MAX_BYTES` | `2097152` | 单页最大下载字节数，范围 64 KiB～10 MiB |
+| `EDEN_AGENT_SEARXNG_URL` | 空 | 自建 SearXNG 根地址；也兼容 `SEARXNG_URL` |
+| `EDEN_AGENT_FETCH_TIMEOUT_MS` | `20000` | `web_fetch` 超时，范围 `1000`～`120000` 毫秒 |
+| `EDEN_AGENT_FETCH_MAX_BYTES` | `2097152` | 单页最大下载字节数，范围 64 KiB～10 MiB |
 
-可以通过进程环境变量配置，也可以写入 MonAgent `.monconfig` 的 `[search]` 段。只配置一个结构化搜索服务即可，例如：
+可以通过进程环境变量配置，也可以写入 Eden Agent `.monconfig` 的 `[search]` 段。只配置一个结构化搜索服务即可，例如：
 
 ```ini
 [search]

@@ -1,5 +1,5 @@
 [package]
-name = "mon-agent-connector-lichess"
+name = "eden-agent-connector-lichess"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 futures.workspace = true
-mon-agent-connector-protocol = { path = "../../../../Server/crates/mon-agent-connector-protocol" }
+eden-agent-connector-protocol = { path = "../../../../Server/crates/eden-agent-connector-protocol" }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -18,6 +18,6 @@ tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-mon-agent-connector-host = { path = "../../../../Server/crates/mon-agent-connector-host" }
-mon-agent-connector-package = { path = "../../../../Server/crates/mon-agent-connector-package" }
+eden-agent-connector-host = { path = "../../../../Server/crates/eden-agent-connector-host" }
+eden-agent-connector-package = { path = "../../../../Server/crates/eden-agent-connector-package" }
 tempfile.workspace = true

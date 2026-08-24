@@ -8,19 +8,19 @@
   "icon": "gamepad",
   "entrypoints": {
     "windows-x64": {
-      "path": "workers/windows-x64/mon-agent-connector-hoi4.exe",
+      "path": "workers/windows-x64/eden-agent-connector-hoi4.exe",
       "args": []
     },
     "linux-x64": {
-      "path": "workers/linux-x64/mon-agent-connector-hoi4",
+      "path": "workers/linux-x64/eden-agent-connector-hoi4",
       "args": []
     },
     "macos-x64": {
-      "path": "workers/macos-x64/mon-agent-connector-hoi4",
+      "path": "workers/macos-x64/eden-agent-connector-hoi4",
       "args": []
     },
     "macos-arm64": {
-      "path": "workers/macos-arm64/mon-agent-connector-hoi4",
+      "path": "workers/macos-arm64/eden-agent-connector-hoi4",
       "args": []
     }
   },
@@ -79,7 +79,7 @@
     {
       "source": "assets/game-mod",
       "targetKind": "paradox-user-mod",
-      "target": "Hearts of Iron IV/mod/monagent_hoi4_observer"
+      "target": "Hearts of Iron IV/mod/edenagent_hoi4_observer"
     }
   ]
 }

@@ -1,6 +1,6 @@
-use mon_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
-use mon_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
-use mon_agent_connector_protocol::{PublishedEvent, method};
+use eden_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
+use eden_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
+use eden_agent_connector_protocol::{PublishedEvent, method};
 use serde_json::json;
 use std::{fs, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -46,13 +46,13 @@ async fn package_worker_streams_challenges_and_executes_safe_actions() {
 
     let package_root = tempfile::tempdir().expect("package root");
     let worker_relative = if cfg!(windows) {
-        "workers/windows-x64/mon-agent-connector-lichess.exe"
+        "workers/windows-x64/eden-agent-connector-lichess.exe"
     } else {
-        "workers/linux-x64/mon-agent-connector-lichess"
+        "workers/linux-x64/eden-agent-connector-lichess"
     };
     let worker = package_root.path().join(worker_relative);
     fs::create_dir_all(worker.parent().expect("worker directory")).expect("worker directory");
-    fs::copy(env!("CARGO_BIN_EXE_mon-agent-connector-lichess"), &worker).expect("worker binary");
+    fs::copy(env!("CARGO_BIN_EXE_eden-agent-connector-lichess"), &worker).expect("worker binary");
     fs::write(
         package_root.path().join("connector.json"),
         serde_json::to_vec(&json!({

@@ -13,6 +13,6 @@
     { "capability": "filesystem.read", "resource": "settings.logPath", "access": "read", "required": true, "description": "读取用户选择的 Hearts of Iron IV game.log。" }
   ],
   "assets": [
-    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Hearts of Iron IV/mod/monagent_hoi4_observer" }
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Hearts of Iron IV/mod/edenagent_hoi4_observer" }
   ]
 }

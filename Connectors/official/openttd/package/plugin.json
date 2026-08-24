@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "official.openttd",
   "name": "本地 OpenTTD",
-  "description": "Official isolated Worker plugin for the loopback OpenTTD Admin Port and MonAgentBridge.",
+  "description": "Official isolated Worker plugin for the loopback OpenTTD Admin Port and EdenAgentBridge.",
   "version": "1.0.0",
   "components": {
     "runtimes": [

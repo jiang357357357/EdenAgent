@@ -1,5 +1,5 @@
-use mon_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
-use mon_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
+use eden_agent_connector_host::{WorkerLaunchConfig, WorkerProcess};
+use eden_agent_connector_package::{LoadPolicy, LoadedPackage, current_platform};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -12,14 +12,14 @@ async fn package_worker_negotiates_capabilities_and_shuts_down_cleanly() {
     let directory = tempfile::tempdir().expect("tempdir");
     let package_root = directory.path().join("package");
     let worker_relative = if cfg!(windows) {
-        "workers/windows-x64/mon-agent-connector-openttd.exe"
+        "workers/windows-x64/eden-agent-connector-openttd.exe"
     } else {
-        "workers/linux-x64/mon-agent-connector-openttd"
+        "workers/linux-x64/eden-agent-connector-openttd"
     };
     let worker_target = package_root.join(worker_relative);
     fs::create_dir_all(worker_target.parent().expect("worker parent")).expect("worker directory");
     fs::copy(
-        env!("CARGO_BIN_EXE_mon-agent-connector-openttd"),
+        env!("CARGO_BIN_EXE_eden-agent-connector-openttd"),
         &worker_target,
     )
     .expect("copy worker");

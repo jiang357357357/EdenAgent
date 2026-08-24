@@ -1,7 +1,7 @@
-# MonAgent local configuration example. Copy to .monconfig and customize locally.
+# Eden Agent local configuration example. Copy to .monconfig and customize locally.
 
 [service]
-NAME=MonAgent
+NAME=Eden Agent
 VERSION=1.8.0
 PUBLIC_HOST=127.0.0.1
 
@@ -13,8 +13,8 @@ BASE_URL=http://127.0.0.1:40092
 WEB_URL=http://127.0.0.1:40091
 
 [process]
-NAME=MonAgent
-PROCESS_TAG=monagent-main
+NAME=Eden Agent
+PROCESS_TAG=edenagent-main
 SERVER_PM2_NAME=agent-api
 SCRIPT_AGENT_SERVER_LINUX_START=Script/Process/linux/server/start_process.sh
 SCRIPT_AGENT_SERVER_LINUX_STOP=Script/Process/linux/server/stop_process.sh
@@ -42,13 +42,13 @@ SCRIPT_AGENT_SERVER_ENV_WIN_INSTALL=Server/Script/EnvTools/win/install_env.ps1
 SCRIPT_AGENT_SERVER_ENV_WIN_REMOVE=Server/Script/EnvTools/win/remove_env.ps1
 
 [desktop]
-TITLE=MonAgent — AI 个人助手
+TITLE=Eden Agent — AI 个人助手
 QUIT_FLAG=.artifacts/desktop-quit.flag
 
 [log]
 LEVEL=DEBUG
-FILE=Data/Logs/Text/MonAgent/MonAgent.log
-PLAIN_FILE=Data/Logs/Text/MonAgent/MonAgent_plain.log
+FILE=Data/Logs/Text/Eden Agent/Eden Agent.log
+PLAIN_FILE=Data/Logs/Text/Eden Agent/Eden Agent_plain.log
 DISPLAY_ENABLED=true
 RENDER_DIR=Data/Logs/Render
 RENDER_FILE=Data/Logs/Render/render.log

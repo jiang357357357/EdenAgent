@@ -14,6 +14,6 @@
     { "capability": "filesystem.write", "resource": "settings.commandDirectory", "access": "write", "required": false, "description": "仅在显式启用控制探针时写入临时 run 命令。" }
   ],
   "assets": [
-    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/monagent_victoria3_observer" }
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/edenagent_victoria3_observer" }
   ]
 }

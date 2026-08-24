@@ -7,10 +7,10 @@
   "protocolVersion": 1,
   "icon": "cable",
   "entrypoints": {
-    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-lichess.exe", "args": [] },
-    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-lichess", "args": [] },
-    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-lichess", "args": [] },
-    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-lichess", "args": [] }
+    "windows-x64": { "path": "workers/windows-x64/eden-agent-connector-lichess.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/eden-agent-connector-lichess", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/eden-agent-connector-lichess", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/eden-agent-connector-lichess", "args": [] }
   },
   "settingsSchema": {
     "type": "object",

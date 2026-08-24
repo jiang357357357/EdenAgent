@@ -3,8 +3,8 @@
 ## 一、文档状态
 
 - 状态：设计定稿；P0、P1、P2、D1 与 D2 已实现，D3 持续评测基线已建立
-- 适用范围：MonAgent Python Server、Python AgentCore、Web/桌面客户端
-- 设计来源：Codex 的主智能体协调规则、OpenCode 的后台 Task 结果回注方式，以及 MonAgent 现有运行时约束
+- 适用范围：Eden Agent Python Server、Python AgentCore、Web/桌面客户端
+- 设计来源：Codex 的主智能体协调规则、OpenCode 的后台 Task 结果回注方式，以及 Eden Agent 现有运行时约束
 - 核心目标：主智能体持续分析并向用户提供阶段性回复，同时将独立任务交给后台子智能体；必要结果收齐后，再生成最终整合回复
 
 本文同时记录目标架构和分阶段实现状态；未标记为已实现的 P2、D2、D3 行为仍属于后续工作。
@@ -13,7 +13,7 @@
 
 采用混合架构：
 
-> **Codex 式任务委派规则 + OpenCode 式后台结果通知 + MonAgent 持久化协调批次与内部整合运行**
+> **Codex 式任务委派规则 + OpenCode 式后台结果通知 + Eden Agent 持久化协调批次与内部整合运行**
 
 不采用以下两种极端形式：
 
@@ -81,7 +81,7 @@ Manager 排队一次内部 aggregation 运行
 
 典型场景：
 
-- 分别研究 OpenCode、Codex 和 MonAgent 的实现。
+- 分别研究 OpenCode、Codex 和 Eden Agent 的实现。
 - 同时检查后端运行链路、前端事件处理和测试覆盖。
 - 大范围代码探索、多来源研究、独立代码审查。
 
@@ -647,11 +647,11 @@ EventBus 重放缓冲和移除 SessionStore 重复数据不属于核心 P0，后
 
 | 文件 | 改动 |
 |------|------|
-| `Server/src/mon_agent_server/tools/subagents.py` | spawn schema 增加 `background`、`required_for_final` |
-| `Server/src/mon_agent_server/runtime/manager.py` | 创建协调批次、登记任务、处理终态、会话锁、排队 aggregation、新增 `_run_aggregation()` |
-| `Server/src/mon_agent_server/store/subagent_repository.py` | 保存批次、标准化终态结果、幂等键 |
-| `Server/src/mon_agent_server/skills/catalog.py` | Root Agent 常驻六个协作工具；multi-agent 技能转为策略说明 |
-| `Server/src/mon_agent_server/runtime/subagents.py` | 默认子智能体策略禁止递归 spawn |
+| `Server/src/eden_agent_server/tools/subagents.py` | spawn schema 增加 `background`、`required_for_final` |
+| `Server/src/eden_agent_server/runtime/manager.py` | 创建协调批次、登记任务、处理终态、会话锁、排队 aggregation、新增 `_run_aggregation()` |
+| `Server/src/eden_agent_server/store/subagent_repository.py` | 保存批次、标准化终态结果、幂等键 |
+| `Server/src/eden_agent_server/skills/catalog.py` | Root Agent 常驻六个协作工具；multi-agent 技能转为策略说明 |
+| `Server/src/eden_agent_server/runtime/subagents.py` | 默认子智能体策略禁止递归 spawn |
 
 P0 不修改 AgentCore。
 
