@@ -17,8 +17,16 @@ const localRuntimeConfig = createLocalRuntimeConfigStore({
 })
 const serverPort = Number(process.env.EDEN_AGENT_PORT ?? config.number("server", "PORT", 40092))
 const webPort = Number(process.env.EDEN_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
+const serverReadyTimeoutMs = positiveTimeout(
+  process.env.EDEN_AGENT_SERVER_READY_TIMEOUT_MS ?? config.number("server", "READY_TIMEOUT_MS", 300_000),
+  "server readiness timeout",
+)
+const webReadyTimeoutMs = positiveTimeout(
+  process.env.EDEN_AGENT_WEB_READY_TIMEOUT_MS ?? config.number("server", "WEB_READY_TIMEOUT_MS", 60_000),
+  "web readiness timeout",
+)
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
-const capabilityToken = process.env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
+let capabilityToken = process.env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
 
 rmSync(quitFlag, { force: true })
 
@@ -46,6 +54,46 @@ const ansi = {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function positiveTimeout(value, label) {
+  const timeout = Number(value)
+  if (!Number.isFinite(timeout) || timeout <= 0) {
+    throw new Error(`${label} must be a positive number of milliseconds, got ${JSON.stringify(value)}`)
+  }
+  return timeout
+}
+
+async function probeEdenAgentServer(port) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 2000)
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: controller.signal })
+    if (!response.ok) return false
+    const health = await response.json()
+    return health?.status === "ok" &&
+      typeof health?.serverVersion === "string" &&
+      Number.isInteger(health?.protocolVersion)
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function externalCapabilityToken() {
+  if (process.env.EDEN_AGENT_CAPABILITY_TOKEN?.trim()) {
+    return process.env.EDEN_AGENT_CAPABILITY_TOKEN.trim()
+  }
+  const tokenFile = path.resolve(
+    root,
+    process.env.EDEN_AGENT_TOKEN_FILE?.trim() || path.join("Data", "server-capability.token"),
+  )
+  try {
+    const token = readFileSync(tokenFile, "utf8").trim()
+    if (token.length >= 32) return token
+  } catch {}
+  throw new Error(`检测到已运行的 Eden Agent Server，但无法读取其能力令牌：${tokenFile}`)
 }
 
 function labelText(label) {
@@ -272,7 +320,7 @@ function start(label, args, extraEnv = {}) {
   return child
 }
 
-async function waitFor(url, label, child) {
+async function waitFor(url, label, child, timeoutMs) {
   let exited = false
   let exitCode = null
   if (child) {
@@ -282,7 +330,8 @@ async function waitFor(url, label, child) {
     })
   }
 
-  for (let i = 0; i < 60; i += 1) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
     if (exited) {
       throw new Error(`${label} 启动进程已退出，退出码：${exitCode}`)
     }
@@ -290,9 +339,9 @@ async function waitFor(url, label, child) {
       const res = await fetch(url)
       if (res.ok || res.status === 304) return
     } catch {}
-    await sleep(500)
+    await sleep(Math.min(500, Math.max(1, deadline - Date.now())))
   }
-  throw new Error(`${label} 未在 30s 内就绪：${url}`)
+  throw new Error(`${label} 未在 ${Math.ceil(timeoutMs / 1000)}s 内就绪：${url}`)
 }
 
 function assertPortFree(port, label) {
@@ -330,21 +379,30 @@ const quitWatcher = setInterval(() => {
 quitWatcher.unref?.()
 
 try {
-  await ensurePortFree(serverPort, "server")
+  const reuseExternalServer = await probeEdenAgentServer(serverPort)
+  if (reuseExternalServer) {
+    capabilityToken = externalCapabilityToken()
+    devLog(`复用已运行的 Eden Agent Server，端口 ${serverPort}`)
+  } else {
+    await ensurePortFree(serverPort, "server")
+  }
   await ensurePortFree(webPort, "web")
 
-  devLog(`启动 server，端口 ${serverPort}`)
-  const server = start("server", ["run", "dev:server"], {
-    EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
-    ...localRuntimeConfig.environment(),
-  })
-  await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server)
+  let server = null
+  if (!reuseExternalServer) {
+    devLog(`启动 server，端口 ${serverPort}`)
+    server = start("server", ["run", "dev:server"], {
+      EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
+      ...localRuntimeConfig.environment(),
+    })
+  }
+  await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server, serverReadyTimeoutMs)
 
   devLog(`启动 web，端口 ${webPort}`)
   const web = start("web", ["run", "dev:web"], {
     VITE_EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
   })
-  await waitFor(`http://127.0.0.1:${webPort}`, "web", web)
+  await waitFor(`http://127.0.0.1:${webPort}`, "web", web, webReadyTimeoutMs)
 
   devLog("启动 desktop")
   const desktop = start("desktop", ["run", "dev:desktop"], {

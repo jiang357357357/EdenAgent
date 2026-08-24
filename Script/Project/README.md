@@ -1,6 +1,6 @@
 # Project development scripts
 
-- `dev.mjs`：启动 Rust Server、Web 与 Electron，并统一管理生命周期和能力令牌。
+- `dev.mjs`：启动 Rust Server、Web 与 Electron，并统一管理生命周期和能力令牌；若端口上已有健康的 Eden Agent Server（例如由 MonPM 托管），则安全复用该服务。
 - `dev_desktop.mjs`：仅启动 Web 与桌面壳。
 - `monconfig.mjs`：读取项目 `.monconfig`。
 - `monconfig.test.mjs`：配置读取测试。
@@ -9,3 +9,5 @@
 - `package_connector.mjs`：把已经构建的官方 Connector Worker 与清单、资产组装为完整校验包，并原子安装到 `Data/connectors/packages`；它不会隐式触发 Cargo 构建。
 
 Server 的编译、运行和检查均由 Cargo 完成；本目录不再包含 Python 启动器或 sidecar 打包脚本。
+
+首次编译可能耗时较长。Server 与 Web 的默认就绪等待时间分别为 300 秒和 60 秒，可通过 `.monconfig` 的 `server.READY_TIMEOUT_MS`、`server.WEB_READY_TIMEOUT_MS`，或环境变量 `EDEN_AGENT_SERVER_READY_TIMEOUT_MS`、`EDEN_AGENT_WEB_READY_TIMEOUT_MS` 调整。

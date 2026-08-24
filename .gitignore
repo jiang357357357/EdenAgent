@@ -2,6 +2,7 @@ node_modules/
 dist/
 target/
 .eden-agent/
+.opencode/
 .artifacts/
 temp_web/
 temp_web_eve/
