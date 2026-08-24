@@ -1,0 +1,8 @@
+# MonAgent's observer only emits read-only telemetry records.
+monagent_observer_emit_hello = {
+	debug_log = "[MONAGENT]|1|HELLO|bridge_version=0.1.0|mode=observe"
+}
+
+monagent_observer_emit_snapshot = {
+	debug_log = "[MONAGENT]|1|SNAPSHOT|date=[TimeKeeper.GetCurrentDate.GetString]|country_id=[THIS.GetCountry.GetIDString]|country_name=[THIS.GetCountry.GetNameNoFormatting]|gold_reserves=[THIS.GetCountry.GetGoldReserves]|weekly_income=[THIS.GetCountry.PredictWeeklyIncome]|weekly_expenses=[THIS.GetCountry.GetWeeklyExpenses]|gdp=[THIS.GetCountry.GetGDP]|population=[THIS.GetCountry.GetTotalPopulation]|radicals=[THIS.GetCountry.GetNumRadicals]|loyalists=[THIS.GetCountry.GetNumLoyalists]|legitimacy=[THIS.GetCountry.GetGovernmentLegitimacy]|prestige=[THIS.GetCountry.GetPrestige]|infamy=[THIS.GetCountry.GetInfamy]"
+}

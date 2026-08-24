@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "official.openttd",
+  "name": "本地 OpenTTD",
+  "description": "Official isolated Worker plugin for the loopback OpenTTD Admin Port and MonAgentBridge.",
+  "version": "1.0.0",
+  "components": {
+    "runtimes": [
+      { "id": "openttd", "kind": "native_worker", "manifest": "connector.json", "enabledByDefault": true }
+    ]
+  },
+  "permissions": [
+    { "capability": "network.connect", "resource": "loopback", "access": "connect", "required": true, "description": "仅连接本机 OpenTTD Admin Port。" },
+    { "capability": "filesystem.read", "resource": "settings.instanceRegistry", "access": "read", "required": false, "description": "读取受管实例注册文件。" },
+    { "capability": "environment.read", "resource": "XDG_RUNTIME_DIR", "access": "read", "required": false, "description": "定位 Linux 受管实例注册目录。" },
+    { "capability": "environment.read", "resource": "MON_OPENTTD_INSTANCE_REGISTRY", "access": "read", "required": false, "description": "读取显式配置的实例注册文件位置。" },
+    { "capability": "environment.read", "resource": "connector.identityCredential", "access": "read", "required": true, "description": "读取此身份隔离的 Admin Port 密码。" },
+    { "capability": "environment.read", "resource": "settings.passwordEnv", "access": "read", "required": false, "description": "读取用户显式选择的密码环境变量。" }
+  ]
+}

@@ -1,0 +1,43 @@
+node_modules/
+dist/
+target/
+.mon-agent/
+.artifacts/
+temp_web/
+temp_web_eve/
+temp_web_lily/
+Data/
+.env
+.monconfig
+*.log
+.DS_Store
+Thumbs.db
+
+# Local external reference repositories
+/文档/参考/项目/
+
+# 本地阅读用外部参考仓库，体积较大，不进入 MonAgent 源码仓库。
+文档/参考/Claude-Code/
+文档/参考/codex-cli/
+文档/参考/codex/
+文档/参考/opencode/
+文档/参考/pi/
+文档/参考/TouhouLittleMaid/
+
+# Image assets
+frontend/web/public/characters/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+!frontend/web/src/assets/
+!frontend/web/src/assets/self-awake/
+!frontend/web/src/assets/self-awake/diary-paper.png
+!frontend/web/src/assets/self-awake/journal-workspace-bg.png
+!frontend/web/src/assets/self-awake/memo-workspace-bg.png
+!frontend/web/src/assets/self-awake/memo-workspace-bg-v2.png
+!frontend/desktop/assets/
+!frontend/desktop/assets/icon.ico

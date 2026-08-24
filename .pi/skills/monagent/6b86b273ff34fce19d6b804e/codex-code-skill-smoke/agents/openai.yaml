@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex 技能冒烟测试"
+  short_description: "生成并输出一行 JSON 技能报告，用于验证技能包脚本、参考文档和模板资源的完整链路。"
+  default_prompt: "使用 $codex-code-skill-smoke 技能：完成当前任务。"

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "id": "hoi4",
+  "name": "Hearts of Iron IV Observer",
+  "description": "通过只读游戏日志观察本地 Hearts of Iron IV 战局。",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "icon": "gamepad",
+  "entrypoints": {
+    "windows-x64": {
+      "path": "workers/windows-x64/mon-agent-connector-hoi4.exe",
+      "args": []
+    },
+    "linux-x64": {
+      "path": "workers/linux-x64/mon-agent-connector-hoi4",
+      "args": []
+    },
+    "macos-x64": {
+      "path": "workers/macos-x64/mon-agent-connector-hoi4",
+      "args": []
+    },
+    "macos-arm64": {
+      "path": "workers/macos-arm64/mon-agent-connector-hoi4",
+      "args": []
+    }
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "logPath": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "selfAwakeOnEvent": {
+        "type": "boolean"
+      },
+      "boundSessionId": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "capability": "filesystem.read",
+      "resource": "settings.logPath",
+      "access": "read",
+      "required": true,
+      "description": "读取用户选择的 Hearts of Iron IV game.log。"
+    }
+  ],
+  "events": {
+    "bridge_ready": {
+      "type": "object",
+      "title": "Bridge 已就绪",
+      "description": "检测到兼容的 HOI4 Observer Bridge。",
+      "additionalProperties": true
+    },
+    "snapshot": {
+      "type": "object",
+      "title": "战局状态快照",
+      "description": "接收玩家国家的只读状态快照。",
+      "additionalProperties": true
+    }
+  },
+  "queries": {
+    "get_state": {
+      "type": "object",
+      "title": "读取最新战局状态",
+      "description": "返回 Bridge 状态与最新玩家国家快照。",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  "actions": {},
+  "assets": [
+    {
+      "source": "assets/game-mod",
+      "targetKind": "paradox-user-mod",
+      "target": "Hearts of Iron IV/mod/monagent_hoi4_observer"
+    }
+  ]
+}

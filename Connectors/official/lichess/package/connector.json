@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "lichess",
+  "name": "Lichess",
+  "description": "接收挑战与棋局事件，并通过 Lichess Bot API 执行动作。",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "icon": "cable",
+  "entrypoints": {
+    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-lichess.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-lichess", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-lichess", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-lichess", "args": [] }
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": { "type": "string", "minLength": 1, "maxLength": 2048 },
+      "tokenEnv": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+      "selfAwakeOnEvent": { "type": "boolean" },
+      "boundSessionId": { "type": "string", "format": "uuid" }
+    },
+    "additionalProperties": false
+  },
+  "permissions": [
+    { "capability": "network.connect", "resource": "https://lichess.org", "access": "connect", "required": true, "description": "连接默认 Lichess HTTPS API。" },
+    { "capability": "network.connect", "resource": "settings.baseUrl", "access": "connect", "required": false, "description": "连接用户配置的兼容 Lichess API。" },
+    { "capability": "environment.read", "resource": "connector.identityCredential", "access": "read", "required": true, "description": "读取此身份隔离的 Lichess Bot API 令牌。" },
+    { "capability": "environment.read", "resource": "settings.tokenEnv", "access": "read", "required": false, "description": "读取用户显式选择的令牌环境变量。" }
+  ],
+  "events": {
+    "challenge": { "type": "object", "title": "挑战事件", "additionalProperties": true },
+    "game_state": { "type": "object", "title": "棋局状态", "additionalProperties": true }
+  },
+  "queries": {},
+  "actions": {
+    "accept_challenge": { "type": "object", "title": "接受挑战", "properties": { "challenge_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" } }, "required": ["challenge_id"], "additionalProperties": false },
+    "decline_challenge": { "type": "object", "title": "拒绝挑战", "properties": { "challenge_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }, "reason": { "type": "string", "enum": ["generic","later","tooFast","tooSlow","timeControl","rated","casual","standard","variant","noBot","onlyBot"] } }, "required": ["challenge_id"], "additionalProperties": false },
+    "make_move": { "type": "object", "title": "执行走棋", "properties": { "game_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }, "move": { "type": "string", "pattern": "^[a-h][1-8][a-h][1-8][qrbn]?$" }, "offer_draw": { "type": "boolean" } }, "required": ["game_id","move"], "additionalProperties": false },
+    "resign": { "type": "object", "title": "认输", "properties": { "game_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" } }, "required": ["game_id"], "additionalProperties": false },
+    "offer_draw": { "type": "object", "title": "提出和棋", "properties": { "game_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" } }, "required": ["game_id"], "additionalProperties": false },
+    "send_chat": { "type": "object", "title": "发送棋局消息", "properties": { "game_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }, "text": { "type": "string", "minLength": 1, "maxLength": 1000 }, "room": { "type": "string", "enum": ["player","spectator"] } }, "required": ["game_id","text"], "additionalProperties": false }
+  },
+  "assets": []
+}

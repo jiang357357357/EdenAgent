@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "official.victoria3",
+  "name": "Victoria 3 Bridge",
+  "description": "Official isolated Worker plugin for Victoria 3 observation and the opt-in control probe.",
+  "version": "1.0.0",
+  "components": {
+    "runtimes": [
+      { "id": "victoria3", "kind": "native_worker", "manifest": "connector.json", "enabledByDefault": true }
+    ]
+  },
+  "permissions": [
+    { "capability": "filesystem.read", "resource": "settings.logPath", "access": "read", "required": true, "description": "读取用户选择的 Victoria 3 debug.log。" },
+    { "capability": "filesystem.write", "resource": "settings.commandDirectory", "access": "write", "required": false, "description": "仅在显式启用控制探针时写入临时 run 命令。" }
+  ],
+  "assets": [
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/monagent_victoria3_observer" }
+  ]
+}

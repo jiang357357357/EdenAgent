@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "victoria3",
+  "name": "Victoria 3 Bridge",
+  "description": "通过日志桥接观察本地 Victoria 3 战役；控制探针默认关闭。",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "icon": "gamepad",
+  "entrypoints": {
+    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-victoria3.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-victoria3", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-victoria3", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-victoria3", "args": [] }
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "logPath": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "commandDirectory": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "controlEnabled": { "type": "boolean" },
+      "selfAwakeOnEvent": { "type": "boolean" },
+      "boundSessionId": { "type": "string", "format": "uuid" }
+    },
+    "additionalProperties": false
+  },
+  "permissions": [
+    { "capability": "filesystem.read", "resource": "settings.logPath", "access": "read", "required": true, "description": "读取用户选择的 Victoria 3 debug.log。" },
+    { "capability": "filesystem.write", "resource": "settings.commandDirectory", "access": "write", "required": false, "description": "仅在显式启用控制探针时写入临时 run 命令。" }
+  ],
+  "events": {
+    "bridge_ready": { "type": "object", "title": "Bridge 已就绪", "additionalProperties": true },
+    "snapshot": { "type": "object", "title": "战役状态快照", "additionalProperties": true },
+    "command_ack": { "type": "object", "title": "控制命令回执", "additionalProperties": true }
+  },
+  "queries": {
+    "get_state": { "type": "object", "title": "读取最新战役状态", "properties": {}, "additionalProperties": false }
+  },
+  "actions": {
+    "probe_control": { "type": "object", "title": "验证回程通道", "properties": {}, "additionalProperties": false }
+  },
+  "assets": [
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Victoria 3/mod/monagent_victoria3_observer" }
+  ]
+}

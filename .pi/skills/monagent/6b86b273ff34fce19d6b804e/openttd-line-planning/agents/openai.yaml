@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenTTD 开局线路规划"
+  short_description: "为 OpenTTD 当前服务器规划开局盈利线路：探查周边城镇与产业、定位装卸货运站、判断车型与货种，并给出建站/修路/设调..."
+  default_prompt: "使用 $openttd-line-planning 技能：完成当前任务。"

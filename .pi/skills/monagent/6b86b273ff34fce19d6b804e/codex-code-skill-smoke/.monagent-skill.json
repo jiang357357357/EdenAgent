@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "installationID": "skill_bcb71ffe76e04a8e8b75e7062daee5c8",
+  "skillName": "codex-code-skill-smoke",
+  "scope": "project",
+  "source": {
+    "type": "generated",
+    "uri": "generated:codex-code-skill-smoke",
+    "ref": "",
+    "subpath": ""
+  },
+  "version": "1.0.0",
+  "contentHash": "9c929916bb96cbf96b8ea1eadcd9ed5f2151fc57ba52dc6d8bfed36623ff1ed0",
+  "fileCount": 5,
+  "totalBytes": 2611,
+  "enabled": true,
+  "trustStatus": "trusted",
+  "deviceID": "local"
+}

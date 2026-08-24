@@ -1,0 +1,8 @@
+[submodule "frontend"]
+	path = frontend
+	url = ../MonAgentFrontend.git
+	branch = main
+[submodule "Server"]
+	path = Server
+	url = ../MonAgentServer.git
+	branch = main

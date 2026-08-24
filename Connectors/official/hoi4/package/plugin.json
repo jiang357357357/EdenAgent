@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "official.hoi4",
+  "name": "Hearts of Iron IV Observer",
+  "description": "Official isolated Worker plugin for read-only Hearts of Iron IV observation.",
+  "version": "1.0.0",
+  "components": {
+    "runtimes": [
+      { "id": "hoi4", "kind": "native_worker", "manifest": "connector.json", "enabledByDefault": true }
+    ]
+  },
+  "permissions": [
+    { "capability": "filesystem.read", "resource": "settings.logPath", "access": "read", "required": true, "description": "读取用户选择的 Hearts of Iron IV game.log。" }
+  ],
+  "assets": [
+    { "source": "assets/game-mod", "targetKind": "paradox-user-mod", "target": "Hearts of Iron IV/mod/monagent_hoi4_observer" }
+  ]
+}
