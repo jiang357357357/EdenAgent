@@ -94,7 +94,7 @@ final result: passed
 
 ## Evidence
 
-- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-97e52746-1f4e-46f6-be47-6a2409a9695b.png`
+- Source visual truth: local design reference (not included in the repository)
 - Rendered implementation: `.artifacts/design-qa/assistant-switcher-implementation.png`
 - Full side-by-side comparison: `.artifacts/design-qa/assistant-switcher-comparison-full.png`
 - Focused sidebar comparison: `.artifacts/design-qa/assistant-switcher-comparison-left.png`
@@ -161,7 +161,7 @@ final result: passed
 
 ## Evidence
 
-- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-3afc00f0-8f1d-4a52-bd4c-4af9e935d185.png`
+- Source visual truth: local design reference (not included in the repository)
 - Interaction override: the user's latest direction places the detail above the Token ring rather than to its left.
 - Rendered implementation: `artifacts/design-qa/token-meter-implementation-hover-1920x936.png`
 - Full-view comparison evidence: `artifacts/design-qa/token-meter-reference-vs-implementation.png`（上半部分）
@@ -251,7 +251,7 @@ final result: passed
 
 ## Evidence
 
-- Source visual truth: `[LOCAL_HOME]/.codex/generated_images/019f6487-6371-7d90-b30b-eab4d14bfe85/exec-c10fecdd-0ba8-4333-91ff-2ad4da2c2955.png`
+- Source visual truth: local design reference (not included in the repository)
 - Rendered implementation: `artifacts/design-qa/question-decision-overlay-implementation-final.png`
 - Full-view comparison evidence: `artifacts/design-qa/question-decision-overlay-comparison-full-final.png`
 - Focused region comparison evidence: `artifacts/design-qa/question-decision-overlay-comparison-focus-final.png`
