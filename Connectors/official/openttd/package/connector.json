@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "openttd",
+  "name": "本地 OpenTTD",
+  "description": "隔离 Worker 直连 OpenTTD Admin Port，并通过 MonAgentBridge 执行结构化操作。",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "icon": "gamepad",
+  "entrypoints": {
+    "windows-x64": { "path": "workers/windows-x64/mon-agent-connector-openttd.exe", "args": [] },
+    "linux-x64": { "path": "workers/linux-x64/mon-agent-connector-openttd", "args": [] },
+    "macos-x64": { "path": "workers/macos-x64/mon-agent-connector-openttd", "args": [] },
+    "macos-arm64": { "path": "workers/macos-arm64/mon-agent-connector-openttd", "args": [] }
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "host": { "type": "string", "minLength": 1, "maxLength": 253 },
+      "adminPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+      "gamePort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+      "passwordEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+      "instanceRegistry": { "type": "string", "minLength": 1, "maxLength": 4096 },
+      "selfAwakeOnEvent": { "type": "boolean" },
+      "boundSessionId": { "type": "string", "format": "uuid" }
+    },
+    "additionalProperties": false
+  },
+  "permissions": [
+    { "capability": "network.connect", "resource": "loopback", "access": "connect", "required": true, "description": "仅连接本机 OpenTTD Admin Port。" },
+    { "capability": "filesystem.read", "resource": "settings.instanceRegistry", "access": "read", "required": false, "description": "读取受管实例注册文件。" },
+    { "capability": "environment.read", "resource": "XDG_RUNTIME_DIR", "access": "read", "required": false, "description": "定位 Linux 受管实例注册目录。" },
+    { "capability": "environment.read", "resource": "MON_OPENTTD_INSTANCE_REGISTRY", "access": "read", "required": false, "description": "读取显式配置的实例注册文件位置。" },
+    { "capability": "environment.read", "resource": "connector.identityCredential", "access": "read", "required": true, "description": "读取此身份隔离的 Admin Port 密码。" },
+    { "capability": "environment.read", "resource": "settings.passwordEnv", "access": "read", "required": false, "description": "读取用户显式选择的密码环境变量。" }
+  ],
+  "events": {
+    "chat": { "type": "object", "title": "游戏聊天", "additionalProperties": true },
+    "new_game": { "type": "object", "title": "新游戏事件", "additionalProperties": true },
+    "company_removed": { "type": "object", "title": "公司状态事件", "additionalProperties": true },
+    "gamescript": { "type": "object", "title": "桥接脚本事件", "additionalProperties": true },
+    "shutdown": { "type": "object", "title": "服务器关闭", "additionalProperties": true }
+  },
+  "queries": {
+    "get_state": { "type": "object", "title": "查询游戏状态", "properties": {}, "additionalProperties": false },
+    "inspect_tile": { "type": "object", "title": "检查地图格", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" } }, "required": ["x","y"], "additionalProperties": false },
+    "find_towns": { "type": "object", "title": "查找城镇", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "limit": { "type": "integer", "minimum": 1, "maximum": 100 } }, "additionalProperties": false },
+    "find_industries": { "type": "object", "title": "查找产业", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "limit": { "type": "integer", "minimum": 1, "maximum": 100 } }, "additionalProperties": false },
+    "get_company_assets": { "type": "object", "title": "查询公司资产", "properties": { "company_id": { "type": "integer", "minimum": 0, "maximum": 255 } }, "required": ["company_id"], "additionalProperties": false },
+    "list_road_engines": { "type": "object", "title": "查询公路车型", "properties": { "company_id": { "type": "integer", "minimum": 0, "maximum": 255 } }, "required": ["company_id"], "additionalProperties": false },
+    "find_road_route_site": { "type": "object", "title": "规划公路站点", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "length": { "type": "integer", "minimum": 1, "maximum": 256 } }, "additionalProperties": false }
+  },
+  "actions": {
+    "refresh_state": { "type": "object", "title": "刷新状态", "properties": {}, "additionalProperties": false },
+    "pause_game": { "type": "object", "title": "暂停游戏", "properties": {}, "additionalProperties": false },
+    "resume_game": { "type": "object", "title": "继续游戏", "properties": {}, "additionalProperties": false },
+    "save_game": { "type": "object", "title": "保存游戏", "properties": { "save_name": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" } }, "additionalProperties": false },
+    "send_chat": { "type": "object", "title": "发送聊天", "properties": { "text": { "type": "string", "minLength": 1, "maxLength": 4096 } }, "required": ["text"], "additionalProperties": false },
+    "gameplay_command": { "type": "object", "title": "执行游戏操作", "properties": { "command": { "type": "object", "properties": { "action": { "type": "string" } }, "required": ["action"], "additionalProperties": true } }, "required": ["command"], "additionalProperties": false },
+    "gameplay_plan": { "type": "object", "title": "执行玩法计划", "properties": { "commands": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "object", "properties": { "action": { "type": "string" } }, "required": ["action"], "additionalProperties": true } } }, "required": ["commands"], "additionalProperties": false }
+  },
+  "assets": []
+}

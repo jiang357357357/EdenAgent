@@ -150,16 +150,21 @@ if (await isWebReady()) {
   await waitForVite(webProc)
 }
 
+const desktopEnvironment = {
+  ...process.env,
+  MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
+  MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
+  MON_AGENT_SERVER_MODE: "external",
+  MON_AGENT_TOKEN_FILE: process.env.MON_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
+}
+// Electron switches into plain Node mode when this inherited variable is set.
+// The standalone desktop launcher must clear it just like the full dev launcher.
+delete desktopEnvironment.ELECTRON_RUN_AS_NODE
+
 desktopProc = spawnNpm(["--prefix", "frontend/desktop", "run", "dev"], {
   cwd: root,
   stdio: ["ignore", "pipe", "pipe"],
-  env: {
-    ...process.env,
-    MON_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
-    MON_AGENT_DEV_PARENT_PID: process.env.MON_AGENT_DEV_PARENT_PID || String(process.pid),
-    MON_AGENT_SERVER_MODE: "external",
-    MON_AGENT_TOKEN_FILE: process.env.MON_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
-  },
+  env: desktopEnvironment,
   detached: process.platform !== "win32",
 })
 

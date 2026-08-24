@@ -5,6 +5,9 @@ members = [
     "AgentCore/crates/mon-agent-core",
     "AgentCore/crates/mon-agent-tools",
     "Connectors/official/hoi4/worker",
+    "Connectors/official/lichess/worker",
+    "Connectors/official/openttd/worker",
+    "Connectors/official/victoria3/worker",
     "Server",
     "Server/crates/mon-agent-api",
     "Server/crates/mon-agent-app",
@@ -19,8 +22,11 @@ members = [
     "Server/crates/mon-agent-host",
     "Server/crates/mon-agent-hoi4",
     "Server/crates/mon-agent-multiagent",
+    "Server/crates/mon-agent-mcp",
+    "Server/crates/mon-agent-market",
     "Server/crates/mon-agent-provider",
     "Server/crates/mon-agent-sandbox",
+    "Server/crates/mon-agent-plugins",
     "Server/crates/mon-agent-skills",
     "Server/crates/mon-agent-store",
     "Server/crates/mon-agent-workspace",
@@ -31,7 +37,7 @@ members = [
 version = "1.8.0"
 edition = "2024"
 rust-version = "1.85"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -40,6 +46,7 @@ axum = { version = "0.8", features = ["ws"] }
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
+ed25519-dalek = "2"
 clap = { version = "4", features = ["derive", "env"] }
 futures = "0.3"
 globset = "0.4"
@@ -50,6 +57,7 @@ libc = "0.2"
 mime_guess = "2"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+rmcp = { version = "1.8.0", default-features = false, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest"] }
 schemars = { version = "0.8", features = ["uuid1"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -70,6 +78,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 ts-rs = { version = "12", features = ["no-serde-warnings", "serde-json-impl", "uuid-impl"] }
 unicode-normalization = "0.1"
+url = "2"
 uuid = { version = "1", features = ["serde", "v4", "v7"] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
@@ -77,6 +86,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 lto = true

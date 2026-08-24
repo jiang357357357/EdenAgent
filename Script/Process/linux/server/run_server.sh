@@ -15,4 +15,12 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set +a
 fi
 
+# The desktop configuration page persists the selected provider and model in
+# Data/local-runtime.json. MonPM starts this script outside Electron, so load
+# that file explicitly before the Rust process reads its environment.
+RUNTIME_ENV_LOADER="$PROJECT_ROOT/Script/Project/local_runtime_environment.cjs"
+RUNTIME_EXPORTS="$(node "$RUNTIME_ENV_LOADER" --shell "$PROJECT_ROOT")"
+eval "$RUNTIME_EXPORTS"
+unset RUNTIME_EXPORTS
+
 exec cargo run -p mon-agent-server

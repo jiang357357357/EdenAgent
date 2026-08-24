@@ -3,11 +3,18 @@ import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync, rmSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { createRequire } from "node:module"
 import { spawnExecutable, spawnNpm } from "../../frontend/Script/Project/process_runner.mjs"
 import { loadMonConfig } from "./monconfig.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
+const require = createRequire(import.meta.url)
+const { createLocalRuntimeConfigStore } = require("../../frontend/desktop/src/app/local-runtime-config.cjs")
 const config = loadMonConfig(root)
+const localRuntimeConfig = createLocalRuntimeConfigStore({
+  app: { isPackaged: false, getPath: () => path.join(root, "Data") },
+  agentRoot: root,
+})
 const serverPort = Number(process.env.MON_AGENT_PORT ?? config.number("server", "PORT", 40092))
 const webPort = Number(process.env.MON_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
@@ -329,6 +336,7 @@ try {
   devLog(`启动 server，端口 ${serverPort}`)
   const server = start("server", ["run", "dev:server"], {
     MON_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    ...localRuntimeConfig.environment(),
   })
   await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server)
 

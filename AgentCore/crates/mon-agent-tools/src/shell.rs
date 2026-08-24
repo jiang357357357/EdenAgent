@@ -5,7 +5,7 @@ use mon_agent_core::{PermissionRequest, Tool, ToolCall, ToolCallContext, ToolDef
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::env;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -27,6 +27,16 @@ pub struct SandboxedProgramOutput {
     pub exit_code: Option<i32>,
 }
 
+pub struct SandboxedProgramRequest<'a> {
+    pub workspace_root: &'a Path,
+    pub cwd: &'a Path,
+    pub program: &'a str,
+    pub arguments: &'a [String],
+    pub stdin: &'a [u8],
+    pub environment: &'a [(&'a str, &'a str)],
+    pub timeout: Duration,
+}
+
 /// Run one argv-based program inside the configured process sandbox.
 ///
 /// This is intentionally separate from the interactive shell tools: callers
@@ -34,23 +44,23 @@ pub struct SandboxedProgramOutput {
 /// payload, and cancellation/timeout always drops a kill-on-drop child.
 pub async fn run_sandboxed_program(
     sandbox: &ProcessSandbox,
-    workspace_root: &Path,
-    cwd: &Path,
-    program: &str,
-    arguments: &[String],
-    stdin: &[u8],
-    environment: &[(&str, &str)],
-    timeout: Duration,
+    request: SandboxedProgramRequest<'_>,
     cancellation: &CancellationToken,
 ) -> Result<SandboxedProgramOutput, ToolFailure> {
-    let mut command =
-        sandboxed_program_command(sandbox, workspace_root, cwd, "program", Path::new(program), arguments)?;
+    let mut command = sandboxed_program_command(
+        sandbox,
+        request.workspace_root,
+        request.cwd,
+        "program",
+        Path::new(request.program),
+        request.arguments,
+    )?;
     command
-        .current_dir(cwd)
+        .current_dir(request.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    for (name, value) in environment {
+    for (name, value) in request.environment {
         command.env(name, value);
     }
     configure_process_group(&mut command);
@@ -60,10 +70,11 @@ pub async fn run_sandboxed_program(
         .spawn()
         .map_err(|error| fail("command_spawn_failed", error.to_string()))?;
     if let Some(mut child_stdin) = child.stdin.take() {
-        child_stdin
-            .write_all(stdin)
-            .await
-            .map_err(|error| fail("stdin_write_failed", error.to_string()))?;
+        if let Err(error) = child_stdin.write_all(request.stdin).await
+            && error.kind() != ErrorKind::BrokenPipe
+        {
+            return Err(fail("stdin_write_failed", error.to_string()));
+        }
     }
     let wait = child.wait_with_output();
     tokio::pin!(wait);
@@ -71,8 +82,8 @@ pub async fn run_sandboxed_program(
         _ = cancellation.cancelled() => {
             return Err(fail("command_aborted", "sandboxed program was cancelled"));
         }
-        _ = tokio::time::sleep(timeout) => {
-            return Err(fail("command_timeout", format!("sandboxed program exceeded {} seconds", timeout.as_secs())));
+        _ = tokio::time::sleep(request.timeout) => {
+            return Err(fail("command_timeout", format!("sandboxed program exceeded {} seconds", request.timeout.as_secs())));
         }
         result = &mut wait => result.map_err(|error| fail("command_wait_failed", error.to_string()))?,
     };
@@ -357,7 +368,7 @@ fn sandboxed_command(
     sandboxed_program_command(sandbox, workspace_root, cwd, launcher.name(), program, arguments)
 }
 
-fn sandboxed_program_command(
+pub fn sandboxed_program_command(
     sandbox: &ProcessSandbox,
     workspace_root: &Path,
     cwd: &Path,
@@ -511,6 +522,9 @@ fn resolve_bash() -> Result<PathBuf, ToolFailure> {
     if let Some(found) = find_in_path(Path::new(if cfg!(windows) { "bash.exe" } else { "bash" })) {
         return Ok(found);
     }
+    #[cfg(not(windows))]
+    let candidates = vec![PathBuf::from("/bin/bash")];
+    #[cfg(windows)]
     let mut candidates = vec![PathBuf::from("/bin/bash")];
     #[cfg(windows)]
     {

@@ -1,7 +1,4 @@
-# ============================================================
-# MonAgent .monconfig
-# AI personal assistant development environment
-# ============================================================
+# MonAgent local configuration example. Copy to .monconfig and customize locally.
 
 [service]
 NAME=MonAgent
@@ -68,20 +65,19 @@ BACKUP_COUNT=5
 MODE=development
 
 [auth_dev]
-USERNAME=admin1
-PASSWORD=123456
+USERNAME=
+PASSWORD=
 
 [environment]
 TIMEZONE=Asia/Shanghai
 LOCALE=zh-CN
-COUNTRY=中国
-REGION=上海市
-CITY=上海
-LATITUDE=31.2304
-LONGITUDE=121.4737
+COUNTRY=
+REGION=
+CITY=
+LATITUDE=
+LONGITUDE=
 
 [search]
-# 优先使用官方匿名远程 MCP；专用 Key 存在时自动携带，再降级到网页搜索入口。
 PROVIDER=parallel_mcp,exa_mcp,bing,duckduckgo
 TIMEOUT_MS=10000
 CACHE_TTL_SECONDS=120

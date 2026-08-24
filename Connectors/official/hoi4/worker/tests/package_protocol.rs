@@ -179,16 +179,21 @@ async fn server_supervisor_persists_worker_events_and_routes_queries() {
     assert_eq!(state["latestSnapshot"]["country"]["politicalPower"], 125.5);
 
     let events = tokio::time::timeout(Duration::from_secs(5), async {
+        let mut observed = Vec::new();
         loop {
             let events = store
                 .claim_connector_events(connector.id, 10, 60_000)
                 .await
                 .expect("claim events");
-            if events
+            observed.extend(events);
+            let has_snapshot = observed
                 .iter()
-                .any(|event| event.event_type == "hoi4.snapshot")
-            {
-                break events;
+                .any(|event| event.event_type == "hoi4.snapshot");
+            let has_bridge_ready = observed
+                .iter()
+                .any(|event| event.event_type == "hoi4.bridge_ready");
+            if has_snapshot && has_bridge_ready {
+                break observed;
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
         }

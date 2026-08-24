@@ -1,0 +1,22 @@
+on_game_started_after_lobby = {
+	on_actions = { monagent_observer_on_game_started }
+}
+
+on_monthly_pulse_country = {
+	on_actions = { monagent_observer_on_monthly_country }
+}
+
+monagent_observer_on_game_started = {
+	effect = {
+		monagent_observer_emit_hello = yes
+		every_country = {
+			limit = { is_player = yes }
+			monagent_observer_emit_snapshot = yes
+		}
+	}
+}
+
+monagent_observer_on_monthly_country = {
+	trigger = { is_player = yes }
+	effect = { monagent_observer_emit_snapshot = yes }
+}

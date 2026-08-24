@@ -18,7 +18,10 @@ pub use mutation::{EditTool, WriteTool};
 pub use patch::ApplyPatchTool;
 pub use read::{LsTool, ReadTool};
 pub use search::{FindTool, GrepTool};
-pub use shell::{BashTool, PowerShellTool, SandboxedProgramOutput, WriteStdinTool, run_sandboxed_program};
+pub use shell::{
+    BashTool, PowerShellTool, SandboxedProgramOutput, SandboxedProgramRequest, WriteStdinTool, run_sandboxed_program,
+    sandboxed_program_command,
+};
 pub use skills::load_skills;
 
 pub const NATIVE_TOOL_NAMES: &[&str] = &[

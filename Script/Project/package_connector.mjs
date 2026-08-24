@@ -34,6 +34,27 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
 if (manifest.id !== connectorId) {
   throw new Error(`manifest ID ${manifest.id} does not match ${connectorId}`)
 }
+const pluginPath = path.join(sourceRoot, "plugin.json")
+if (!existsSync(pluginPath)) {
+  throw new Error(`official connector must also be a unified plugin bundle: ${pluginPath}`)
+}
+const plugin = JSON.parse(readFileSync(pluginPath, "utf8"))
+const nativeRuntime = plugin.components?.runtimes?.find(
+  (runtime) => runtime.kind === "native_worker" && runtime.manifest === "connector.json",
+)
+if (plugin.schemaVersion !== 1 || !nativeRuntime || nativeRuntime.id !== connectorId) {
+  throw new Error(`plugin manifest does not expose connector ${connectorId} as a native_worker`)
+}
+for (const permission of manifest.permissions ?? []) {
+  const declared = (plugin.permissions ?? []).some(
+    (outer) => outer.capability === permission.capability
+      && outer.resource === permission.resource
+      && outer.access === permission.access,
+  )
+  if (!declared) {
+    throw new Error(`plugin manifest does not declare connector permission ${permission.capability} ${permission.access} ${permission.resource}`)
+  }
+}
 
 const platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux"
 const architecture = process.arch === "x64" ? "x64" : process.arch === "arm64" ? "arm64" : process.arch

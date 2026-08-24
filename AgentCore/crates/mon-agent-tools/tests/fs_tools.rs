@@ -1,7 +1,9 @@
 use mon_agent_core::{ContentBlock, Tool, ToolCall, ToolCallContext, ToolDefinition, event_channel};
+#[cfg(windows)]
+use mon_agent_tools::PowerShellTool;
 use mon_agent_tools::{
-    ApplyPatchTool, BashTool, EditTool, FindTool, GetDiffTool, GrepTool, LsTool, NativeToolConfig, PowerShellTool,
-    ProcessSandbox, ReadTool, WriteStdinTool, WriteTool,
+    ApplyPatchTool, BashTool, EditTool, FindTool, GetDiffTool, GrepTool, LsTool, NativeToolConfig, ProcessSandbox,
+    ReadTool, WriteStdinTool, WriteTool,
 };
 use serde_json::{Value, json};
 use std::fs;

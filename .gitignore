@@ -4,9 +4,11 @@ target/
 .mon-agent/
 .artifacts/
 temp_web/
+temp_web_eve/
 temp_web_lily/
 Data/
 .env
+.monconfig
 *.log
 .DS_Store
 Thumbs.db
@@ -20,6 +22,7 @@ Thumbs.db
 文档/参考/codex/
 文档/参考/opencode/
 文档/参考/pi/
+文档/参考/TouhouLittleMaid/
 
 # Image assets
 frontend/web/public/characters/

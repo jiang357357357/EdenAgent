@@ -62,7 +62,7 @@ manifest 声明固定 ID、版本、协议、平台入口、设置 Schema、事�
 
 当前加载器已强制校验全部声明文件的 SHA-256，拒绝缺失摘要、额外文件、路径逃逸和
 符号链接；开发模式允许显式加载未校验目录。`signature.json` 是发布者签名的保留槽位，
-在签名信任库完成前不得开放远程市场的一键安装。包内技能默认禁用，经过用户检查后
+远程市场已经接入统一 Plugin 信任库；只有签名索引、摘要钉扎且包签名受信的 release 才能进入安装预览。包内技能默认禁用，经过用户检查后
 才能进入提示上下文。
 
 ## 工具表面
@@ -83,7 +83,7 @@ manifest 声明固定 ID、版本、协议、平台入口、设置 Schema、事�
 1. 引入 `mon-agent-connector-protocol`、`package` 和 `host`。
 2. 将 HOI4 变为第一个独立 Worker。
 3. 引入通用 `query_connector`，移除 `query_hoi4` 静态实现。
-4. 迁移 Victoria 3、OpenTTD 和 Lichess。
+4. Victoria 3、OpenTTD 和 Lichess 已迁移为官方外部 Worker 包；继续在各目标平台执行发行签名与真实应用联调。
 5. 删除所有 connector key 分支和旧清单目录。
 6. 完成签名、原子升级、失败回滚和多语言 SDK。
 
@@ -94,10 +94,12 @@ Protocol v1 是新扩展系统的兼容起点；旧的静态连接器 API 不作
 - `mon-agent-connector-protocol`：8 MiB 上限的长度前缀 JSON、请求/响应/通知类型。
 - `mon-agent-connector-package`：目录热发现、严格 manifest、平台入口、完整性和坏包隔离。
 - `mon-agent-connector-host`：最小环境启动、握手、能力核验、超时、通知和有序退出。
-- `mon-agent-connectors`：包优先运行、状态同步、事件持久化、通用查询/动作工具。
+- `mon-agent-connectors`：只通过包 Worker 运行，负责状态同步、事件持久化和通用查询/动作工具。
 - HOI4：已移除 Server 内的静态运行分支，官方 Worker 通过真实子进程协议运行。
 - 前端：目录展示动态包能力与设置 Schema，创建连接器时可填写设置 JSON。
 
 开发安装目录为 `Data/connectors/packages/<connector-id>`。目录变化会触发清单刷新和
-对应实例重启；单个坏包只进入 catalog errors，不影响其他包。正式远程分发仍需完成
-发布者签名信任库和操作系统级 Worker 沙箱，不能把“独立进程”误称为完整安全边界。
+对应实例重启；单个坏包只进入 catalog errors，不影响其他包。正式远程分发已由统一
+Plugin 市场提供发布者签名、摘要钉扎和撤销。Native Worker 启动时使用最小环境并受
+revision 级权限准入，但它仍是受信本机代码边界，不能把“独立进程”误称为内核级沙箱；
+不受信任的第三方进程应使用缺少 OS 沙箱即故障关闭的 `mcp_stdio`。

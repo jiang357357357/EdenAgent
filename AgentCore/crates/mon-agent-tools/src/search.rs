@@ -35,6 +35,7 @@ fn files_under(root: &Path, cancellation: &tokio_util::sync::CancellationToken) 
         .git_ignore(true)
         .git_exclude(true)
         .ignore(true)
+        .require_git(false)
         .follow_links(false)
         .build()
     {
