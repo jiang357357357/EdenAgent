@@ -16,6 +16,13 @@ React / Vite client · Electron desktop app · WebSocket JSON-RPC · SQLite
 
 </div>
 
+> “And they shall make an ark of shittim wood...”<br>
+> “And there I will meet with thee...”
+>
+> — Exodus 25:10, 25:22 (KJV)
+
+Eden Agent is inspired by the “Shittim Chest” from *Blue Archive*. This is an independent source-available project and is not affiliated with or endorsed by the original work or its publishers.
+
 > [!IMPORTANT]
 > Eden Agent is under active development, and its protocols and configuration formats may still change. The current source is available for noncommercial use under PolyForm Noncommercial 1.0.0. This is not an OSI-approved open-source license; commercial use requires a separate license.
 
