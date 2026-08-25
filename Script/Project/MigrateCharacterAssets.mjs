@@ -9,7 +9,9 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
 const agentRoot = path.resolve(scriptDirectory, "../..")
 const assetRoot = path.resolve(process.argv[2] || path.join(agentRoot, "../AgentAssets"))
 const aronaRoot = path.join(assetRoot, "characters", "arona")
-const configPath = path.join(agentRoot, "Data", "local-runtime.json")
+const configPath = path.join(agentRoot, "Data", "realms", "local", "local-runtime.json")
+const legacyConfigPath = path.join(agentRoot, "Data", "local-runtime.json")
+const sourceConfigPath = fs.existsSync(configPath) ? configPath : legacyConfigPath
 
 const assets = {
   avatar: path.join(aronaRoot, "avatar.png"),
@@ -25,12 +27,12 @@ for (const [kind, assetPath] of Object.entries(assets)) {
   }
 }
 
-if (!fs.existsSync(configPath)) {
-  console.log(`未找到本地运行配置，无需迁移：${configPath}`)
+if (!fs.existsSync(sourceConfigPath)) {
+  console.log(`未找到本地运行配置，无需迁移：${sourceConfigPath}`)
   process.exit(0)
 }
 
-const stored = JSON.parse(fs.readFileSync(configPath, "utf8"))
+const stored = JSON.parse(fs.readFileSync(sourceConfigPath, "utf8"))
 const character = stored.character && typeof stored.character === "object" ? stored.character : {}
 const legacyPrefix = "./characters/arona/"
 const hasLegacyPath = (value) => typeof value === "string"
@@ -64,7 +66,8 @@ stored.character = {
 }
 
 const temporaryPath = `${configPath}.assets-migration-${process.pid}`
-const mode = fs.statSync(configPath).mode & 0o777
+const mode = fs.statSync(sourceConfigPath).mode & 0o777
+fs.mkdirSync(path.dirname(configPath), { recursive: true, mode: 0o700 })
 fs.writeFileSync(temporaryPath, `${JSON.stringify(stored, null, 2)}\n`, { mode })
 fs.renameSync(temporaryPath, configPath)
 console.log(`已将本地角色视觉资源切换到：${aronaRoot}`)

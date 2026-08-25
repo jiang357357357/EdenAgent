@@ -1,6 +1,6 @@
 import net from "node:net"
 import { randomBytes } from "node:crypto"
-import { existsSync, readFileSync, rmSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { createRequire } from "node:module"
@@ -15,7 +15,13 @@ const localRuntimeConfig = createLocalRuntimeConfigStore({
   app: { isPackaged: false, getPath: () => path.join(root, "Data") },
   agentRoot: root,
 })
+const localRuntimeEnvironment = localRuntimeConfig.environment()
+const monRuntimeEnvironmentExclusions = Object.fromEntries(
+  [...new Set([...Object.keys(localRuntimeEnvironment), "OPENAI_API_KEY", "OPENAI_BASE_URL"])]
+    .map((key) => [key, undefined]),
+)
 const serverPort = Number(process.env.EDEN_AGENT_PORT ?? config.number("server", "PORT", 40092))
+const localServerPort = Number(process.env.EDEN_AGENT_LOCAL_PORT ?? config.number("server", "LOCAL_PORT", serverPort + 1))
 const webPort = Number(process.env.EDEN_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
 const serverReadyTimeoutMs = positiveTimeout(
   process.env.EDEN_AGENT_SERVER_READY_TIMEOUT_MS ?? config.number("server", "READY_TIMEOUT_MS", 300_000),
@@ -26,12 +32,61 @@ const webReadyTimeoutMs = positiveTimeout(
   "web readiness timeout",
 )
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
-let capabilityToken = process.env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex")
+const capabilityTokens = {
+  mon: process.env.EDEN_AGENT_MON_CAPABILITY_TOKEN ?? process.env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex"),
+  local: process.env.EDEN_AGENT_LOCAL_CAPABILITY_TOKEN ?? randomBytes(32).toString("hex"),
+}
+const realmDataRoot = path.join(root, "Data", "realms")
+
+function realmPaths(origin) {
+  const dataRoot = path.join(realmDataRoot, origin)
+  return {
+    dataRoot,
+    database: path.join(dataRoot, "eden-agent.db"),
+    blobs: path.join(dataRoot, "blobs"),
+    logs: path.join(dataRoot, "logs"),
+    plugins: path.join(dataRoot, "plugins"),
+    skills: path.join(dataRoot, "skills"),
+    connectors: path.join(dataRoot, "connectors"),
+    agents: path.join(dataRoot, "agents"),
+    tokenFile: path.join(dataRoot, "capability.token"),
+    migrationMarker: path.join(dataRoot, ".realm-migration-pending"),
+    migrationComplete: path.join(dataRoot, ".realm-migration-complete"),
+  }
+}
+
+function copyIfMissing(source, target) {
+  if (!existsSync(source) || existsSync(target)) return false
+  mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 })
+  cpSync(source, target, { recursive: true, preserveTimestamps: true })
+  return true
+}
+
+function prepareRealmData(origin) {
+  const paths = realmPaths(origin)
+  mkdirSync(paths.dataRoot, { recursive: true, mode: 0o700 })
+  for (const suffix of ["", "-wal", "-shm"]) {
+    copyIfMissing(path.join(root, "Data", `eden-agent.db${suffix}`), `${paths.database}${suffix}`)
+  }
+  copyIfMissing(path.join(root, "Data", "blobs"), paths.blobs)
+  copyIfMissing(path.join(root, "Data", "plugins"), paths.plugins)
+  copyIfMissing(path.join(root, "Data", "skills"), paths.skills)
+  copyIfMissing(path.join(root, "Data", "connectors"), paths.connectors)
+  copyIfMissing(path.join(root, "Data", "agents"), paths.agents)
+  if (origin === "local") {
+    copyIfMissing(path.join(root, "Data", "local-runtime.json"), path.join(paths.dataRoot, "local-runtime.json"))
+  }
+  if (existsSync(path.join(root, "Data", "eden-agent.db")) && !existsSync(paths.migrationComplete)) {
+    writeFileSync(paths.migrationMarker, `${origin}\n`, { mode: 0o600 })
+  }
+  return paths
+}
 
 rmSync(quitFlag, { force: true })
 
 const children = []
 let shuttingDown = false
+let quitWatcherArmed = false
 
 function handleOutputError(error) {
   if (error?.code === "EPIPE" || error?.code === "ERR_STREAM_DESTROYED") {
@@ -64,14 +119,14 @@ function positiveTimeout(value, label) {
   return timeout
 }
 
-async function probeEdenAgentServer(port) {
+async function probeEdenAgentServer(port, expectedOrigin) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 2000)
   try {
     const response = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: controller.signal })
     if (!response.ok) return false
     const health = await response.json()
-    return health?.status === "ok" &&
+    return health?.status === "ok" && health?.runtimeOrigin === expectedOrigin &&
       typeof health?.serverVersion === "string" &&
       Number.isInteger(health?.protocolVersion)
   } catch {
@@ -81,23 +136,23 @@ async function probeEdenAgentServer(port) {
   }
 }
 
-function externalCapabilityToken() {
-  if (process.env.EDEN_AGENT_CAPABILITY_TOKEN?.trim()) {
-    return process.env.EDEN_AGENT_CAPABILITY_TOKEN.trim()
+function externalCapabilityToken(origin) {
+  const configured = origin === "local"
+    ? process.env.EDEN_AGENT_LOCAL_CAPABILITY_TOKEN
+    : process.env.EDEN_AGENT_MON_CAPABILITY_TOKEN ?? process.env.EDEN_AGENT_CAPABILITY_TOKEN
+  if (configured?.trim()) {
+    return configured.trim()
   }
-  const tokenFile = path.resolve(
-    root,
-    process.env.EDEN_AGENT_TOKEN_FILE?.trim() || path.join("Data", "server-capability.token"),
-  )
+  const tokenFile = realmPaths(origin).tokenFile
   try {
     const token = readFileSync(tokenFile, "utf8").trim()
     if (token.length >= 32) return token
   } catch {}
-  throw new Error(`检测到已运行的 Eden Agent Server，但无法读取其能力令牌：${tokenFile}`)
+  throw new Error(`检测到已运行的 ${origin} Eden Agent Server，但无法读取其能力令牌：${tokenFile}`)
 }
 
 function labelText(label) {
-  const color = label === "server" ? ansi.server : label === "web" ? ansi.web : label === "desktop" ? ansi.desktop : ansi.dev
+  const color = label.startsWith("server") ? ansi.server : label === "web" ? ansi.web : label === "desktop" ? ansi.desktop : ansi.dev
   return `${color}[${label}]${ansi.reset}`
 }
 
@@ -355,6 +410,12 @@ function assertPortFree(port, label) {
 }
 
 async function ensurePortFree(port, label) {
+  if (process.platform === "linux" && port === serverPort) {
+    const stopManagedServer = path.join(root, "Script", "Process", "linux", "server", "stop_process.sh")
+    if (existsSync(stopManagedServer)) {
+      await runWithTimeout(["bash", stopManagedServer], 10_000).catch(() => {})
+    }
+  }
   await releaseOwnedPort(port, label)
   await assertPortFree(port, label)
 }
@@ -371,7 +432,7 @@ process.on("SIGTERM", () => void shutdown(0))
 if (process.platform !== "win32") process.on("SIGHUP", () => void shutdown(0))
 
 const quitWatcher = setInterval(() => {
-  if (existsSync(quitFlag)) {
+  if (quitWatcherArmed && existsSync(quitFlag)) {
     devLog("检测到桌面退出标记，正在退出 server / web / desktop")
     void shutdown(0)
   }
@@ -379,39 +440,105 @@ const quitWatcher = setInterval(() => {
 quitWatcher.unref?.()
 
 try {
-  const reuseExternalServer = await probeEdenAgentServer(serverPort)
-  if (reuseExternalServer) {
-    capabilityToken = externalCapabilityToken()
-    devLog(`复用已运行的 Eden Agent Server，端口 ${serverPort}`)
-  } else {
-    await ensurePortFree(serverPort, "server")
+  let reuseMonServer = await probeEdenAgentServer(serverPort, "mon")
+  let reuseLocalServer = await probeEdenAgentServer(localServerPort, "local")
+  if (reuseMonServer) {
+    try {
+      capabilityTokens.mon = externalCapabilityToken("mon")
+      devLog(`复用已运行的伊甸园 Server，端口 ${serverPort}`)
+    } catch (error) {
+      reuseMonServer = false
+      devLog(`${error instanceof Error ? error.message : String(error)}；改为安全接管`)
+    }
   }
+  if (!reuseMonServer) await ensurePortFree(serverPort, "伊甸园 server")
+  if (reuseLocalServer) {
+    try {
+      capabilityTokens.local = externalCapabilityToken("local")
+      devLog(`复用已运行的尘世 Server，端口 ${localServerPort}`)
+    } catch (error) {
+      reuseLocalServer = false
+      devLog(`${error instanceof Error ? error.message : String(error)}；改为安全接管`)
+    }
+  }
+  if (!reuseLocalServer) await ensurePortFree(localServerPort, "尘世 server")
   await ensurePortFree(webPort, "web")
 
-  let server = null
-  if (!reuseExternalServer) {
-    devLog(`启动 server，端口 ${serverPort}`)
-    server = start("server", ["run", "dev:server"], {
-      EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
-      ...localRuntimeConfig.environment(),
+  const monPaths = prepareRealmData("mon")
+  const localPaths = prepareRealmData("local")
+  let monServer = null
+  let localServer = null
+  if (!reuseMonServer) {
+    devLog(`启动伊甸园 server，端口 ${serverPort}`)
+    monServer = start("server-mon", ["run", "dev:server"], {
+      EDEN_AGENT_RUNTIME_ORIGIN: "mon",
+      EDEN_AGENT_BIND: `127.0.0.1:${serverPort}`,
+      EDEN_AGENT_CAPABILITY_TOKEN: capabilityTokens.mon,
+      EDEN_AGENT_TOKEN_FILE: monPaths.tokenFile,
+      EDEN_AGENT_DATABASE: monPaths.database,
+      EDEN_AGENT_BLOB_ROOT: monPaths.blobs,
+      EDEN_AGENT_LOG_DIRECTORY: monPaths.logs,
+      EDEN_AGENT_PLUGIN_ROOT: monPaths.plugins,
+      EDEN_AGENT_SKILL_INSTALL_ROOT: monPaths.skills,
+      EDEN_AGENT_CONNECTOR_PACKAGE_ROOT: path.join(monPaths.connectors, "packages"),
+      EDEN_AGENT_CONNECTOR_DATA_ROOT: path.join(monPaths.connectors, "runtime"),
+      EDEN_AGENT_USER_AGENT_ROOT: monPaths.agents,
+      EDEN_AGENT_REALM_MIGRATION_MARKER: monPaths.migrationMarker,
+      ...monRuntimeEnvironmentExclusions,
     })
   }
-  await waitFor(`http://127.0.0.1:${serverPort}/readyz`, "server", server, serverReadyTimeoutMs)
+  if (!reuseLocalServer) {
+    devLog(`启动尘世 server，端口 ${localServerPort}`)
+    localServer = start("server-local", ["run", "dev:server"], {
+      EDEN_AGENT_RUNTIME_ORIGIN: "local",
+      EDEN_AGENT_BIND: `127.0.0.1:${localServerPort}`,
+      EDEN_AGENT_CAPABILITY_TOKEN: capabilityTokens.local,
+      EDEN_AGENT_TOKEN_FILE: localPaths.tokenFile,
+      EDEN_AGENT_DATABASE: localPaths.database,
+      EDEN_AGENT_BLOB_ROOT: localPaths.blobs,
+      EDEN_AGENT_LOG_DIRECTORY: localPaths.logs,
+      EDEN_AGENT_PLUGIN_ROOT: localPaths.plugins,
+      EDEN_AGENT_SKILL_INSTALL_ROOT: localPaths.skills,
+      EDEN_AGENT_CONNECTOR_PACKAGE_ROOT: path.join(localPaths.connectors, "packages"),
+      EDEN_AGENT_CONNECTOR_DATA_ROOT: path.join(localPaths.connectors, "runtime"),
+      EDEN_AGENT_USER_AGENT_ROOT: localPaths.agents,
+      EDEN_AGENT_REALM_MIGRATION_MARKER: localPaths.migrationMarker,
+      MON_CORE_BASE_URL: undefined,
+      MON_CORE_TOKEN: undefined,
+      EDEN_AGENT_LEGACY_CORE_DATABASE: path.join(localPaths.dataRoot, "no-legacy-core.db"),
+      ...localRuntimeEnvironment,
+    })
+  }
+  await Promise.all([
+    waitFor(`http://127.0.0.1:${serverPort}/readyz`, "伊甸园 server", monServer, serverReadyTimeoutMs),
+    waitFor(`http://127.0.0.1:${localServerPort}/readyz`, "尘世 server", localServer, serverReadyTimeoutMs),
+  ])
 
   devLog(`启动 web，端口 ${webPort}`)
   const web = start("web", ["run", "dev:web"], {
-    VITE_EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    VITE_EDEN_AGENT_MON_BASE_URL: `http://127.0.0.1:${serverPort}`,
+    VITE_EDEN_AGENT_LOCAL_BASE_URL: `http://127.0.0.1:${localServerPort}`,
+    VITE_EDEN_AGENT_MON_CAPABILITY_TOKEN: capabilityTokens.mon,
+    VITE_EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: capabilityTokens.local,
   })
   await waitFor(`http://127.0.0.1:${webPort}`, "web", web, webReadyTimeoutMs)
 
   devLog("启动 desktop")
+  // A previous externally managed desktop may write its quit flag while this
+  // launcher is taking over the old ports.  It does not belong to the new
+  // process tree, so only arm observation after the replacement is spawned.
+  rmSync(quitFlag, { force: true })
   const desktop = start("desktop", ["run", "dev:desktop"], {
     ELECTRON_RUN_AS_NODE: undefined,
-    EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken,
+    EDEN_AGENT_MON_PORT: String(serverPort),
+    EDEN_AGENT_LOCAL_PORT: String(localServerPort),
+    EDEN_AGENT_MON_CAPABILITY_TOKEN: capabilityTokens.mon,
+    EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: capabilityTokens.local,
     EDEN_AGENT_DEV_PARENT_PID: String(process.pid),
   })
+  quitWatcherArmed = true
 
-  devLog("已启动：server / web / desktop。按 Ctrl+C 退出全部进程。")
+  devLog("已启动：伊甸园 server / 尘世 server / web / desktop。按 Ctrl+C 退出全部进程。")
   desktop.on("exit", () => void shutdown(0))
 } catch (error) {
   process.stderr.write(`${labelText("dev")} ${error instanceof Error ? error.message : String(error)}\n`)

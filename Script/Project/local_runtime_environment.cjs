@@ -28,10 +28,12 @@ if (require.main === module) {
   const environment = createLocalRuntimeEnvironment(agentRoot)
   if (mode === "--shell") {
     process.stdout.write(`${bashExports(environment)}\n`)
+  } else if (mode === "--keys") {
+    process.stdout.write(`${Object.keys(environment).join("\n")}\n`)
   } else if (mode === "--json") {
     process.stdout.write(JSON.stringify(environment))
   } else {
-    throw new Error("Usage: local_runtime_environment.cjs --shell|--json [agent-root]")
+    throw new Error("Usage: local_runtime_environment.cjs --shell|--keys|--json [agent-root]")
   }
 }
 

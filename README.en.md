@@ -32,7 +32,7 @@ Eden Agent is inspired by the “Shittim Chest” from *Blue Archive*. This is a
 
 ## Overview
 
-Eden Agent runs the agent loop, tool execution, persistence, and desktop experience locally. The Rust Server is the only backend process. The frontend talks to it exclusively through a generated WebSocket JSON-RPC client and Blob endpoints—there is no Python sidecar or legacy native bridge.
+Eden Agent runs the agent loop, tool execution, persistence, and desktop experience locally. The desktop supervises separate Rust Server processes for Eden and Local. The frontend talks only to the active realm through a generated WebSocket JSON-RPC client and Blob endpoints—there is no Python sidecar or legacy native bridge.
 
 ### Capabilities
 
@@ -51,17 +51,17 @@ Eden Agent runs the agent loop, tool execution, persistence, and desktop experie
 ```mermaid
 flowchart LR
     Desktop[Electron desktop shell] --> Web[React / Vite client]
-    Web -->|WebSocket JSON-RPC| Server[Rust Agent Server]
-    Web -->|Blob HTTP| Server
-    Desktop -->|launches and supervises| Server
-    Server --> Core[AgentCore]
-    Server --> Store[(SQLite / Blob)]
-    Server --> Models[Model providers]
-    Server --> Extensions[Skills / plugins / MCP / connectors]
-    Core --> Tools[Workspace tools and permission policy]
+    Web -->|Eden RPC / Blob| Mon[Eden Server :40092]
+    Web -->|Local RPC / Blob| Local[Local Server :40093]
+    Desktop -->|separately supervises| Mon
+    Desktop -->|separately supervises| Local
+    Mon --> MonStore[(mon SQLite / Blob)]
+    Local --> LocalStore[(local SQLite / Blob)]
+    Mon --> Core[AgentCore + Eden Core]
+    Local --> LocalCore[AgentCore + local model]
 ```
 
-The Server persists events before broadcasting them. `AgentCore` remains host-independent and has no dependency on HTTP, SQLite, Electron, or a specific model provider.
+The realms use different ports, capability tokens, SQLite databases, Blob roots, logs, plugins, user skills, subagents, and connector directories, and model credentials are not shared between their processes. Local model secrets live only in `Data/realms/local/local-runtime.json`. Once a database is bound to a realm, the other realm cannot open it. Each Server persists events before broadcasting them. `AgentCore` remains host-independent and has no dependency on HTTP, SQLite, Electron, or a specific model provider.
 
 ## Repository layout
 
@@ -97,8 +97,9 @@ npm run dev
 Default endpoints:
 
 - Web client: `http://127.0.0.1:40091`
-- Rust Server: `http://127.0.0.1:40092`
-- Health check: `http://127.0.0.1:40092/readyz`
+- Eden Server: `http://127.0.0.1:40092`
+- Local Server: `http://127.0.0.1:40093`
+- Health checks: `http://127.0.0.1:40092/readyz` and `http://127.0.0.1:40093/readyz`
 
 After the desktop app starts, open **Configuration → Model Service** to set the model name, API endpoint, and key. Credentials should remain local—never commit `.monconfig`, runtime configuration, or logs.
 
@@ -106,8 +107,8 @@ After the desktop app starts, open **Configuration → Model Service** to set th
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the Web client, Electron, and Rust Server |
-| `npm run dev:server` | Start only the Rust Server |
+| `npm run dev` | Start the Web client, Electron, and both isolated Rust Servers |
+| `npm run dev:server` | Safely start one Rust Server; Eden by default, or Local with `EDEN_AGENT_RUNTIME_ORIGIN=local` |
 | `npm run dev:web` | Start only the Web client |
 | `npm run dev:desktop` | Start the desktop development environment |
 | `npm run generate:rpc` | Regenerate the TypeScript RPC client from Rust API types |
@@ -143,7 +144,8 @@ GitHub Actions runs the same core checks on every push and pull request.
 ## Security principles
 
 - The Server binds to `127.0.0.1` by default.
-- The renderer connects with a short-lived capability token.
+- Each realm has its own local process, port, capability token, and durable data directories.
+- The renderer connects only to the active realm using its short-lived capability token.
 - File writes, command execution, and external communication go through the permission policy.
 - Command tools are registered only when an OS sandbox is available; otherwise they fail closed.
 - Events are persisted before they are broadcast to clients.

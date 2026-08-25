@@ -32,7 +32,7 @@ Eden Agent 的设计灵感来自《蔚蓝档案》中的“什亭之匣”。这
 
 ## 项目简介
 
-Eden Agent 把智能体循环、工具调用、持久化和桌面体验放在本地运行。Rust Server 是唯一后端进程；前端只通过生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问它，不依赖 Python sidecar 或旧原生桥接层。
+Eden Agent 把智能体循环、工具调用、持久化和桌面体验放在本地运行。桌面端分别监管伊甸园与尘世两个 Rust Server；前端只通过生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问当前世界，不依赖 Python sidecar 或旧原生桥接层。
 
 ### 核心能力
 
@@ -51,17 +51,17 @@ Eden Agent 把智能体循环、工具调用、持久化和桌面体验放在本
 ```mermaid
 flowchart LR
     Desktop[Electron 桌面壳] --> Web[React / Vite 客户端]
-    Web -->|WebSocket JSON-RPC| Server[Rust Agent Server]
-    Web -->|Blob HTTP| Server
-    Desktop -->|启动与监管| Server
-    Server --> Core[AgentCore]
-    Server --> Store[(SQLite / Blob)]
-    Server --> Models[模型服务]
-    Server --> Extensions[技能 / 插件 / MCP / 连接器]
-    Core --> Tools[工作区工具与权限策略]
+    Web -->|伊甸园 RPC / Blob| Mon[伊甸园 Server :40092]
+    Web -->|尘世 RPC / Blob| Local[尘世 Server :40093]
+    Desktop -->|分别启动与监管| Mon
+    Desktop -->|分别启动与监管| Local
+    Mon --> MonStore[(mon SQLite / Blob)]
+    Local --> LocalStore[(local SQLite / Blob)]
+    Mon --> Core[AgentCore + Eden Core]
+    Local --> LocalCore[AgentCore + 本地模型]
 ```
 
-事件由 Server 先持久化再广播。`AgentCore` 保持宿主无关，不依赖 HTTP、SQLite、Electron 或具体模型供应商。
+两个世界使用不同端口、能力令牌、SQLite、Blob、日志、插件、用户技能、子智能体与连接器目录，进程也不共享模型凭据。尘世模型密钥仅保存在 `Data/realms/local/local-runtime.json`。数据库首次绑定世界后不可被另一世界打开。事件由对应 Server 先持久化再广播。`AgentCore` 保持宿主无关，不依赖 HTTP、SQLite、Electron 或具体模型供应商。
 
 ## 仓库结构
 
@@ -97,8 +97,9 @@ npm run dev
 默认端口：
 
 - Web 客户端：`http://127.0.0.1:40091`
-- Rust Server：`http://127.0.0.1:40092`
-- 健康检查：`http://127.0.0.1:40092/readyz`
+- 伊甸园 Server：`http://127.0.0.1:40092`
+- 尘世 Server：`http://127.0.0.1:40093`
+- 健康检查：`http://127.0.0.1:40092/readyz`、`http://127.0.0.1:40093/readyz`
 
 启动桌面端后，可在 **配置 → 模型服务** 中填写模型名称、API 地址与密钥。密钥只应保存在本机，不要提交 `.monconfig`、运行时配置或日志。
 
@@ -106,8 +107,8 @@ npm run dev
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | 启动 Web、Electron 与 Rust Server |
-| `npm run dev:server` | 只启动 Rust Server |
+| `npm run dev` | 启动 Web、Electron 与两个隔离的 Rust Server |
+| `npm run dev:server` | 安全启动一个 Rust Server；默认伊甸园，可用 `EDEN_AGENT_RUNTIME_ORIGIN=local` 选择尘世 |
 | `npm run dev:web` | 只启动 Web 客户端 |
 | `npm run dev:desktop` | 启动桌面开发环境 |
 | `npm run generate:rpc` | 从 Rust API 类型重新生成 TypeScript RPC 客户端 |
@@ -143,7 +144,8 @@ GitHub Actions 会在每次推送和拉取请求中执行同样的核心检查�
 ## 安全原则
 
 - Server 默认只监听 `127.0.0.1`。
-- 渲染进程使用短期能力令牌连接本地服务。
+- 两个世界使用不同的本地进程、端口、能力令牌与持久化目录。
+- 渲染进程只使用当前世界的短期能力令牌连接对应服务。
 - 写文件、执行命令、外部通信等副作用必须经过权限策略。
 - 命令工具只有在可用的操作系统沙箱中才注册；缺少沙箱时保持关闭。
 - 事件先持久化，再向客户端广播。

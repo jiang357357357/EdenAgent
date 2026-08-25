@@ -7,7 +7,7 @@
   "packageManager": "npm@10.9.7",
   "scripts": {
     "dev": "node Script/Project/dev.mjs",
-    "dev:server": "cargo run -p eden-agent-server",
+    "dev:server": "node Script/Project/start_server.mjs",
     "dev:web": "npm --prefix frontend/web run dev",
     "dev:desktop": "node Script/Project/dev_desktop.mjs",
     "generate:rpc": "cargo run -p eden-agent-api --bin generate-types -- frontend/web/src/generated/eden-agent-rpc.ts",
@@ -26,7 +26,7 @@
     "test:openttd-launcher": "node --test Script/Project/openttd_launcher.test.mjs",
     "lint": "oxlint",
     "typecheck": "cargo check --workspace && npm --prefix frontend/web run typecheck",
-    "postinstall": "node -e \"console.log('Eden Agent uses one in-process Rust server runtime.')\"",
+    "postinstall": "node -e \"console.log('Eden Agent uses isolated in-process Rust server runtimes for Eden and Local.')\"",
     "prepare": "husky",
     "test": "echo 'do not run tests from root' && exit 1"
   },
