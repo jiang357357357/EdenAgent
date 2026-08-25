@@ -23,6 +23,10 @@ React / Vite 客户端 · Electron 桌面端 · WebSocket JSON-RPC · SQLite
 
 Eden Agent 的设计灵感来自《蔚蓝档案》中的“什亭之匣”。这是一个独立的源代码公开项目，与原作及其官方无关联。
 
+<p align="center">
+  <img src="docs/assets/eden-agent-runtime.png" alt="Eden Agent 运行界面" width="100%">
+</p>
+
 > [!IMPORTANT]
 > Eden Agent 正在持续开发，协议与配置格式仍可能变化。当前代码以 PolyForm Noncommercial 1.0.0 提供非商业使用，并非 OSI 定义的开源许可证；商业使用需要单独授权。
 

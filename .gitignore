@@ -34,6 +34,7 @@ frontend/web/public/characters/
 *.webp
 *.svg
 *.ico
+!docs/assets/eden-agent-runtime.png
 !frontend/web/src/assets/
 !frontend/web/src/assets/self-awake/
 !frontend/web/src/assets/self-awake/diary-paper.png

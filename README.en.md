@@ -23,6 +23,10 @@ React / Vite client · Electron desktop app · WebSocket JSON-RPC · SQLite
 
 Eden Agent is inspired by the “Shittim Chest” from *Blue Archive*. This is an independent source-available project and is not affiliated with or endorsed by the original work or its publishers.
 
+<p align="center">
+  <img src="docs/assets/eden-agent-runtime.png" alt="Eden Agent running interface" width="100%">
+</p>
+
 > [!IMPORTANT]
 > Eden Agent is under active development, and its protocols and configuration formats may still change. The current source is available for noncommercial use under PolyForm Noncommercial 1.0.0. This is not an OSI-approved open-source license; commercial use requires a separate license.
 
