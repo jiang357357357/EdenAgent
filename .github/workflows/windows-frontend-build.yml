@@ -83,7 +83,7 @@ jobs:
           $checksums = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
             Sort-Object FullName |
             ForEach-Object {
-              $relative = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace("\\", "/")
+              $relative = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace("\", "/")
               $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
               "$hash  $relative"
             }
