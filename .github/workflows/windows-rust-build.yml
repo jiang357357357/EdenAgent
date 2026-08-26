@@ -62,6 +62,10 @@ jobs:
             if ($header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
               throw "Windows executable does not have an MZ header: $source"
             }
+            $image = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($source))
+            if ($image -match "VCRUNTIME[0-9_]*\.dll") {
+              throw "Windows Rust executable still depends on the Microsoft Visual C++ runtime: $source"
+            }
             $destination = "dist/windows-x64/$name.exe"
             Copy-Item -LiteralPath $source -Destination $destination
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $destination).Hash.ToLowerInvariant()

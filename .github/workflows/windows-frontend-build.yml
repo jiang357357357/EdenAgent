@@ -77,6 +77,16 @@ jobs:
               $stream.Dispose()
             }
           }
+          $rustExecutables = @(
+            "$packageRoot/resources/eden-agent-server.exe",
+            "$packageRoot/resources/edenagent-pointer-observer.exe"
+          )
+          foreach ($path in $rustExecutables) {
+            $image = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($path))
+            if ($image -match "VCRUNTIME[0-9_]*\.dll") {
+              throw "Packaged Rust executable still depends on the Microsoft Visual C++ runtime: $path"
+            }
+          }
           if (-not (Test-Path -LiteralPath "$packageRoot/resources/skills/builtin" -PathType Container)) {
             throw "Packaged built-in skills are missing"
           }
