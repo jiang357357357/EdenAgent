@@ -1,0 +1,78 @@
+name: Windows Rust build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-rust-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-x64:
+    name: Build Windows x64 Rust services
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Windows workspace tests
+        run: cargo test --workspace --locked
+
+      - name: Build Windows release executables
+        run: >-
+          cargo build --release --locked
+          --bin eden-agent-server
+          --bin eden-agent-connector-hoi4
+          --bin eden-agent-connector-lichess
+          --bin eden-agent-connector-openttd
+          --bin eden-agent-connector-victoria3
+
+      - name: Verify and stage executables
+        shell: pwsh
+        run: |
+          $names = @(
+            "eden-agent-server",
+            "eden-agent-connector-hoi4",
+            "eden-agent-connector-lichess",
+            "eden-agent-connector-openttd",
+            "eden-agent-connector-victoria3"
+          )
+          New-Item -ItemType Directory -Force -Path "dist/windows-x64" | Out-Null
+          $checksums = foreach ($name in $names) {
+            $source = "target/release/$name.exe"
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+              throw "Windows executable is missing: $source"
+            }
+            $header = [System.IO.File]::ReadAllBytes($source)[0..1]
+            if ($header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
+              throw "Windows executable does not have an MZ header: $source"
+            }
+            $destination = "dist/windows-x64/$name.exe"
+            Copy-Item -LiteralPath $source -Destination $destination
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $destination).Hash.ToLowerInvariant()
+            "$hash  $name.exe"
+            $file = Get-Item -LiteralPath $destination
+            Write-Host "$($file.FullName) $($file.Length) bytes"
+          }
+          $checksums | Set-Content -Encoding ascii "dist/windows-x64/SHA256SUMS"
+
+      - name: Upload Windows x64 Rust services
+        uses: actions/upload-artifact@v7
+        with:
+          name: eden-agent-rust-windows-x64-${{ github.sha }}
+          path: dist/windows-x64/
+          if-no-files-found: error
+          retention-days: 7
