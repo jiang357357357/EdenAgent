@@ -27,9 +27,11 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Run Windows workspace tests
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --locked --no-fail-fast
 
       - name: Build Windows release executables
         run: >-
