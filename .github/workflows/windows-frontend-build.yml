@@ -1,0 +1,101 @@
+name: Windows Agent desktop build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-agent-desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-x64:
+    name: Build Windows x64 Agent desktop
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          workspaces: |
+            . -> target
+            frontend/desktop/native/win32-pointer-observer -> target
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Test frontend
+        run: |
+          npm --prefix frontend/web run typecheck
+          npm --prefix frontend/web test
+          npm --prefix frontend/desktop test
+
+      - name: Build Agent server
+        run: cargo build --release --locked --bin eden-agent-server
+
+      - name: Package Windows desktop client
+        run: npm --prefix frontend run dist:win
+
+      - name: Verify packaged client
+        shell: pwsh
+        run: |
+          $packageRoot = "frontend/dist/app/eden-agent-win32-x64"
+          $requiredFiles = @(
+            "$packageRoot/eden-agent.exe",
+            "$packageRoot/resources/eden-agent-server.exe",
+            "$packageRoot/resources/edenagent-pointer-observer.exe"
+          )
+          foreach ($path in $requiredFiles) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Packaged Windows file is missing: $path"
+            }
+            $stream = [System.IO.File]::OpenRead($path)
+            try {
+              if ($stream.ReadByte() -ne 0x4D -or $stream.ReadByte() -ne 0x5A) {
+                throw "Packaged Windows executable does not have an MZ header: $path"
+              }
+            } finally {
+              $stream.Dispose()
+            }
+          }
+          if (-not (Test-Path -LiteralPath "$packageRoot/resources/skills/builtin" -PathType Container)) {
+            throw "Packaged built-in skills are missing"
+          }
+          $checksums = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
+            Sort-Object FullName |
+            ForEach-Object {
+              $relative = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace("\\", "/")
+              $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+              "$hash  $relative"
+            }
+          $checksums | Set-Content -Encoding ascii "$packageRoot/SHA256SUMS"
+          Get-Item -LiteralPath $requiredFiles | ForEach-Object {
+            Write-Host "$($_.FullName) $($_.Length) bytes"
+          }
+
+      - name: Upload Windows x64 Agent desktop
+        uses: actions/upload-artifact@v7
+        with:
+          name: eden-agent-desktop-windows-x64-${{ github.sha }}
+          path: frontend/dist/app/eden-agent-win32-x64/
+          if-no-files-found: error
+          retention-days: 7
