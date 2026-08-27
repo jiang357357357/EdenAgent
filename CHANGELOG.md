@@ -10,6 +10,7 @@
 - 统一 Eden Agent 模块配置边界和启动脚本，并更新 AgentCore、AgentServer 与 AgentFrontend 运行组件。
 - `AgentCore` 已由仓库内的 Rust workspace 正式接管，通过原生 sidecar 与 AgentServer 通信；旧 Python 实现不再作为活动子模块参与安装、启动和发布。
 - 开发自动登录账号改为仅从 `EDEN_AGENT_DEV_USERNAME` 与 `EDEN_AGENT_DEV_PASSWORD` 注入，不再提交默认口令。
+- Agent Server 持久化流式 TTS 音频并在首次合成前同步 Mon Core 会话投影；AgentFrontend 同步修正纯标点流式分段。
 
 ## [1.8.0] - 2026-08-05
 
