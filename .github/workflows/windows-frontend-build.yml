@@ -90,6 +90,9 @@ jobs:
           if (-not (Test-Path -LiteralPath "$packageRoot/resources/skills/builtin" -PathType Container)) {
             throw "Packaged built-in skills are missing"
           }
+          if (-not (Test-Path -LiteralPath "$packageRoot/resources/manifests/README.md" -PathType Leaf)) {
+            throw "Packaged connector manifest directory is missing"
+          }
           $checksums = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
             Sort-Object FullName |
             ForEach-Object {
