@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-api"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-domain",
  "schemars",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-app"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-blob"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-domain",
  "eden-agent-store",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-hoi4"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-connector-host",
  "eden-agent-connector-package",
@@ -654,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-host"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-connector-package",
  "eden-agent-connector-protocol",
@@ -667,7 +667,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-lichess"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-connector-host",
  "eden-agent-connector-package",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-openttd"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-connector-host",
  "eden-agent-connector-package",
@@ -700,7 +700,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-package"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "hex",
  "regex",
@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-protocol"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connector-victoria3"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-connector-host",
  "eden-agent-connector-package",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-connectors"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-connector-host",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-core"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-domain",
@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-core-sync"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "chrono",
  "eden-agent-domain",
@@ -796,7 +796,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-domain"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "schemars",
  "serde",
@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-environment"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -816,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-hoi4"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-host"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -850,7 +850,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-interaction"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -868,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-market"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-mcp"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-core",
@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-multiagent"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-core",
@@ -919,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-plugins"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -935,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-provider"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-core",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-sandbox"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-core",
@@ -967,7 +967,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-server"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1013,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-skills"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -1032,7 +1032,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-store"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "eden-agent-domain",
  "serde",
@@ -1046,7 +1046,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-tools"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -1068,7 +1068,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-victoria3"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "eden-agent-workspace"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "eden-agent-core",
