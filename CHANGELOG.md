@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-08-29
+
+### Changed
+
+- Linux 服务端启动优先使用完整分发安装的预编译 `eden-agent-server`，仅开发工作区在二进制缺失时回退到 Cargo。
+- 移除模块配置中已退出运行链路的 Python AgentServer 环境脚本定义，并同步 Eden `1.9.1` 产品版本。
+
 ## [1.9.0] - 2026-08-27
 
 ### Changed

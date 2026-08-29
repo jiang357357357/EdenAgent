@@ -2,7 +2,7 @@
 
 [service]
 NAME=Eden Agent
-VERSION=1.8.0
+VERSION=1.9.1
 PUBLIC_HOST=127.0.0.1
 
 [server]
@@ -32,18 +32,6 @@ SCRIPT_CMD_WIN_START=Script/Cmd/Win/Start.ps1
 SCRIPT_CMD_ALL_WIN_START=Script/Cmd/Win/StartAll.ps1
 SCRIPT_CMD_SERVER_WIN_START=Script/Cmd/Win/StartServer.ps1
 SCRIPT_CMD_DESKTOP_WIN_START=Script/Cmd/Win/StartDesktop.ps1
-SCRIPT_VENV_LINUX_CHECK=Server/Script/EnvTools/linux/check_env.sh
-SCRIPT_VENV_LINUX_INSTALL=Server/Script/EnvTools/linux/install_env.sh
-SCRIPT_VENV_LINUX_REMOVE=Server/Script/EnvTools/linux/remove_env.sh
-SCRIPT_VENV_WIN_CHECK=Server/Script/EnvTools/win/check_env.ps1
-SCRIPT_VENV_WIN_INSTALL=Server/Script/EnvTools/win/install_env.ps1
-SCRIPT_VENV_WIN_REMOVE=Server/Script/EnvTools/win/remove_env.ps1
-SCRIPT_AGENT_SERVER_ENV_LINUX_CHECK=Server/Script/EnvTools/linux/check_env.sh
-SCRIPT_AGENT_SERVER_ENV_LINUX_INSTALL=Server/Script/EnvTools/linux/install_env.sh
-SCRIPT_AGENT_SERVER_ENV_LINUX_REMOVE=Server/Script/EnvTools/linux/remove_env.sh
-SCRIPT_AGENT_SERVER_ENV_WIN_CHECK=Server/Script/EnvTools/win/check_env.ps1
-SCRIPT_AGENT_SERVER_ENV_WIN_INSTALL=Server/Script/EnvTools/win/install_env.ps1
-SCRIPT_AGENT_SERVER_ENV_WIN_REMOVE=Server/Script/EnvTools/win/remove_env.ps1
 
 [desktop]
 TITLE=Eden Agent — AI 个人助手

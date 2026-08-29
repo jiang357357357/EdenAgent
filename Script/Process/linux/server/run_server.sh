@@ -75,4 +75,18 @@ else
   unset OPENAI_API_KEY OPENAI_BASE_URL
 fi
 
+for server_binary in \
+  "$PROJECT_ROOT/.runtime/server/eden-agent-server" \
+  "$PROJECT_ROOT/target/release/eden-agent-server" \
+  "$PROJECT_ROOT/frontend/dist/app/eden-agent-linux-x64/resources/eden-agent-server" \
+  "$PROJECT_ROOT/frontend/portable/linux-x64/eden-agent/resources/eden-agent-server"; do
+  if [[ -x "$server_binary" ]]; then
+    exec "$server_binary"
+  fi
+done
+
+command -v cargo >/dev/null 2>&1 || {
+  echo "[x] Eden Agent Server binary is missing and cargo is unavailable" >&2
+  exit 1
+}
 exec cargo run -p eden-agent-server
