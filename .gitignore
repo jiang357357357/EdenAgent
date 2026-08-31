@@ -9,7 +9,6 @@ temp_web_eve/
 temp_web_lily/
 Data/
 .env
-.monconfig
 *.log
 .DS_Store
 Thumbs.db
