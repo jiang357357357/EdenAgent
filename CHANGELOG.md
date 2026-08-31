@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-09-01
+
+### Changed
+
+- 同步 Eden `1.9.2` 产品版本，并接入 Windows x64 AgentFrontend 与 AgentServer 完整分发构建。
+
+### Fixed
+
+- Agent 开发启动器显式声明外部管理的运行域，不再把开发父进程生命周期误当成 `mon` 与 `local` 两个运行域均由外部接管。
+
 ## [1.9.1] - 2026-08-29
 
 ### Changed

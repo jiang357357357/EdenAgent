@@ -534,6 +534,7 @@ try {
     EDEN_AGENT_LOCAL_PORT: String(localServerPort),
     EDEN_AGENT_MON_CAPABILITY_TOKEN: capabilityTokens.mon,
     EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: capabilityTokens.local,
+    EDEN_AGENT_EXTERNAL_ORIGINS: "mon,local",
     EDEN_AGENT_DEV_PARENT_PID: String(process.pid),
   })
   quitWatcherArmed = true

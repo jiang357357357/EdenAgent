@@ -3,7 +3,10 @@ import { rm } from "node:fs/promises"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { spawnExecutable, spawnNpm } from "../../frontend/Script/Project/process_runner.mjs"
+import desktopRuntimeContract from "../../frontend/desktop/src/processes/desktop-runtime-contract.cjs"
 import { loadMonConfig } from "./monconfig.mjs"
+
+const { createDesktopRuntimeEnvironment } = desktopRuntimeContract
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
@@ -150,13 +153,13 @@ if (await isWebReady()) {
   await waitForVite(webProc)
 }
 
-const desktopEnvironment = {
-  ...process.env,
-  EDEN_AGENT_DESKTOP_QUIT_FLAG: quitFlag,
-  EDEN_AGENT_DEV_PARENT_PID: process.env.EDEN_AGENT_DEV_PARENT_PID || String(process.pid),
-  EDEN_AGENT_SERVER_MODE: "external",
-  EDEN_AGENT_TOKEN_FILE: process.env.EDEN_AGENT_TOKEN_FILE || path.join(root, "Data", "server-capability.token"),
-}
+const desktopEnvironment = createDesktopRuntimeEnvironment({
+  environment: process.env,
+  agentRoot: root,
+  parentPid: process.pid,
+  quitFlag,
+  externalOrigins: "mon",
+})
 // Electron switches into plain Node mode when this inherited variable is set.
 // The standalone desktop launcher must clear it just like the full dev launcher.
 delete desktopEnvironment.ELECTRON_RUN_AS_NODE
