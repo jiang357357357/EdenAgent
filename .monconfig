@@ -5,7 +5,7 @@
 
 [service]
 NAME=Eden Agent
-VERSION=1.9.2
+VERSION=1.10.0
 PUBLIC_HOST=127.0.0.1
 
 [server]

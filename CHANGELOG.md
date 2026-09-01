@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-01
+
+### Changed
+
+- 聚合配置与 Rust 工作区元数据同步到 Eden `1.10.0`，并更新 AgentFrontend 源码引用。
+
 ## [1.9.2] - 2026-09-01
 
 ### Changed

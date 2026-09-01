@@ -34,7 +34,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.9.2"
+version = "1.10.0"
 edition = "2024"
 rust-version = "1.85"
 license = "PolyForm-Noncommercial-1.0.0"
