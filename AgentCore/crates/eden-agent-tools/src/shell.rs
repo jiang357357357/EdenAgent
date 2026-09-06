@@ -207,7 +207,17 @@ impl ProcessSession {
             .try_wait()
             .ok()
             .flatten()
-            .and_then(|status| status.code())
+            .and_then(|status| {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::process::ExitStatusExt;
+                    status.code().or_else(|| status.signal().map(|signal| 128 + signal))
+                }
+                #[cfg(not(unix))]
+                {
+                    status.code()
+                }
+            })
     }
 
     fn complete(&self) -> bool {
@@ -381,7 +391,7 @@ pub fn sandboxed_program_command(
             "sandbox_unavailable",
             "Command execution is disabled because no OS sandbox is configured",
         )),
-        ProcessSandbox::Bubblewrap(executable) => {
+        ProcessSandbox::Bubblewrap(executable) | ProcessSandbox::BubblewrapWithAccess { executable, .. } => {
             let workspace = workspace_root
                 .canonicalize()
                 .map_err(|error| fail("sandbox_workspace", error.to_string()))?;
@@ -394,7 +404,24 @@ pub fn sandboxed_program_command(
             let mut command = Command::new(executable);
             command
                 .args(["--die-with-parent", "--new-session", "--unshare-all"])
-                .args(["--ro-bind", "/", "/"])
+                .args(["--ro-bind", "/", "/"]);
+            if let ProcessSandbox::BubblewrapWithAccess {
+                network,
+                writable_roots,
+                ..
+            } = sandbox
+            {
+                if *network {
+                    command.arg("--share-net");
+                }
+                for root in writable_roots {
+                    let root = root
+                        .canonicalize()
+                        .map_err(|error| fail("sandbox_writable_root", error.to_string()))?;
+                    command.arg("--bind").arg(&root).arg(&root);
+                }
+            }
+            command
                 .arg("--bind")
                 .arg(&workspace)
                 .arg(&workspace)
@@ -426,6 +453,56 @@ pub fn sandboxed_program_command(
             Ok(command)
         }
     }
+}
+
+/// Resolve the platform shell without launching user commands or loading profiles.
+pub fn native_shell_path() -> Result<PathBuf, ToolFailure> {
+    if cfg!(windows) {
+        resolve_powershell()
+    } else {
+        resolve_bash()
+    }
+}
+
+/// Check that the selected isolation backend can actually start a child process.
+/// A failed probe never falls back to direct execution.
+pub async fn probe_process_sandbox(sandbox: &ProcessSandbox, workspace: &Path) -> Result<(), ToolFailure> {
+    let program = native_shell_path()?;
+    let arguments = if cfg!(windows) {
+        vec![
+            "-NoLogo".into(),
+            "-NoProfile".into(),
+            "-NonInteractive".into(),
+            "-Command".into(),
+            "exit 0".into(),
+        ]
+    } else {
+        vec!["--noprofile".into(), "--norc".into(), "-c".into(), "exit 0".into()]
+    };
+    let output = run_sandboxed_program(
+        sandbox,
+        SandboxedProgramRequest {
+            workspace_root: workspace,
+            cwd: workspace,
+            program: &program.to_string_lossy(),
+            arguments: &arguments,
+            stdin: &[],
+            environment: &[],
+            timeout: Duration::from_secs(5),
+        },
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await?;
+    if output.exit_code != Some(0) {
+        return Err(fail(
+            "sandbox_probe_failed",
+            format!(
+                "Sandbox startup failed: {}",
+                output.stderr.chars().take(1000).collect::<String>()
+            ),
+        ));
+    }
+    Ok(())
 }
 
 fn powershell_script(command_text: &str) -> String {

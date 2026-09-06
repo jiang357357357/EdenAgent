@@ -21,6 +21,7 @@
     "package:connector:victoria3": "node Script/Project/package_connector.mjs victoria3 --profile debug",
     "build:connectors": "cargo build -p eden-agent-connector-hoi4 -p eden-agent-connector-lichess -p eden-agent-connector-openttd -p eden-agent-connector-victoria3",
     "package:connectors": "npm run package:connector:hoi4 && npm run package:connector:lichess && npm run package:connector:openttd && npm run package:connector:victoria3",
+    "test:command-live": "cargo build -p eden-agent-server --locked && node --experimental-strip-types Script/Project/test_command_runtime_live.mjs",
     "test:dev-smoke": "npm --prefix frontend run test:dev-smoke",
     "test:process-runner": "npm --prefix frontend run test:process-runner",
     "test:openttd-launcher": "node --test Script/Project/openttd_launcher.test.mjs",

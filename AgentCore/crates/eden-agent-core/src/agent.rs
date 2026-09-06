@@ -202,10 +202,8 @@ fn apply_event(state: &RwLock<AgentState>, event: &AgentEvent) {
                 }
             }
         }
-        AgentEvent::ToolExecutionStart { tool_call_id, .. } => {
-            if !state.pending_tool_calls.contains(tool_call_id) {
-                state.pending_tool_calls.push(tool_call_id.clone());
-            }
+        AgentEvent::ToolExecutionStart { tool_call_id, .. } if !state.pending_tool_calls.contains(tool_call_id) => {
+            state.pending_tool_calls.push(tool_call_id.clone());
         }
         AgentEvent::ToolExecutionEnd { tool_call_id, .. } => {
             state.pending_tool_calls.retain(|pending| pending != tool_call_id);

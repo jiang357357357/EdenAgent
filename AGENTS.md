@@ -7,7 +7,7 @@
 - `AgentCore`：宿主无关的 Rust library crates，负责领域类型、Agent 循环、上下文、工具执行和本地工作区工具。
 - `Server`：Rust 宿主服务，直接链接 AgentCore，负责 JSON-RPC、SQLite、模型供应商、权限、Blob、技能、多智能体、作业、连接器和 Mon 业务工具。
 - `frontend/web`：React/Vite 客户端，只使用生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问 Agent Server。
-- `frontend/desktop`：Electron 桌面壳，分别启动并监管伊甸园与尘世两个 `eden-agent-server`，向渲染进程传递当前世界的短期能力令牌。
+- `frontend/desktop`：Electron 桌面壳，分别启动并监管伊甸园与尘世两个 `eden-agent-server`，向渲染进程传递当前世界服务实例的能力令牌。
 - `Script/Project`：开发启动和 `.monconfig` 读取工具。
 - `Script/Cmd`：Server、Desktop 和 All 的命令行入口。
 
@@ -23,7 +23,7 @@
 1. AgentCore 不依赖 HTTP、SQLite、具体模型供应商、Electron 或 Mon Core。
 2. 两个世界拥有独立进程边界和外部副作用状态；数据库永久绑定一个 `runtime_origin`，事件先持久化再广播。
 3. 写文件、执行命令、外部通信和其他副作用必须经过权限请求。
-4. 命令工具只有在可用的 OS 沙箱中才注册；缺少沙箱时故障关闭。
+4. 终端执行边界与审批策略独立。默认沙箱执行，缺少沙箱或启动探测失败时拒绝执行；用户可通过明确确认开启本机执行，按当前 OS 账户权限运行。模型不得自行切换边界，运行中的进程结束前不得切换。MCP stdio 和技能代码仍要求可用沙箱。本机命令不提供两个世界之间的 OS 访问隔离。
 5. 前端协议以 `eden-agent-api` Rust 类型和生成客户端为唯一事实来源。
 
 ## 技术栈

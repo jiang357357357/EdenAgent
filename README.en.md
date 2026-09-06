@@ -145,9 +145,10 @@ GitHub Actions runs the same core checks on every push and pull request.
 
 - The Server binds to `127.0.0.1` by default.
 - Each realm has its own local process, port, capability token, and durable data directories.
-- The renderer connects only to the active realm using its short-lived capability token.
+- The renderer connects only to the active realm using the current server instance’s capability token.
+- Desktop-managed realms receive random tokens when the supervisor initializes; Server restarts within that supervisor reuse them. Environment configuration or external management can supply fixed tokens. Tokens currently have no independent TTL or automatic expiration.
 - File writes, command execution, and external communication go through the permission policy.
-- Command tools are registered only when an OS sandbox is available; otherwise they fail closed.
+- Terminal commands default to a verified OS sandbox. Users can explicitly enable host execution in the permissions menu; approval policy remains independent. MCP stdio and skill code still require a sandbox.
 - Events are persisted before they are broadcast to clients.
 
 Read [SECURITY.md](SECURITY.md) before reporting a security issue. Do not disclose credentials or vulnerability details in a public Issue.

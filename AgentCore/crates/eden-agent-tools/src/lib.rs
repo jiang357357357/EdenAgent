@@ -19,8 +19,8 @@ pub use patch::ApplyPatchTool;
 pub use read::{LsTool, ReadTool};
 pub use search::{FindTool, GrepTool};
 pub use shell::{
-    BashTool, PowerShellTool, SandboxedProgramOutput, SandboxedProgramRequest, WriteStdinTool, run_sandboxed_program,
-    sandboxed_program_command,
+    BashTool, PowerShellTool, SandboxedProgramOutput, SandboxedProgramRequest, WriteStdinTool, native_shell_path,
+    probe_process_sandbox, run_sandboxed_program, sandboxed_program_command,
 };
 pub use skills::load_skills;
 
@@ -43,8 +43,13 @@ pub enum ProcessSandbox {
     #[default]
     Disabled,
     Bubblewrap(PathBuf),
+    BubblewrapWithAccess {
+        executable: PathBuf,
+        network: bool,
+        writable_roots: Vec<PathBuf>,
+    },
     External(PathBuf),
-    /// Direct execution for callers already inside an external test/container boundary.
+    /// Unsandboxed execution. The host must explicitly authorize this boundary.
     Direct,
 }
 

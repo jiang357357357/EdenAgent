@@ -435,3 +435,62 @@ async fn get_diff_bounds_large_model_and_review_payloads() {
     );
     assert_eq!(result.details["patchTruncated"], true);
 }
+
+#[tokio::test]
+async fn sandbox_probe_requires_a_successful_isolated_child() {
+    let root = TempDir::new().unwrap();
+    let disabled = eden_agent_tools::probe_process_sandbox(&ProcessSandbox::Disabled, root.path())
+        .await
+        .unwrap_err();
+    assert_eq!(disabled.info.code, "sandbox_unavailable");
+    // An existing executable is not enough: this test binary rejects wrapper arguments.
+    let executable = std::env::current_exe().unwrap();
+    let error = eden_agent_tools::probe_process_sandbox(&ProcessSandbox::External(executable), root.path())
+        .await
+        .unwrap_err();
+    assert_eq!(error.info.code, "sandbox_probe_failed");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bubblewrap_network_and_write_access_require_explicit_configuration() {
+    let root = TempDir::new().unwrap();
+    let extra = TempDir::new().unwrap();
+    let program = std::path::Path::new("/bin/bash");
+    let command = |sandbox| {
+        eden_agent_tools::sandboxed_program_command(
+            &sandbox,
+            root.path(),
+            root.path(),
+            "bash",
+            program,
+            &["-c".into(), "exit 0".into()],
+        )
+        .unwrap()
+    };
+    let default = command(ProcessSandbox::Bubblewrap("/usr/bin/bwrap".into()));
+    let default_args: Vec<_> = default
+        .get_args()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+    assert!(default_args.iter().any(|arg| arg == "--unshare-all"));
+    assert!(!default_args.iter().any(|arg| arg == "--share-net"));
+    assert!(!default_args.iter().any(|arg| arg == &extra.path().to_string_lossy()));
+    let configured = command(ProcessSandbox::BubblewrapWithAccess {
+        executable: "/usr/bin/bwrap".into(),
+        network: true,
+        writable_roots: vec![extra.path().into()],
+    });
+    let configured_args: Vec<_> = configured
+        .get_args()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+    assert!(configured_args.iter().any(|arg| arg == "--share-net"));
+    let extra_path = extra.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    assert!(
+        configured_args
+            .windows(3)
+            .any(|args| args == ["--bind", extra_path.as_str(), extra_path.as_str()])
+    );
+    assert!(configured_args.windows(3).any(|args| args == ["--ro-bind", "/", "/"]));
+}
