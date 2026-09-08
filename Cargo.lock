@@ -782,6 +782,7 @@ version = "1.10.1"
 dependencies = [
  "chrono",
  "eden-agent-domain",
+ "eden-agent-host",
  "eden-agent-store",
  "hex",
  "reqwest 0.12.28",
@@ -846,6 +847,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-util",
+ "uuid",
 ]
 
 [[package]]
@@ -970,6 +972,7 @@ name = "eden-agent-server"
 version = "1.10.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "base64",
  "chrono",
@@ -994,6 +997,7 @@ dependencies = [
  "eden-agent-tools",
  "eden-agent-workspace",
  "futures",
+ "hmac",
  "http",
  "reqwest 0.12.28",
  "schemars",
