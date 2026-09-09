@@ -3,6 +3,8 @@ use eden_agent_connector_protocol::{
     RpcRequest, RpcResponse, WireMessage, WorkerStatus, method, read_message, write_message,
 };
 use futures::StreamExt;
+mod http_client;
+
 use reqwest::Client;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -149,12 +151,7 @@ async fn initialize(
             format!("credential environment variable is empty: {token_name}"),
         ));
     }
-    let client = Client::builder()
-        .connect_timeout(Duration::from_secs(15))
-        .user_agent("Eden Agent-Lichess-Worker/1")
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|error| ("client_error", error.to_string()))?;
+    let client = http_client::build().map_err(|error| ("client_error", error))?;
     let cancellation = CancellationToken::new();
     let stream_writer = Arc::clone(writer);
     let stream_client = client.clone();

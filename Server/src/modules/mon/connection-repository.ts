@@ -21,10 +21,14 @@ export class MonConnectionRepository {
       .run(sessionId, connection.coreBaseUrl, connection.coreToken, Date.now())
   }
 
-  read(sessionId: string): MonConnection | undefined {
+  read(sessionId: string): MonConnection | undefined { return this.lookup(sessionId, false) }
+
+  readForSync(sessionId: string): MonConnection | undefined { return this.lookup(sessionId, true) }
+
+  private lookup(sessionId: string, includeClosed: boolean): MonConnection | undefined {
     z.uuid().parse(sessionId)
     const row = this.database.connection.prepare(`SELECT core_base_url,core_token FROM mon_connections JOIN sessions ON sessions.id=mon_connections.session_id
-      WHERE session_id=? AND sessions.status='active'`).get(sessionId)
+      WHERE session_id=? AND (sessions.status='active' OR (? AND sessions.status='closed'))`).get(sessionId, Number(includeClosed))
     return row ? connectionSchema.parse({ coreBaseUrl: row.core_base_url, coreToken: row.core_token }) : undefined
   }
 }

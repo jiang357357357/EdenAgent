@@ -24,6 +24,7 @@ export class SessionService {
   private readonly stopping = new Set<string>()
   private readonly editing = new Set<string>()
   private readonly boundaryWaiting = new Set<string>()
+  private descendantStop: ((sessionId: string) => Promise<void>) | undefined
   private closed = false
   private readonly faults = new Map<string, string>()
   private readonly admissions = new InputAdmissions()
@@ -54,6 +55,15 @@ export class SessionService {
 
   start(sessionId: string, text: string, idempotencyKey: string = randomUUID(), environment?: JsonValue, kind: 'prompt' | 'compact' = 'prompt'): AcceptedInput {
     return this.accept(sessionId, text, idempotencyKey, environment, kind)
+  }
+
+  submitJob(sessionId: string, text: string, jobId: string, jobKind: string, onCommit: (input: AcceptedInput) => void): AcceptedInput {
+    const metadata = { ...this.inputMetadata(sessionId), job: { id: jobId, kind: jobKind } }
+    const accepted = this.inputs.enqueue(sessionId, text, `job:${jobId}`, metadata, 'prompt', undefined, onCommit)
+    this.stopping.delete(sessionId)
+    this.boundaryWaiting.delete(sessionId)
+    this.wake(sessionId)
+    return accepted
   }
 
   startWithAttachments(sessionId: string, text: string, references: readonly AttachmentRef[], idempotencyKey: string = randomUUID(), environment?: JsonValue): Promise<AcceptedInput> {
@@ -181,8 +191,11 @@ export class SessionService {
     return this.attachments.images(snapshots)
   }
 
+  setDescendantStop(handler: (sessionId: string) => Promise<void>): void { this.descendantStop = handler }
+
   async cancel(sessionId: string): Promise<boolean> {
     this.repository.read(sessionId)
+    await this.descendantStop?.(sessionId)
     const admissionCancelled = this.admissions.cancel(sessionId)
     if (!this.tasks.has(sessionId)) return admissionCancelled
     this.stopping.add(sessionId)

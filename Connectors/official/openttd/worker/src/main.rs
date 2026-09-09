@@ -2,7 +2,7 @@ use eden_agent_connector_protocol::{
     CapabilityCall, InitializeParams, InitializeResult, PublishedEvent, RpcNotification,
     RpcRequest, RpcResponse, WireMessage, WorkerStatus, method, read_message, write_message,
 };
-use eden_agent_connectors::openttd::{self, Event, Handle};
+use eden_agent_openttd::{self as openttd, Event, Handle};
 use serde_json::{Value, json};
 use std::{process::ExitCode, sync::Arc};
 use tokio::{io::Stdout, sync::Mutex, task::JoinHandle};

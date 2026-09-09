@@ -22,13 +22,13 @@ export class MonOperationRepository {
     }))
   }
 
-  begin(sessionId: string | undefined, endpoint: string, request: JsonValue): string {
+  begin(sessionId: string | undefined, endpoint: string, request: JsonValue, kind = 'model.select'): string {
     const id = randomUUID()
     const event = this.sessions.database.transaction(() => {
       const now = Date.now()
       this.sessions.database.connection.prepare('INSERT INTO mon_operations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(id, sessionId ?? null, 'model.select', endpoint, JSON.stringify(request), 'running', null, now, now)
-      return sessionId ? this.sessions.events.insert(sessionId, null, 'mon.operation.started', { operationId: id, kind: 'model.select', endpoint, request }) : undefined
+        .run(id, sessionId ?? null, kind, endpoint, JSON.stringify(request), 'running', null, now, now)
+      return sessionId ? this.sessions.events.insert(sessionId, null, 'mon.operation.started', { operationId: id, kind, endpoint, request }) : undefined
     })
     if (event) this.sessions.events.publish(event)
     return id

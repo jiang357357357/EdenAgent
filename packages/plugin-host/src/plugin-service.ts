@@ -1,3 +1,5 @@
+import { PluginOperationRepository } from './management/operation-repository.ts'
+import { PluginManagementRepository } from './management/management-repository.ts'
 import type { EdenDatabase } from '@eden/store'
 import type { JsonValue } from '@eden/api'
 import { probeSandbox } from '@eden/execution'
@@ -11,6 +13,8 @@ import { invokePlugin } from './runtime/invoke-plugin.ts'
 import { pluginGuide } from './drafts/plugin-guide.ts'
 
 export class PluginService {
+  readonly operations: PluginOperationRepository
+  readonly management: PluginManagementRepository
   readonly drafts: DraftRepository
   readonly versions: VersionRepository
   readonly activations: ActivationRepository
@@ -20,17 +24,20 @@ export class PluginService {
   private readonly reports: ReportRepository
 
   constructor(database: EdenDatabase, protectedRoots: readonly string[] = []) {
+    this.operations = new PluginOperationRepository(database)
+    this.operations.recover()
     this.drafts = new DraftRepository(database)
     this.versions = new VersionRepository(database)
+    this.management = new PluginManagementRepository(database, this.versions)
     this.activations = new ActivationRepository(database, this.versions, protectedRoots)
     this.reports = new ReportRepository(database)
   }
 
-  async validate(id: string, signal?: AbortSignal) { return this.track(id, inner => buildPlugin(this.drafts.read(id), inner), signal) }
+  async validate(id: string, signal?: AbortSignal) { return this.track(id, 'validate', inner => buildPlugin(this.drafts.read(id), inner), signal) }
   describe() { return pluginGuide() }
 
   async test(id: string, signal?: AbortSignal, expectedRevision?: string) {
-    return this.track(id, async inner => {
+    return this.track(id, 'test', async inner => {
       const built = await buildPlugin(this.drafts.read(id), inner)
       if (expectedRevision && built.revision !== expectedRevision) throw new Error('Draft changed after permission request')
       const report = await testPlugin(built, inner)
@@ -40,27 +47,35 @@ export class PluginService {
   }
 
   async install(id: string, expectedRevision: string, signal?: AbortSignal) {
-    const built = await this.validate(id, signal)
-    signal?.throwIfAborted()
-    if (built.revision !== expectedRevision) throw new Error('Draft changed after testing')
-    this.versions.install(built, this.reports.read(id, built.revision))
-    return { id, revision: built.revision }
+    return this.track(id, 'install', async inner => {
+      const built = await buildPlugin(this.drafts.read(id), inner)
+      inner.throwIfAborted()
+      if (built.revision !== expectedRevision) throw new Error('Draft changed after testing')
+      this.versions.install(built, this.reports.read(id, built.revision))
+      return { id, revision: built.revision }
+    }, signal, expectedRevision)
   }
 
   async activate(id: string, revision: string, readRoot?: string) {
     if (this.activeCalls.get(id)?.size) throw new Error('Plugin has active calls; wait before activating another version')
-    return this.track(id, async signal => {
+    return this.track(id, 'activate', async signal => {
       const sandbox = await probeSandbox()
       signal.throwIfAborted()
       if (!sandbox.available) throw new Error('OS sandbox unavailable; activation refused')
       if ((this.activeCalls.get(id)?.size ?? 0) > 1) throw new Error('Plugin has active calls; activation refused')
       return this.activations.activate(id, revision, readRoot)
-    })
+    }, undefined, revision)
   }
 
   disable(id: string): void {
     this.activations.disable(id)
     for (const controller of this.activeCalls.get(id) ?? []) controller.abort()
+  }
+
+  uninstall(id: string) {
+    if (this.closed) throw new Error('Plugin host is shutting down')
+    if (this.activeCalls.get(id)?.size) throw new Error('Plugin has active operations; stop them before uninstalling')
+    return this.management.remove(id)
   }
 
   async invoke(id: string, revision: string, input: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
@@ -69,12 +84,13 @@ export class PluginService {
     if (!active) throw new Error('Plugin revision is not active')
     const canonical = this.activations.assertScope(id, revision, active.readRoot)
     if (canonical !== active.readRoot) throw new Error('Granted workspace path changed; grant it again')
-    return this.track(id, inner => invokePlugin(this.versions.read(id, revision), input, active.readRoot, inner), signal)
+    return this.track(id, 'invoke', inner => invokePlugin(this.versions.read(id, revision), input, active.readRoot, inner), signal, revision)
   }
 
-  private async track<T>(id: string, work: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  private async track<T>(id: string, action: string, work: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, revision?: string): Promise<T> {
     if (this.closed) throw new Error('Plugin host is shutting down')
     signal?.throwIfAborted()
+    const logId = this.operations.begin(id, action, revision)
     const controller = new AbortController()
     const abort = () => controller.abort()
     signal?.addEventListener('abort', abort, { once: true })
@@ -83,8 +99,17 @@ export class PluginService {
     calls.add(controller)
     const task = Promise.resolve().then(() => { controller.signal.throwIfAborted(); return work(controller.signal) })
     this.activeTasks.add(task)
-    try { return await task }
-    finally {
+    try {
+      const result = await task
+      const fields = result && typeof result === 'object' ? result as Record<string, unknown> : {}
+      const failed = action === 'test' && fields.passed === false
+      this.operations.finish(logId, failed ? 'failed' : 'completed', revision ?? (action !== 'invoke' && typeof fields.revision === 'string' ? fields.revision : undefined),
+        failed ? 'declared_tests_failed' : undefined)
+      return result
+    } catch (error) {
+      this.operations.finish(logId, controller.signal.aborted ? 'cancelled' : 'failed', revision, controller.signal.aborted ? 'cancelled' : 'operation_failed')
+      throw error
+    } finally {
       signal?.removeEventListener('abort', abort)
       calls.delete(controller)
       this.activeTasks.delete(task)

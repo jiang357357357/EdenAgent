@@ -6,6 +6,7 @@ export interface RuntimeTool {
   revision: string
   parameters: Record<string, JsonValue>
   executionMode?: 'parallel' | 'sequential'
+  resultImages?(result: JsonValue, signal: AbortSignal): Promise<readonly RuntimeImage[]>
   execute(input: Record<string, unknown>, context: { callId: string; signal: AbortSignal }): Promise<JsonValue>
 }
 

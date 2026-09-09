@@ -12,7 +12,9 @@
     "@eden/permissions": "2.0.0-dev.0",
     "@eden/integrations": "2.0.0-dev.0",
     "ws": "8.18.3",
-    "zod": "4.1.12"
+    "zod": "4.1.12",
+    "yaml": "2.9.0",
+    "@eden/plugin-sdk": "2.0.0-dev.0"
   },
   "devDependencies": {
     "@types/ws": "8.18.1"

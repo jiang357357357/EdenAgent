@@ -35,9 +35,11 @@ export class SessionRepository {
     }
   }
 
-  list(limit = 100, includeClosed = false): SessionSummary[] {
-    return this.database.connection.prepare("SELECT id FROM sessions WHERE origin=? AND status!='deleted' AND (? OR status='active') ORDER BY updated_at DESC LIMIT ?")
-      .all(this.origin, Number(includeClosed), Math.min(limit, 1000)).map(row => this.read(String(row.id)))
+  list(limit = 100, includeClosed = false, includeBackground = true): SessionSummary[] {
+    return this.database.connection.prepare(`SELECT id FROM sessions WHERE origin=? AND status!='deleted' AND (? OR status='active')
+      AND (? OR NOT EXISTS (SELECT 1 FROM self_awake_submissions s JOIN jobs j ON j.id=s.job_id WHERE j.session_id=sessions.id))
+      ORDER BY updated_at DESC LIMIT ?`)
+      .all(this.origin, Number(includeClosed), Number(includeBackground), Math.min(limit, 1000)).map(row => this.read(String(row.id)))
   }
 
   rename(id: string, title: string): SessionSummary {

@@ -9,6 +9,7 @@ export class ModelService {
   private readonly configured: RuntimeModel | undefined
   private readonly bindings = new Map<string, ModelBinding>()
   private readonly visionBindings = new Map<string, RuntimeModel>()
+  private readonly visionEntities = new Map<string, string | number>()
   private readonly directors = new Map<string, RuntimeModel>()
   private readonly actors = new Map<string, Map<string, ActorModelBinding>>()
   constructor(private readonly origin: RuntimeOrigin, configured?: RuntimeModel, private readonly storage?: ModelBindingRepository) {
@@ -28,6 +29,14 @@ export class ModelService {
     }
   }
 
+  inherit(parentSessionId: string, childSessionId: string): void {
+    if (this.origin === 'local') { if (!this.configured) throw new Error('No local model configured'); return }
+    this.refresh(parentSessionId)
+    const binding = this.bindings.get(parentSessionId)
+    if (!binding) throw new Error('Subagent requires a bound single-actor parent model')
+    this.replace(childSessionId, { mode: 'single', main: structuredClone(binding), vision: structuredClone(this.visionBindings.get(parentSessionId) ?? null), visionEntityId: this.visionEntities.get(parentSessionId) ?? null })
+  }
+
   resolve(sessionId: string): RuntimeModel | undefined {
     this.refresh(sessionId)
     return this.origin === 'local' ? this.configured : this.bindings.get(sessionId)?.model
@@ -41,6 +50,7 @@ export class ModelService {
   private clear(sessionId: string): void {
     this.bindings.delete(sessionId)
     this.visionBindings.delete(sessionId)
+    this.visionEntities.delete(sessionId)
     this.actors.delete(sessionId)
     this.directors.delete(sessionId)
   }
@@ -73,12 +83,12 @@ export class ModelService {
     return this.origin === 'local' ? this.configured : this.resolveActor(sessionId, assistantId)?.main.model
   }
 
-  bindVision(sessionId: string, model: RuntimeModel | undefined): void {
+  bindVision(sessionId: string, model: RuntimeModel | undefined, entityId?: string | number | null): void {
     if (this.origin !== 'mon') throw new Error('Local vision models cannot be configured from Mon')
     this.refresh(sessionId)
     if (this.actors.has(sessionId)) throw new Error('Multi-actor vision models require actor bindings')
     this.replace(sessionId, { mode: 'single', main: this.bindings.get(sessionId) ?? null,
-      vision: model ? configuredModelSchema.parse(model) : null })
+      vision: model ? configuredModelSchema.parse(model) : null, visionEntityId: model && entityId != null ? actorIdSchema.parse(entityId) : null })
   }
 
   resolveVision(sessionId: string): RuntimeModel | undefined { this.refresh(sessionId); return this.visionBindings.get(sessionId) }
@@ -113,6 +123,7 @@ export class ModelService {
     if (snapshot.mode === 'single') {
       if (snapshot.main) this.bindings.set(key, snapshot.main)
       if (snapshot.vision) this.visionBindings.set(key, snapshot.vision)
+      if (snapshot.visionEntityId != null) this.visionEntities.set(key, snapshot.visionEntityId)
     } else {
       this.actors.set(key, new Map(snapshot.actors.map(actor => [String(actor.assistantId), { ...actor, vision: actor.vision ?? undefined }])))
       if (snapshot.director) this.directors.set(key, snapshot.director)

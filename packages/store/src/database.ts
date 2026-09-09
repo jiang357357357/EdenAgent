@@ -15,7 +15,11 @@ export class EdenDatabase {
       // Refuse legacy/foreign databases before migrations can change their schema.
       const tables = this.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()
       if (tables.length && !tables.some(row => row.name === 'realm_meta')) throw new Error('Legacy or foreign database requires explicit import')
-      if (tables.length) this.assertOrigin(origin)
+      if (tables.length) {
+        this.assertOrigin(origin)
+        const importing = this.connection.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()
+        if (importing && importing.value !== 'complete') throw new Error('Legacy import is incomplete; finish conversion before starting the host')
+      }
       this.connection.exec('PRAGMA journal_mode=WAL')
       migrateDatabase(this.connection)
       this.transaction(() => {

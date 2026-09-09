@@ -5,16 +5,16 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish = false
+# Legacy integration tests depend on the archived Rust host; migrate in phase T.
+autotests = false
 
 [dependencies]
-eden-agent-connector-protocol = { path = "../../../../Server/crates/eden-agent-connector-protocol" }
-eden-agent-connectors = { path = "../../../../Server/crates/eden-agent-connectors" }
+eden-agent-connector-protocol = { path = "../../../../Native/crates/eden-agent-connector-protocol" }
+eden-agent-openttd = { path = "../../../../Native/crates/eden-agent-openttd" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-eden-agent-connector-host = { path = "../../../../Server/crates/eden-agent-connector-host" }
-eden-agent-connector-package = { path = "../../../../Server/crates/eden-agent-connector-package" }
 tempfile.workspace = true

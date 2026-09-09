@@ -1,7 +1,7 @@
 import type { RequestListener } from 'node:http'
 import type { RuntimeOrigin } from '@eden/api'
 
-interface HealthChecks { model: boolean; sessionFaults: number; memoryExtraction: boolean }
+interface HealthChecks { model: boolean; sessionFaults: number; memoryExtraction: boolean; jobs?: boolean; selfAwake?: boolean }
 
 export function healthHandler(origin: RuntimeOrigin, checks: () => HealthChecks): RequestListener {
   return (request, response) => {
@@ -12,7 +12,7 @@ export function healthHandler(origin: RuntimeOrigin, checks: () => HealthChecks)
       return
     }
     const current = checks()
-    const ready = (origin === 'mon' || current.model) && !current.sessionFaults && current.memoryExtraction
+    const ready = (origin === 'mon' || current.model) && !current.sessionFaults && current.memoryExtraction && current.jobs !== false && current.selfAwake !== false
     const unavailable = request.url === '/readyz' && !ready
     response.writeHead(unavailable ? 503 : 200).end(JSON.stringify({
       status: unavailable ? 'not_ready' : 'ok', runtimeOrigin: origin, serverVersion: '2.0.0-dev.0', checks: { database: true, ...current },

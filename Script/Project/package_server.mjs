@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serverDependencyPlan } from './server_dependency_plan.mjs'
+import { copyConnectorResources } from './connector_resources.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const output = path.resolve(process.argv[2] ?? path.join(root, 'dist', `runtime-${process.platform}-${process.arch}`))
@@ -19,6 +20,7 @@ if (!license) throw new Error('The Node distribution LICENSE must be present alo
 const staging = `${output}.staging-${randomUUID()}`
 await mkdir(staging, { recursive: true })
 try {
+  const connectors = await copyConnectorResources(root, staging)
   await mkdir(path.join(staging, 'server'))
   await cp(entry, path.join(staging, 'server/main.mjs'))
   await cp(`${entry}.map`, path.join(staging, 'server/main.mjs.map'))
@@ -35,7 +37,7 @@ try {
   await writeFile(path.join(staging, 'runtime-manifest.json'), JSON.stringify({
     format: 1, platform: process.platform, arch: process.arch, node: process.versions.node,
     entry: 'server/main.mjs', lockSha256: sha256(lock), entrySha256: sha256(await readFile(entry)),
-    packages: packages.map(({ source, ...dependency }) => dependency),
+    packages: packages.map(({ source, ...dependency }) => dependency), connectors,
   }, null, 2) + '\n')
   await rename(staging, output)
   process.stdout.write(`Packaged ${packages.length} runtime dependencies: ${output}\n`)

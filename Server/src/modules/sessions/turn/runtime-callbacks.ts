@@ -1,3 +1,4 @@
+import { chargeSubagentBudget } from '../../subagents/budget.ts'
 import { randomUUID } from 'node:crypto'
 import type { RuntimeCallbacks } from '@eden/runtime-pi'
 import { toJson } from '@eden/api'
@@ -49,19 +50,26 @@ export function runtimeCallbacks(repository: SessionRepository, input: SessionIn
       append(`${namespace}.${kind}`, projected)
       if (kind === 'message_end' && messageRole(value) === 'user') initialUserEnded = true
     },
-    async request(snapshot) { append('model.request', snapshot) },
+    async request(snapshot) {
+      const event = repository.database.transaction(() => {
+        chargeSubagentBudget(repository.database, input.sessionId, 'model')
+        return repository.events.insert(input.sessionId, input.turnId, 'model.request', scoped(snapshot))
+      })
+      repository.events.publish(event)
+    },
     async beforeTool(name, callId, revision, args) {
       const event = repository.database.transaction(() => {
-        repository.database.connection.prepare('INSERT INTO tool_operations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-          .run(`${input.turnId}:${callId}`, input.sessionId, input.turnId, name, revision, 'running', null, Date.now(), Date.now())
+        chargeSubagentBudget(repository.database, input.sessionId, 'tool')
+        repository.database.connection.prepare('INSERT INTO tool_operations(id,session_id,turn_id,tool_name,revision,state,result_json,created_at,updated_at,request_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(`${input.turnId}:${callId}`, input.sessionId, input.turnId, name, revision, 'running', null, Date.now(), Date.now(), JSON.stringify(toJson(args)))
         return repository.events.insert(input.sessionId, input.turnId, 'operation.started', scoped({ callId, name, revision, args: toJson(args) }))
       })
       repository.events.publish(event)
     },
     async afterTool(callId, result, failed) {
       const event = repository.database.transaction(() => {
-        repository.database.connection.prepare('UPDATE tool_operations SET state=?, result_json=?, updated_at=? WHERE id=?')
-          .run(failed ? 'failed' : 'completed', JSON.stringify(result), Date.now(), `${input.turnId}:${callId}`)
+        repository.database.connection.prepare('UPDATE tool_operations SET state=?, result_json=?, error_json=?, updated_at=? WHERE id=?')
+          .run(failed ? 'failed' : 'completed', JSON.stringify(result), failed ? JSON.stringify(result) : null, Date.now(), `${input.turnId}:${callId}`)
         return repository.events.insert(input.sessionId, input.turnId, 'operation.completed', scoped({ callId, result, failed }))
       })
       repository.events.publish(event)

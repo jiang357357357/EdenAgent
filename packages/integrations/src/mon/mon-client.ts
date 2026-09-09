@@ -1,3 +1,4 @@
+import { fetchMonAudio } from './audio.ts'
 import { jsonValue, modelEndpointSchema } from '@eden/api'
 import type { JsonValue } from '@eden/api'
 
@@ -50,6 +51,23 @@ export class MonClient {
   async patch(endpoint: string, body: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
     return this.request('PATCH', endpoint, body, signal)
   }
+
+  async put(endpoint: string, body: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
+    return this.request('PUT', endpoint, body, signal)
+  }
+
+  async post(endpoint: string, body: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
+    return this.request('POST', endpoint, body, signal)
+  }
+
+  realtimeSttUrl(): string {
+    const url = new URL('ws/stt/realtime/', this.base)
+    url.protocol = this.base.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.searchParams.set('token', this.token.replace(/^(Token|Bearer) /, ''))
+    return url.href
+  }
+
+  fetchAudio(source: string, signal?: AbortSignal) { return fetchMonAudio(this.base, this.token, source, signal) }
 
   private endpointUrl(endpoint: string): URL {
     const pathname = endpoint.split('?')[0]!

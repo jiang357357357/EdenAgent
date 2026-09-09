@@ -8,7 +8,7 @@
 
 ## 当前执行优先级
 
-用户最新要求：先完成全部计划功能实现，再集中逐步测试与修正，不再每一步运行测试。优先推进完整业务覆盖，记录待验收项，保留最终 P0–P5 完成标准和数据/权限边界。本次迁移本地 Git 提交已明确授权。
+用户最新要求：以完成全部业务为主，先完成全部计划功能实现，再编写测试代码；只有用户明确要求测试后才执行测试和修正。实现阶段不逐步新增测试，不运行单元/专项/全量/冒烟或 UI 测试；不因提交或阶段结束自行启动测试，也不以检查名义变相测试。优先完整业务覆盖，记录已知问题和待验收项，保留最终 P0–P5 完成标准及数据/权限边界。编写测试不等于获准运行测试。
 
 ## 当前结构
 
@@ -16,6 +16,7 @@
 - `packages/runtime-pi`：唯一允许导入 pi 的运行时适配包；只依赖公开 SDK。
 - `packages/api`、`store`、`permissions`、`plugin-sdk`、`plugin-host`、`execution`：协议、基础存储、权限策略、插件与隔离执行。
 - `Archive/2026-09-09-rust-runtime`：旧 Rust Core/Server 和原启动/CI 参考；新代码不得运行时依赖归档。
+- `Native/crates`：官方 worker 的独立帧协议和游戏辅助组件；根 Cargo workspace 仅包含这些组件与 `Connectors/official/*/worker`，不再组装 Rust 宿主。
 - `frontend/web`：React/Vite 客户端，只使用生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问 Agent Server。
 - `frontend/desktop`：Electron 桌面壳，分别启动并监管伊甸园与尘世两个 `eden-agent-server`，向渲染进程传递当前世界服务实例的能力令牌。
 - `Script/Project`：开发启动和 `.monconfig` 读取工具。

@@ -1,3 +1,18 @@
+import { operationRoutes } from '../transport/rpc/operation.routes.ts'
+import { commandRoutes } from '../transport/rpc/command.routes.ts'
+import { mcpRoutes } from '../transport/rpc/mcp.routes.ts'
+import { connectorRoutes } from '../transport/rpc/connector.routes.ts'
+import { mediaRoutes } from '../transport/rpc/media.routes.ts'
+import { voiceRoutes } from '../transport/rpc/voice.routes.ts'
+import { subagentRoutes } from '../transport/rpc/subagent.routes.ts'
+import { pluginAssetRoutes } from '../transport/rpc/plugin-assets.routes.ts'
+import { pluginMarketRoutes } from '../transport/rpc/plugin-market.routes.ts'
+import { skillRoutes } from '../transport/rpc/skill.routes.ts'
+import { SelfAwakeHttp } from '../transport/http/self-awake.ts'
+import { notificationRoutes } from '../transport/rpc/notification.routes.ts'
+import { selfAwakeRoutes } from '../transport/rpc/self-awake.routes.ts'
+import { jobRoutes } from '../transport/rpc/job.routes.ts'
+import { memoRoutes } from '../transport/rpc/memo.routes.ts'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { EdenDatabase } from '@eden/store'
@@ -25,21 +40,24 @@ export async function startServer(config: ServerConfig) {
   try { services = createServices(database, config) }
   catch (error) { database.close(); releaseLock(); throw error }
   const { plugins, permissions, sessions, workspace, models, mon, directors, companion, questions, memoryExtractions } = services
+  const selfAwakeHttp = new SelfAwakeHttp(config.origin, services.selfAwakeBridge)
   const blobHttp = new BlobHttp(services.blobs, config)
-  const drainServices = () => Promise.allSettled([memoryExtractions.close(), blobHttp.close(), plugins.close(), sessions.close(),
-    mon.close(), companion.close(), Promise.resolve().then(() => questions.close())])
+  const drainServices = () => { services.realtimeVoice.close(); services.scheduler.close(); services.pluginHooks.close(); services.selfAwake.close(); return Promise.allSettled([services.mcpResults.close(), services.mcp.close(), services.connectorLifecycle.close(), services.speech.close(), services.voice.close(), services.subagentLifecycle.close(), services.packageAssets.close(), services.pluginMarket.close(), services.skills.close(), selfAwakeHttp.close(), services.selfAwakeActions.close(), memoryExtractions.close(), blobHttp.close(), plugins.close(), sessions.close(),
+    mon.close(), companion.close(), Promise.resolve().then(() => services.media.close()), Promise.resolve().then(() => questions.close())]) }
   const health = healthHandler(config.origin, () => ({ model: Boolean(config.model), sessionFaults: sessions.faultCount(),
-    memoryExtraction: memoryExtractions.fault === undefined }))
+    memoryExtraction: memoryExtractions.fault === undefined, jobs: services.scheduler.fault === undefined, pluginHooks: services.pluginHooks.fault === undefined, subagents: services.subagentLifecycle.fault === undefined, selfAwake: services.selfAwake.fault === undefined && services.selfAwakeActions.fault === undefined }))
   const http = createServer((request, response) => {
-    if (blobHttp.handle(request, response)) return
+    if (selfAwakeHttp.handle(request, response) || blobHttp.handle(request, response)) return
     health(request, response)
   })
   const websocket = attachWebsocket(http, config, sessions, {
-    ...memoryExtractionRoutes(memoryExtractions),
-    ...directorRoutes(directors),
+    ...operationRoutes(services.repository), ...commandRoutes(services.commands), ...mcpRoutes(services.mcp, database, services.mcpResults), ...connectorRoutes(services.connectorCatalog, services.connectors, services.connectorEvents, services.connectorPermissions, services.connectorCredentials), ...mediaRoutes(services.media), ...voiceRoutes(services.voiceConfig, services.voice, services.speech), ...subagentRoutes(services.subagents), ...memoryExtractionRoutes(memoryExtractions), ...memoRoutes(services.memos, services.memoNotifications),
+    ...notificationRoutes(services.desktopReminders),
+    ...selfAwakeRoutes(services.selfAwake.repository, services.selfAwakeActions),
+    ...directorRoutes(directors), ...jobRoutes(services.jobs),
     ...questionRoutes(questions),
-    ...pluginRoutes(plugins), ...permissionRoutes(permissions), ...workspaceRoutes(workspace, sessions), ...modelRoutes(models, sessions, config.origin === 'mon' ? mon : undefined),
-  })
+    ...pluginAssetRoutes(services.packageAssets), ...pluginMarketRoutes(services.pluginMarket), ...skillRoutes(services.skills), ...pluginRoutes(plugins, services.pluginMarket.installed), ...permissionRoutes(permissions), ...workspaceRoutes(workspace, sessions), ...modelRoutes(models, sessions, config.origin === 'mon' ? mon : undefined),
+  }, sessionId => services.realtimeVoice.prepare(sessionId))
   try {
     await memoryExtractions.start()
     await new Promise<void>((resolve, reject) => {
@@ -47,7 +65,16 @@ export async function startServer(config: ServerConfig) {
       http.listen(config.port, config.host, () => { http.removeListener('error', reject); resolve() })
     })
     persistToken(config)
+    await services.subagentLifecycle.start()
     sessions.resumePending()
+    services.memos.recoverSchedules()
+    services.selfAwakeActions.start()
+    services.selfAwake.start()
+    services.pluginHooks.start()
+    services.scheduler.start()
+    services.mon.startSync()
+    services.mcp.start()
+    services.connectorLifecycle.start()
   } catch (error) {
     for (const client of websocket.clients) client.terminate()
     await drainServices()

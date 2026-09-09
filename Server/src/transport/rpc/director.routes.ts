@@ -1,7 +1,7 @@
-import { sessionIdSchema, toJson } from '@eden/api'
-import type { JsonValue } from '@eden/api'
+import { rpcMethods } from '@eden/api'
+import { contractHandler } from './contract-handler.ts'
 import type { DirectorRunRepository } from '../../modules/director/index.ts'
 
-export function directorRoutes(directors: DirectorRunRepository): Record<string, (params: JsonValue) => JsonValue> {
-  return { 'director.list': params => toJson(directors.list(sessionIdSchema.parse(params).sessionId)) }
+export function directorRoutes(directors: DirectorRunRepository) {
+  return { 'director.list': contractHandler(rpcMethods['director.list'], input => directors.list(input.sessionId)) }
 }

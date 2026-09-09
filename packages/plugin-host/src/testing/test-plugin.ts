@@ -4,14 +4,11 @@ import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { probeSandbox, runIsolatedModule } from '@eden/execution'
 import { jsonValue } from '@eden/api'
-import { z } from 'zod'
 import type { BuiltPlugin } from '../builds/build-plugin.ts'
 
-export const testReportSchema = z.object({
-  revision: z.string().regex(/^[a-f0-9]{64}$/), passed: z.boolean(), testedAt: z.number().int(), backend: z.string(),
-  cases: z.array(z.object({ index: z.number().int(), passed: z.boolean(), error: z.string().nullable() }).strict()),
-}).strict()
-export type PluginTestReport = z.infer<typeof testReportSchema>
+export { pluginTestReportSchema as testReportSchema } from '@eden/api'
+import { pluginTestReportSchema as testReportSchema, type PluginTestReport } from '@eden/api'
+export type { PluginTestReport } from '@eden/api'
 
 export async function testPlugin(plugin: BuiltPlugin, signal?: AbortSignal): Promise<PluginTestReport> {
   const sandbox = await probeSandbox()

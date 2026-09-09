@@ -1,1 +1,7 @@
 export { MonClient, MonHttpError } from './mon/mon-client.ts'
+export { serviceSignature, acquireMonServiceToken } from './mon/service-identity.ts'
+export type { MonServiceIdentity } from './mon/service-identity.ts'
+export { McpClient } from './mcp/client.ts'
+export { McpStdioChannel, McpRemoteError } from './mcp/stdio-channel.ts'
+export type { McpChannel } from './mcp/stdio-channel.ts'
+export { McpHttpChannel } from './mcp/http-channel.ts'

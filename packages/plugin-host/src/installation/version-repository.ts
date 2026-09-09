@@ -10,6 +10,7 @@ export class VersionRepository {
   constructor(private readonly database: EdenDatabase) {}
 
   install(plugin: BuiltPlugin, report: PluginTestReport): void {
+    if (this.database.connection.prepare('SELECT 1 FROM plugin_packages WHERE id=? LIMIT 1').get(plugin.manifest.id)) throw new Error('Plugin ID is already used by an installed component package')
     if (!report.passed || report.revision !== plugin.revision) throw new Error('Installation requires passing tests for this exact revision')
     this.database.connection.prepare('INSERT OR IGNORE INTO plugin_versions VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
       plugin.manifest.id, plugin.revision, plugin.manifest.version, JSON.stringify(plugin.manifest),

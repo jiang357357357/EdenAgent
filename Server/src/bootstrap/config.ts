@@ -1,3 +1,5 @@
+import { monServiceIdentity } from './mon-identity.ts'
+import type { MonServiceIdentity } from '@eden/integrations'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, writeFileSync, renameSync } from 'node:fs'
@@ -15,6 +17,7 @@ export interface ServerConfig {
   token: string
   allowedOrigins: string[]
   model: RuntimeModel | undefined
+  monIdentity?: MonServiceIdentity | undefined
   maxBlobBytes?: number
 }
 
@@ -26,7 +29,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
   if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw new Error('Capability token must contain at least 32 URL-safe characters')
   const allowedOrigins = (env.EDEN_AGENT_ALLOWED_ORIGINS ?? 'http://127.0.0.1:40091,http://localhost:40091,edenagent://app').split(',').map(value => value.trim()).filter(Boolean)
   return { origin, host: '127.0.0.1', port, dataRoot, databasePath: path.join(dataRoot, 'eden-agent.db'), token,
-    allowedOrigins, maxBlobBytes: z.coerce.number().int().min(1).max(1024 * 1024 * 1024).parse(env.EDEN_AGENT_MAX_BLOB_BYTES ?? 32 * 1024 * 1024),
+    allowedOrigins, monIdentity: monServiceIdentity(origin, env), maxBlobBytes: z.coerce.number().int().min(1).max(1024 * 1024 * 1024).parse(env.EDEN_AGENT_MAX_BLOB_BYTES ?? 32 * 1024 * 1024),
     model: origin === 'local' ? localModel(env) : undefined }
 }
 

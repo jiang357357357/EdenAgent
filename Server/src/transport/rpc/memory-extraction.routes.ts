@@ -1,16 +1,10 @@
-import { memoryCandidatesListSchema, memoryCandidatesResumeSchema, toJson } from '@eden/api'
-import type { JsonValue } from '@eden/api'
+import { rpcMethods } from '@eden/api'
+import { contractHandler } from './contract-handler.ts'
 import type { MemoryExtractionService } from '../../modules/memories/index.ts'
 
-export function memoryExtractionRoutes(service: MemoryExtractionService): Record<string, (params: JsonValue) => JsonValue> {
+export function memoryExtractionRoutes(service: MemoryExtractionService) {
   return {
-    'memory.extraction.candidates': params => {
-      const value = memoryCandidatesListSchema.parse(params)
-      return toJson(service.candidates(value.sessionId, value.after, value.limit))
-    },
-    'memory.extraction.resume': params => {
-      const value = memoryCandidatesResumeSchema.parse(params)
-      return toJson(service.resume(value.sessionId, value.jobId, value.revision))
-    },
+    'memory.extraction.candidates': contractHandler(rpcMethods['memory.extraction.candidates'], input => service.candidates(input.sessionId, input.after, input.limit)),
+    'memory.extraction.resume': contractHandler(rpcMethods['memory.extraction.resume'], input => service.resume(input.sessionId, input.jobId, input.revision)),
   }
 }

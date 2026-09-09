@@ -3,6 +3,8 @@ import { sessionTitleSchema, sessionParticipantsSchema, messageListSchema, sessi
 import type { DurableEvent, JsonValue } from '@eden/api'
 import type { SessionService } from '../../modules/sessions/index.ts'
 import { eventPayload } from './event-payload.ts'
+import { rpcMethods } from '@eden/api'
+import { contractHandler } from './contract-handler.ts'
 
 export function wireEvent(event: DurableEvent): JsonValue {
   return { id: event.id, sessionId: event.sessionId, turnId: event.turnId, seq: event.seq,
@@ -11,7 +13,7 @@ export function wireEvent(event: DurableEvent): JsonValue {
 
 export function sessionRoutes(service: SessionService): Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> {
   const repository = service.repository
-  return {
+  const handlers: Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> = {
     ping: () => ({ pong: true }),
     'tool.list': () => toJson(service.toolCatalog()),
     'session.create': value => {
@@ -20,7 +22,7 @@ export function sessionRoutes(service: SessionService): Record<string, (params: 
     },
     'session.list': value => {
       const params = sessionListSchema.parse(value)
-      return toJson(repository.list(params.limit, params.includeClosed))
+      return toJson(repository.list(params.limit, params.includeClosed, params.includeBackground))
     },
     'session.read': value => toJson(repository.read(sessionIdSchema.parse(value).sessionId)),
     'session.rename': value => { const params = sessionTitleSchema.parse(value); return toJson(repository.rename(params.sessionId, params.title)) },
@@ -60,4 +62,8 @@ export function sessionRoutes(service: SessionService): Record<string, (params: 
       return { ...page, items: page.items.map(wireEvent) }
     },
   }
+  return Object.fromEntries(Object.entries(handlers).map(([method, handler]) => {
+    const contract = Object.hasOwn(rpcMethods, method) ? rpcMethods[method as keyof typeof rpcMethods] : undefined
+    return [method, contract ? contractHandler(contract, input => handler(toJson(input))) : handler]
+  }))
 }

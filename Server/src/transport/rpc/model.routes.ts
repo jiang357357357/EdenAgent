@@ -1,4 +1,5 @@
-import { modelReadSchema, modelCatalogSchema, modelSelectSchema, monOperationListSchema, toJson } from '@eden/api'
+import { rpcMethods, toJson } from '@eden/api'
+import { contractHandler } from './contract-handler.ts'
 import type { JsonValue } from '@eden/api'
 import type { ModelService } from '../../modules/models/index.ts'
 import type { SessionService } from '../../modules/sessions/index.ts'
@@ -6,13 +7,15 @@ import type { MonBindingService } from '../../modules/mon/index.ts'
 
 export function modelRoutes(models: ModelService, sessions: SessionService, mon?: MonBindingService): Record<string, (value: JsonValue) => JsonValue | Promise<JsonValue>> {
   return {
-    'model.read': value => {
-      const params = modelReadSchema.parse(value)
+    'model.read': contractHandler(rpcMethods['model.read'], params => {
       const participants = params.sessionId ? sessions.repository.read(params.sessionId).participants : undefined
       return toJson(models.read(params.sessionId ?? undefined, participants))
-    },
-    ...(mon ? { 'model.catalog': (value: JsonValue) => mon.catalog(modelCatalogSchema.parse(value)) } : {}),
-    ...(mon ? { 'model.select': (value: JsonValue) => mon.select(modelSelectSchema.parse(value)) } : {}),
-    ...(mon ? { 'mon.operation.list': (value: JsonValue) => mon.listOperations(monOperationListSchema.parse(value)) } : {}),
+    }),
+    ...(mon ? { 'model.catalog': contractHandler(rpcMethods['model.catalog'], input => mon.catalog(input)) } : {}),
+    ...(mon ? { 'model.select': contractHandler(rpcMethods['model.select'], input => mon.select(input)) } : {}),
+    ...(mon ? { 'mon.sync.legacy.resolve': contractHandler(rpcMethods['mon.sync.legacy.resolve'], input => mon.resolveLegacySync(input)) } : {}),
+    ...(mon ? { 'mon.sync.legacy.replay': contractHandler(rpcMethods['mon.sync.legacy.replay'], input => mon.replayLegacySync(input)) } : {}),
+    ...(mon ? { 'mon.sync.status': contractHandler(rpcMethods['mon.sync.status'], input => mon.syncStatus(toJson(input))) } : {}),
+    ...(mon ? { 'mon.operation.list': contractHandler(rpcMethods['mon.operation.list'], input => mon.listOperations(input)) } : {}),
   }
 }

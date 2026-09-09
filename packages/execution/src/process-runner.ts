@@ -3,6 +3,7 @@ import { StringDecoder } from 'node:string_decoder'
 
 export interface ProcessResult { stdout: string; stderr: string; exitCode: number }
 export interface ProcessRequest {
+  cwd?: string
   executable: string
   args: string[]
   input: string
@@ -15,6 +16,7 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
   request.signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
     const child = spawn(request.executable, request.args, {
+      ...(request.cwd ? { cwd: request.cwd } : {}),
       env: { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     })

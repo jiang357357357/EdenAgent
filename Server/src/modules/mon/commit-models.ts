@@ -13,7 +13,7 @@ export function commitMonModels(models: ModelService, sessions: SessionRepositor
   else {
     event = sessions.database.transaction(insert)
     if (snapshot.mode === 'multi') models.bindActors(key, snapshot.actors.map(actor => ({ ...actor, vision: actor.vision ?? undefined })), snapshot.director ?? undefined)
-    else { models.bind(sessionId, snapshot.main ?? undefined); if (sessionId) models.bindVision(sessionId, snapshot.vision ?? undefined) }
+    else { models.bind(sessionId, snapshot.main ?? undefined); if (sessionId) models.bindVision(sessionId, snapshot.vision ?? undefined, snapshot.visionEntityId) }
   }
   if (event) sessions.events.publish(event)
 }

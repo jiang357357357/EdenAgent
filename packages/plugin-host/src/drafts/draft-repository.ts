@@ -9,6 +9,7 @@ export class DraftRepository {
 
   save(manifest: unknown, source: string): PluginDraft {
     const parsed = pluginManifestSchema.parse(manifest)
+    if (this.database.connection.prepare('SELECT 1 FROM plugin_packages WHERE id=? LIMIT 1').get(parsed.id)) throw new Error('Plugin ID is already used by an installed component package')
     validateToolSchema(parsed.tool.parameters)
     for (const sample of parsed.tests) assertToolInput(parsed.tool.parameters, sample.input)
     if (Buffer.byteLength(source) > 64 * 1024) throw new Error('Plugin source exceeds 64 KiB')

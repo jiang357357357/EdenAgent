@@ -13,5 +13,6 @@ export class WorkspaceRepository {
 
   set(root: string): void {
     this.database.connection.prepare('INSERT OR REPLACE INTO runtime_settings VALUES (?, ?, ?)').run('workspace.root', JSON.stringify(root), Date.now())
+    this.database.connection.prepare("UPDATE runtime_settings SET value_json=json_set(value_json,'$.state','reselected'),updated_at=? WHERE key='workspace.legacy_import'").run(Date.now())
   }
 }

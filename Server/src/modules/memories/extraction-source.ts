@@ -39,6 +39,7 @@ export function extractionSource(database: EdenDatabase, inputId: string, actorI
     FROM inputs JOIN sessions ON sessions.id=inputs.session_id JOIN turns ON turns.id=inputs.turn_id WHERE inputs.id=?`).get(inputId)
   if (!row || row.state !== 'completed' || row.turn_state !== 'completed' || row.session_status !== 'active') throw new Error('Memory extraction requires a completed input in an active session')
   const metadata = object(JSON.parse(String(row.metadata_json)))
+  if (metadata.job) return undefined
   if (row.kind !== 'prompt' || metadata.internalHandoff === true) return undefined
   const owner = identity(metadata, actorId)
   if (!owner) return undefined

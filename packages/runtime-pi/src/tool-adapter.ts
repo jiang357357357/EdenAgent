@@ -1,3 +1,5 @@
+import { runtimeImages } from './images.ts'
+import type { RuntimeImage } from './contracts.ts'
 import { Type } from 'typebox'
 import { z } from 'zod'
 import type { AgentHarnessTool } from '@earendil-works/pi-agent-core'
@@ -21,7 +23,13 @@ export function adaptTool(tool: RuntimeTool, callbacks: RuntimeCallbacks, health
       healthy()
       cancellation.throwIfAborted()
       let result
-      try { result = await tool.execute(input, { callId: invocationId, signal: cancellation }) }
+      let images: RuntimeImage[] = []
+      try {
+        result = await tool.execute(input, { callId: invocationId, signal: cancellation })
+        cancellation.throwIfAborted()
+        if (tool.resultImages) images = runtimeImages(await tool.resultImages(toJson(result), cancellation))
+        cancellation.throwIfAborted()
+      }
       catch (error) {
         try { await callbacks.afterTool?.(invocationId, { error: error instanceof Error ? error.message : String(error) }, true) }
         catch (commitError) { fail(commitError) }
@@ -30,7 +38,7 @@ export function adaptTool(tool: RuntimeTool, callbacks: RuntimeCallbacks, health
       const output = toJson(result)
       try { await callbacks.afterTool?.(invocationId, output, false) }
       catch (error) { fail(error) }
-      return { content: [{ type: 'text', text: JSON.stringify(output) }], details: output }
+      return { content: [{ type: 'text', text: JSON.stringify(output) }, ...images], details: output }
     },
   }
 }

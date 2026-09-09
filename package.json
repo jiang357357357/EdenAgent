@@ -8,6 +8,8 @@
   "scripts": {
     "check:architecture": "node Script/Architecture/check.mjs",
     "test:architecture": "node --test Script/Architecture/rules.test.mjs",
+    "legacy:export": "node --import tsx Script/Project/export_legacy.mjs",
+    "legacy:import": "node --import tsx Script/Project/import_legacy.mjs",
     "inventory:runtime": "node Script/Project/inventory-runtime.mjs",
     "build:server": "node Script/Project/build_server.mjs",
     "start:server": "node dist/server/main.mjs",
@@ -17,7 +19,7 @@
     "dev:server": "node Script/Project/start_server.mjs",
     "dev:web": "npm --prefix frontend/web run dev",
     "dev:desktop": "node Script/Project/dev_desktop.mjs",
-    "generate:rpc": "cargo run -p eden-agent-api --bin generate-types -- frontend/web/src/generated/eden-agent-rpc.ts",
+    "generate:rpc": "node Script/Project/generate_rpc.mjs",
     "build:connector:hoi4": "cargo build -p eden-agent-connector-hoi4",
     "package:connector:hoi4": "node Script/Project/package_connector.mjs hoi4 --profile debug",
     "build:connector:lichess": "cargo build -p eden-agent-connector-lichess",

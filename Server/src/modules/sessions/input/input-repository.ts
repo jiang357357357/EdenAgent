@@ -20,16 +20,19 @@ export class InputRepository {
     return Boolean(this.database.connection.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state='queued' LIMIT 1").get(sessionId))
   }
 
-  enqueue(sessionId: string, text: string, idempotencyKey: string, metadata: JsonValue = {}, kind: 'prompt' | 'compact' = 'prompt', environmentUpdate?: JsonValue): AcceptedInput {
+  enqueue(sessionId: string, text: string, idempotencyKey: string, metadata: JsonValue = {}, kind: 'prompt' | 'compact' = 'prompt', environmentUpdate?: JsonValue, onCommit?: (input: AcceptedInput) => void): AcceptedInput {
     const result = this.database.transaction(() => {
       const old = this.database.connection.prepare('SELECT * FROM inputs WHERE session_id=? AND idempotency_key=?').get(sessionId, idempotencyKey)
       if (old) {
         if (old.text !== text || old.metadata_json !== JSON.stringify(metadata) || old.kind !== kind) throw new Error('Idempotency key already used for a different input')
-        return { accepted: { sessionId, turnId: String(old.turn_id), inputId: String(old.id), state: String(old.state) } }
+        const accepted = { sessionId, turnId: String(old.turn_id), inputId: String(old.id), state: String(old.state) }
+        onCommit?.(accepted)
+        return { accepted }
       }
       const id = randomUUID()
       const turnId = randomUUID()
       this.database.connection.prepare('INSERT INTO inputs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, sessionId, turnId, idempotencyKey, text, 'queued', Date.now(), JSON.stringify(metadata), kind)
+      onCommit?.({ sessionId, turnId, inputId: id, state: 'queued' })
       const environmentEvent = environmentUpdate === undefined ? undefined : this.events.insert(sessionId, turnId, 'session.metadata.updated', environmentUpdate)
       const changedEvent = environmentUpdate === undefined ? undefined : this.events.insert(sessionId, turnId, 'session.environment_updated', environmentUpdate)
       return {

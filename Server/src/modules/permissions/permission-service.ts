@@ -1,5 +1,6 @@
+import { PermissionModeStore } from './permission-mode.ts'
 import { randomUUID } from 'node:crypto'
-import type { JsonValue } from '@eden/api'
+import type { PermissionMode, JsonValue } from '@eden/api'
 import type { EdenDatabase } from '@eden/store'
 import type { PermissionContext, PermissionRequest, PermissionEventSink } from './contracts.ts'
 import { PermissionRepository } from './permission-repository.ts'
@@ -8,8 +9,11 @@ interface Waiter { resolve(): void; reject(error: Error): void }
 
 export class PermissionService {
   private readonly pending = new Map<string, Waiter>()
+  private readonly modeStore: PermissionModeStore
   private readonly repository: PermissionRepository
   constructor(database: EdenDatabase, events: PermissionEventSink) {
+    this.modeStore = new PermissionModeStore(database)
+    this.modeStore.read()
     this.repository = new PermissionRepository(database, events)
     for (const request of this.list().filter(item => item.state === 'pending')) {
       this.repository.events.publish(this.repository.finish(request, 'interrupted'))
@@ -24,7 +28,7 @@ export class PermissionService {
     context.signal.throwIfAborted()
     const request: PermissionRequest = { id: randomUUID(), sessionId: context.sessionId, turnId: context.turnId,
       operationId: `${context.turnId}:${context.callId}`, capability, resource, details, state: 'pending', createdAt: Date.now() }
-    if (this.repository.granted(request)) request.state = 'allowed'
+    if (this.modeStore.allows(capability) || this.repository.granted(request)) request.state = 'allowed'
     const event = this.repository.insert(request)
     if (request.state === 'allowed') { this.repository.events.publish(event); return request.id }
     await new Promise<void>((resolve, reject) => {
@@ -42,6 +46,10 @@ export class PermissionService {
     })
     return request.id
   }
+
+  mode(): PermissionMode { return this.modeStore.read() }
+
+  setMode(mode: PermissionMode): PermissionMode { return this.modeStore.set(mode) }
 
   list(sessionId?: string): PermissionRequest[] { return this.repository.list(sessionId) }
 

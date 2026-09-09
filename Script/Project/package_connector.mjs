@@ -7,7 +7,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
-  statSync,
+  lstatSync,
   writeFileSync,
 } from "node:fs"
 import path from "node:path"
@@ -63,14 +63,18 @@ const entrypoint = manifest.entrypoints?.[platformKey]
 if (!entrypoint?.path) {
   throw new Error(`connector ${connectorId} has no ${platformKey} entrypoint`)
 }
+if (path.isAbsolute(entrypoint.path) || entrypoint.path.includes('\\')
+  || entrypoint.path.split('/').some((part) => !part || part === '.' || part === '..')) {
+  throw new Error('Worker entrypoint must be a relative package path')
+}
 const binaryName = path.basename(entrypoint.path)
 const builtBinary = path.join(agentRoot, "target", profile, binaryName)
-if (!existsSync(builtBinary) || !statSync(builtBinary).isFile()) {
+if (!existsSync(builtBinary) || !lstatSync(builtBinary).isFile()) {
   throw new Error(`worker binary is missing; build it first: ${builtBinary}`)
 }
 
-const connectorsRoot = path.join(agentRoot, "Data", "connectors")
-const packagesRoot = path.join(connectorsRoot, "packages")
+const connectorsRoot = path.join(agentRoot, "dist", "connectors")
+const packagesRoot = connectorsRoot
 const destination = path.join(packagesRoot, connectorId)
 const staging = path.join(connectorsRoot, `.staging-${connectorId}-${randomUUID()}`)
 const backup = path.join(connectorsRoot, `.backup-${connectorId}-${randomUUID()}`)
@@ -81,7 +85,9 @@ try {
     recursive: true,
     filter: (source) => {
       const relative = path.relative(sourceRoot, source)
-      return relative !== "checksums.json" && relative !== "signature.json" && relative.split(path.sep)[0] !== "workers"
+      if (relative === "checksums.json" || relative === "signature.json" || relative.split(path.sep)[0] === "workers") return false
+      if (lstatSync(source).isSymbolicLink()) throw new Error(`Package contains a symbolic link: ${relative}`)
+      return true
     },
   })
   const stagedWorker = path.join(staging, entrypoint.path)

@@ -21,13 +21,22 @@ function authenticated(request: IncomingMessage, config: ServerConfig): boolean 
 }
 
 export function attachWebsocket(server: HttpServer, config: ServerConfig, sessions: SessionService,
-  extraRoutes: Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> = {}): WebSocketServer {
+  extraRoutes: Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> = {}, prepareVoice?: (sessionId: string) => (client: WebSocket) => void): WebSocketServer {
   const websocket = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024,
     handleProtocols: protocols => protocols.has(websocketProtocol) ? websocketProtocol : false })
   server.on('upgrade', (request, socket, head) => {
-    if (request.url !== '/rpc' || !authenticated(request, config)) {
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const isVoice = url.pathname === '/voice/stt/realtime' && prepareVoice !== undefined
+    if ((!isVoice && request.url !== '/rpc') || !authenticated(request, config)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
       socket.destroy()
+      return
+    }
+    if (isVoice) {
+      try {
+        const connect = prepareVoice!(url.searchParams.get('session_id') ?? '')
+        websocket.handleUpgrade(request, socket, head, connect)
+      } catch { socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); socket.destroy() }
       return
     }
     websocket.handleUpgrade(request, socket, head, client => websocket.emit('connection', client))
