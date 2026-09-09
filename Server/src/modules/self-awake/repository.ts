@@ -1,4 +1,7 @@
 import { readNotificationHistory } from './notification-history.ts'
+import { previewNotificationReview, resolveNotificationReview } from './notification-review.ts'
+import { previewRunReview, resolveRunReview } from './run-review.ts'
+import { recentSelfAwakeContacts } from './recent-contacts.ts'
 import { JobRepository } from '../jobs/index.ts'
 import { randomUUID } from 'node:crypto'
 import type { SQLOutputValue } from 'node:sqlite'
@@ -8,6 +11,16 @@ import type { JobInfo, JsonValue, SelfAwakeDecision } from '@eden/api'
 
 export class SelfAwakeRepository {
   constructor(readonly database: EdenDatabase) {}
+  runReview(runId: string) { this.read(runId); return previewRunReview(this.database, runId) }
+  resolveRun(runId: string, fingerprint: string, decision: 'completed' | 'failed', note: string) {
+    this.read(runId)
+    return resolveRunReview(this.database, runId, fingerprint, decision, note)
+  }
+  notificationReview(runId: string) { this.read(runId); return previewNotificationReview(this.database, runId) }
+  resolveNotification(runId: string, fingerprint: string, decision: 'delivered' | 'suppressed', note: string) {
+    this.read(runId)
+    return resolveNotificationReview(this.database, runId, fingerprint, decision, note)
+  }
 
   begin(job: JobInfo, request: JsonValue, author: JsonValue): string {
     const old = this.database.connection.prepare('SELECT id FROM self_awake_runs WHERE job_id=?').get(job.id)
@@ -105,11 +118,7 @@ export class SelfAwakeRepository {
   }
 
   recentContacts(sessionId: string, userId: string, limit: number) {
-    const rows = this.database.connection.prepare(`SELECT n.* FROM desktop_reminders n WHERE (?='' AND n.session_id=?) OR
-      (?!='' AND EXISTS (SELECT 1 FROM self_awake_submissions s JOIN jobs j ON j.id=s.job_id WHERE j.session_id=n.session_id AND s.user_id=?))
-      ORDER BY n.created_at DESC,n.id DESC LIMIT ?`).all(userId, sessionId, userId, userId, limit)
-    return rows.map(row => ({ id: row.id, title: row.title, message: row.message, channel: 'desktop', status: row.state,
-      createdAt: row.created_at, displayedAt: row.displayed_at, closedAt: row.closed_at, author: JSON.parse(String(row.author_json)) }))
+    return recentSelfAwakeContacts(this.database, sessionId, userId, limit)
   }
 
   finalText(sessionId: string, turnId: string): string {
@@ -131,8 +140,10 @@ export class SelfAwakeRepository {
   }
 
   private fromRow(row: Record<string, SQLOutputValue>) {
+    const review = this.database.connection.prepare('SELECT decision,note,created_at FROM self_awake_run_reviews WHERE run_id=?').get(row.id!)
     const diaries = this.database.connection.prepare('SELECT * FROM self_awake_diaries WHERE run_id=? ORDER BY created_at,id').all(row.id!)
     return { id: String(row.id), jobId: String(row.job_id), sessionId: String(row.session_id), schemaVersion: 'self-awake.v1', eventId: String(row.event_id),
+      outcomeReview: review ? { decision: String(review.decision), note: String(review.note), reviewedAt: Number(review.created_at) } : null,
       status: String(row.state), request: toJson(JSON.parse(String(row.request_json))), decision: row.decision_json === null ? null : toJson(JSON.parse(String(row.decision_json))),
       authorSnapshot: toJson(JSON.parse(String(row.author_json))), attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error),
       startedAt: row.started_at === null ? null : Number(row.started_at), completedAt: row.completed_at === null ? null : Number(row.completed_at),

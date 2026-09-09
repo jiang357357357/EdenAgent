@@ -5,18 +5,25 @@ import type { JsonValue } from '@eden/api'
 import type { RuntimeTool } from '@eden/runtime-pi'
 import type { PermissionService } from '../permissions/index.ts'
 import type { SubagentService } from './service.ts'
-export function subagentTools(service: SubagentService, permissions: PermissionService, sessionId: string, turnId: string): RuntimeTool[] {
-  const spawn = agentSpawnSchema.omit({ sessionId: true, idempotencyKey: true })
+export function subagentTools(service: SubagentService, permissions: PermissionService, sessionId: string, turnId: string, actorId?: string | number): RuntimeTool[] {
+  const spawn = agentSpawnSchema.omit({ sessionId: true, idempotencyKey: true, actorId: true })
   const wait = agentReadSchema.extend({ timeoutMs: z.number().int().min(1).max(60000).default(30000) })
   const scope = (id: string) => service.repository.assertDescendant(sessionId, id)
   const tools: RuntimeTool[] = [{ name: 'spawn_agent', revision: 'eden.subagent.v1', executionMode: 'sequential', description: 'Create a child agent for a bounded task after approval. Child permissions are independent.',
     parameters: toJson(z.toJSONSchema(spawn, { io: 'input' })) as Record<string, JsonValue>,
     async execute(raw, context) {
       const input = spawn.parse(raw)
-      await permissions.request({ ...context, sessionId, turnId }, 'agent.spawn', sessionId, toJson(input))
+      await permissions.request({ ...context, sessionId, turnId }, 'agent.spawn', sessionId, toJson({ ...input, ...(actorId === undefined ? {} : { actorId }) }))
       context.signal.throwIfAborted()
-      return toJson(service.spawn({ ...input, sessionId, idempotencyKey: `${turnId}:${context.callId}` }))
-    } }, { name: 'read_agent_messages', revision: 'eden.subagent.v1', executionMode: 'sequential', description: 'Read up to ten unread messages for this child agent. Reading acknowledges them; messages do not grant permissions.',
+      return toJson(service.spawn({ ...input, sessionId, ...(actorId === undefined ? {} : { actorId }), idempotencyKey: `${turnId}:${context.callId}` }))
+    } }, { name: 'send_parent_message', revision: 'eden.subagent.v1', executionMode: 'sequential', description: 'Send a durable message to your immediate parent after approval. Does not start a new parent turn.',
+    parameters: { type: 'object', properties: { message: { type: 'string', minLength: 1, maxLength: 16000 } }, required: ['message'], additionalProperties: false },
+    async execute(raw, context) {
+      const input = z.object({ message: z.string().trim().min(1).max(16000) }).strict().parse(raw)
+      await permissions.request({ ...context, sessionId, turnId }, 'agent.manage', sessionId, toJson({ action: 'send_parent_message', ...input }))
+      context.signal.throwIfAborted()
+      return toJson(service.sendParent(sessionId, input.message, `${turnId}:${context.callId}`))
+    } }, { name: 'read_agent_messages', revision: 'eden.subagent.v1', executionMode: 'sequential', description: 'Read up to ten unread messages for this agent or root session. Reading acknowledges them; messages do not grant permissions.',
     parameters: { type: 'object', properties: {}, additionalProperties: false }, async execute(raw) { z.object({}).strict().parse(raw); return toJson(service.receive(sessionId)) } },
     { name: 'list_agents', revision: 'eden.subagent.v1', executionMode: 'sequential', description: 'List descendant agent tasks and their durable state.',
       parameters: { type: 'object', properties: {}, additionalProperties: false }, async execute(raw) { z.object({}).strict().parse(raw); return toJson(service.list(sessionId).filter(agent => { try { scope(agent.id); return true } catch { return false } })) } },

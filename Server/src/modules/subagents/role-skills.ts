@@ -1,6 +1,10 @@
 import type { SkillRepository } from '../skills/index.ts'
 
-export interface RoleSkillSnapshot { name: string; contentHash: string; workspaceRoot: string; content: string }
+export interface RoleSkillSnapshot {
+  name: string; contentHash: string; workspaceRoot: string; content: string
+  /** Absent on earlier saved snapshots; required when accepting newly captured role skills. */
+  toolDependencies?: { name: string; alternatives: string[] }[]
+}
 
 /** Installed instruction content only; no files are executed or permissions restored. */
 export function captureRoleSkills(names: string[], repository?: SkillRepository): RoleSkillSnapshot[] {
@@ -9,11 +13,12 @@ export function captureRoleSkills(names: string[], repository?: SkillRepository)
   let total = 0
   return names.map(name => {
     const skill = repository!.read(name)
-    if (!skill.enabled || !skill.modelInvocable || typeof skill.content !== 'string') throw new Error(`Role skill is unavailable: ${name}`)
+    if (!skill.enabled || !skill.modelInvocable || !skill.available || typeof skill.content !== 'string') throw new Error(`Role skill is unavailable: ${name}; missing tools: ${skill.missingTools.join(', ') || 'none'}`)
     if (skill.profiles.length && !skill.profiles.includes('user_chat')) throw new Error(`Role skill does not support child conversation tasks: ${name}`)
     total += Buffer.byteLength(skill.content)
     if (total > 256 * 1024) throw new Error('Role skill instructions exceed 256 KiB; narrow the skill selection')
-    return { name, contentHash: skill.contentHash, workspaceRoot: skill.workspaceRoot, content: skill.content }
+    return { name, contentHash: skill.contentHash, workspaceRoot: skill.workspaceRoot, content: skill.content,
+      toolDependencies: repository!.toolDependencies(name) }
   })
 }
 

@@ -1,5 +1,6 @@
 import { tableConverted } from './conversion-state.ts'
 import { convertSelfAwakeJob } from './self-awake-job.ts'
+import { convertSelfAwakeSubmission } from './self-awake-submission.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import type { LegacySnapshotReader } from './snapshot-reader.ts'
 import type { LegacyRow } from './snapshot-format.ts'
@@ -34,13 +35,18 @@ function convertJob(db: DatabaseSync, row: LegacyRow): void {
     key: `legacy-job:${id}`, payload: legacyJson(row, 'payload_json'), dueAt: legacyTime(row.due_at),
     sessionId: row.session_id === null ? null : legacyUuid(row, 'session_id'), causation: `legacy-job:${id}`,
     error: state === 'claimed' ? 'Legacy dispatch outcome is unknown; automatic replay is disabled' : row.last_error === null ? null : legacyText(row, 'last_error') }
-  if (state === 'scheduled' && kind === 'self_awake') job = { ...job, ...convertSelfAwakeJob(db, row) }
+  if (kind === 'self_awake') {
+    const converted = convertSelfAwakeJob(db, row)
+    job = state === 'scheduled' ? { ...job, ...converted } : { ...job,
+      sessionId: converted.sessionId, payload: converted.payload, causation: converted.causation }
+  }
   if (state === 'scheduled' && !['memo.reminder', 'self_awake'].includes(kind)) throw new Error(`Scheduled legacy job requires a domain converter: ${kind}`)
   if (kind === 'memo.reminder' && ['scheduled', 'claimed'].includes(state)) job = reminder(db, job)
   db.prepare(`INSERT INTO jobs(id,kind,session_id,due_at,payload_json,operation_key,causation_id,depth,state,attempts,error,created_at,updated_at)
     VALUES(?,?,?,?,?,?,?,0,?,?,?,?,?)`).run(id, kind, job.sessionId, job.dueAt, job.payload, job.key, job.causation,
       job.state, attempts, job.error, legacyTime(row.created_at), legacyTime(row.updated_at))
   db.prepare('INSERT INTO legacy_conversion_ids VALUES(?,?,?)').run('jobs', id, id)
+  if (kind === 'self_awake') convertSelfAwakeSubmission(db, row)
   db.prepare('INSERT INTO legacy_conversion_records VALUES(?,?,?)').run('jobs', id, preserveLegacyRow(row))
 }
 

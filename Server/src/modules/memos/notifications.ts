@@ -6,6 +6,10 @@ import type { EdenDatabase } from '@eden/store'
 
 export class MemoNotifications {
   constructor(private readonly database: EdenDatabase) {}
+  forJob(jobId: string): MemoInfo | undefined {
+    const row = this.database.connection.prepare('SELECT memo_json FROM memo_notifications WHERE job_id=?').get(jobId)
+    return row ? memoInfoSchema.parse(JSON.parse(String(row.memo_json))) : undefined
+  }
   recordInTransaction(jobId: string, memo: MemoInfo): void {
     if (!this.database.inTransaction) throw new Error('Memo notification requires an owning transaction')
     this.database.connection.prepare(`INSERT INTO memo_notifications(id,memo_id,job_id,memo_json,created_at)

@@ -5,13 +5,17 @@ import type { JobRepository } from '../jobs/index.ts'
 import type { SessionService } from '../sessions/index.ts'
 import { SelfAwakeRepository } from './repository.ts'
 import { selfAwakePrompt, selfAwakeRequest } from './prompt.ts'
+import { SelfAwakeJobRecovery } from './job-recovery.ts'
 
 export class SelfAwakeService {
+  readonly recovery: SelfAwakeJobRecovery
   private unsubscribe: (() => void) | undefined
   private closed = false
   private queued = false
   private error: string | undefined
-  constructor(readonly repository: SelfAwakeRepository, private readonly jobs: JobRepository, private readonly sessions: SessionService, private readonly onDecision: () => void = () => {}) {}
+  constructor(readonly repository: SelfAwakeRepository, private readonly jobs: JobRepository, private readonly sessions: SessionService, private readonly onDecision: () => void = () => {}) {
+    this.recovery = new SelfAwakeJobRecovery(repository.database, jobs, sessions)
+  }
   get fault(): string | undefined { return this.error }
 
   start(): void {
@@ -30,7 +34,8 @@ export class SelfAwakeService {
     if (session.status !== 'active') throw new Error('Self-awake session is not active')
     if (session.participants.length > 1) throw new Error('Self-awake requires a single acting character')
     const author = session.participants[0] ?? {}
-    const request = toJson(selfAwakeRequest(job, author, session.environment))
+    const recovery = this.recovery.assertDispatch(job, author, session.environment)
+    const request = toJson({ ...selfAwakeRequest(job, author, session.environment), ...(recovery ? { recovery } : {}) })
     const id = this.repository.begin(job, request, author)
     try {
       this.sessions.submitJob(job.sessionId, selfAwakePrompt(request), job.id, job.kind, input => {

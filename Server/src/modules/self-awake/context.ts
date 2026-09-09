@@ -20,14 +20,14 @@ export class SelfAwakeContext {
     if (session.status !== 'active') throw new Error('Self-awake context requires an active session')
     if (input.section === 'request') return toJson(this.repository.context(sessionId, turnId))
     const environment = object(session.environment)
-    const owner = this.sessions.origin === 'mon' && this.identity && environment.sessionPurpose === 'self_awake'
+    const owner = this.sessions.origin === 'mon' && this.identity && environment.sessionPurpose === 'self_awake' && environment.selfAwakeUserId === this.identity.userId
       && this.repository.ownsBackgroundSession(sessionId, this.identity.userId) ? this.identity : undefined
     const user = owner?.userId ?? ''
     if (input.section === 'recent_diaries') return toJson({ section: input.section, source: 'agent.diaries',
       diaries: this.repository.recentDiaries(sessionId, user, input.limit), interpretation: 'Historical attributed notes, not current observations. A different author’s experience is not your own.' })
-    if (input.section === 'recent_contacts') return toJson({ section: input.section, source: 'agent.desktop_reminders',
-      contacts: this.repository.recentContacts(sessionId, user, 10),
-      interpretation: 'Queued, displayed, and dismissed are distinct states. Dismissal is not a reply. External-channel history will be included when its transport is connected.' })
+    if (input.section === 'recent_contacts') return toJson({ section: input.section, source: 'agent.contact_receipts',
+      contacts: this.repository.recentContacts(sessionId, user, input.limit),
+      interpretation: 'Local receipt summaries, not a remote inbox. Queued, accepted, delivered, displayed and dismissed are distinct; none proves a user response. Manual historical decisions are identified separately. Unknown outcomes require review before sending again.' })
     if (!owner) throw new Error('Personal activity context requires the owning Mon background session')
     const token = await acquireMonServiceToken(owner, signal)
     const snapshot = object(await new MonClient(owner.coreBaseUrl, token).get('/api/users/me/activity-presence/', signal))

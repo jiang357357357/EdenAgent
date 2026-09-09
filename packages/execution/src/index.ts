@@ -9,3 +9,7 @@ export { runSkillCommand } from './skill-command.ts'
 export { launchConnectorProcess } from './connector-process.ts'
 export type { ConnectorProcessRequest, ConnectorProcess } from './connector-process.ts'
 export { launchMcpProcess } from './mcp-process.ts'
+
+export { hostCommandInfo, runHostCommand } from './host-command.ts'
+
+export { configuredExternalCommandSandbox } from './external-command.ts'

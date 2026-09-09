@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { jobScheduleSchema, jobInfoSchema, jobListSchema, jobIdSchema } from '@eden/api'
+import { resolveJobOutcome } from './outcome-review.ts'
+import { jobScheduleSchema, jobInfoSchema, jobListSchema, jobIdSchema, jobPageSchema } from '@eden/api'
 import type { JobSchedule, JobInfo } from '@eden/api'
 import type { EdenDatabase } from '@eden/store'
 import type { SQLOutputValue } from 'node:sqlite'
@@ -9,6 +10,14 @@ export class JobRepository {
   constructor(private readonly database: EdenDatabase) {}
 
   schedule(value: JobSchedule): JobInfo { return this.database.transaction(() => this.scheduleInTransaction(value)) }
+  byKey(key: string): JobInfo | undefined {
+    const row = this.database.connection.prepare('SELECT id FROM jobs WHERE operation_key=?').get(key)
+    return row ? this.read(String(row.id)) : undefined
+  }
+  resolveOutcome(id: string, expectedUpdatedAt: number, decision: 'completed' | 'cancelled', note: string): JobInfo {
+    resolveJobOutcome(this.database, id, expectedUpdatedAt, decision, note)
+    return this.read(id)
+  }
 
   scheduleInTransaction(value: JobSchedule): JobInfo {
     this.owningTransaction()
@@ -36,6 +45,17 @@ export class JobRepository {
     const input = jobListSchema.parse(value)
     return this.database.connection.prepare(`SELECT * FROM jobs WHERE (? IS NULL OR session_id=?) AND (? IS NULL OR state=?) ORDER BY created_at DESC,id DESC LIMIT ?`)
       .all(input.sessionId ?? null, input.sessionId ?? null, input.state ?? null, input.state ?? null, input.limit).map(fromRow)
+  }
+  page(value: unknown = {}) {
+    const input = jobPageSchema.parse(value), states = input.states ? JSON.stringify(input.states) : null
+    const beforeTime = input.before?.createdAt ?? null, beforeId = input.before?.id ?? null
+    const rows = this.database.connection.prepare(`SELECT * FROM jobs WHERE (? IS NULL OR session_id=?)
+      AND (? IS NULL OR kind=?) AND (? IS NULL OR state IN (SELECT value FROM json_each(?)))
+      AND (? IS NULL OR created_at<? OR (created_at=? AND id<?)) ORDER BY created_at DESC,id DESC LIMIT ?`)
+      .all(input.sessionId ?? null, input.sessionId ?? null, input.kind ?? null, input.kind ?? null, states, states,
+        beforeTime, beforeTime, beforeTime, beforeId, input.limit + 1)
+    const items = rows.slice(0, input.limit).map(fromRow), last = items.at(-1)
+    return { items, nextCursor: rows.length > input.limit && last ? { createdAt: last.createdAt, id: last.id } : null }
   }
 
   recover(): void {

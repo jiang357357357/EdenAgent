@@ -17,6 +17,7 @@ export function selfAwakePrompt(request: JsonValue): string {
 需要创建备忘、检查工作区或向用户提问时，使用现有工具并遵守授权。不能通过终端绕过外发审批。
 结束时只输出一个 JSON 对象，不加 Markdown：mood、current_desire、observations（0—5条事实）、should_interrupt_user、action、action_payload、next_wake、diary。
 action 可为 chat_user、remind_user、create_task、ask_user、run_safe_check、sync_context、write_diary。action_payload 记录最终动作请求或已有工具结果，不把请求写成成功。
+run_safe_check 与 sync_context 最终动作仅保存决策标记，不会自动执行检查或远端同步。需要实际操作时须在本轮调用对应工具并依据执行回执记录结果；没有回执不得称已检查或已同步。
 next_wake 包含 after_minutes（1—10080）、reason；diary 包含非空 title 和 content，以当前角色第一人称记录这次经历。
 REQUEST:\n${JSON.stringify(request)}`
 }

@@ -3,9 +3,13 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { launchNode, realmEnvironment, stopChild, waitForHealth, waitForWeb } from './runtime_children.mjs'
+import realmRoots from '../../frontend/desktop/src/processes/realm-data-roots.cjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(import.meta.url)
+const { roots: dataRoots, selection } = realmRoots.resolveRealmSelection(process.env, {
+  mon: path.join(root, 'Data/realms/mon/v2'), local: path.join(root, 'Data/realms/local/v2'),
+})
 const children = []
 const tokens = { mon: randomBytes(32).toString('base64url'), local: randomBytes(32).toString('base64url') }
 const ports = { mon: Number(process.env.EDEN_AGENT_MON_PORT ?? 40092), local: Number(process.env.EDEN_AGENT_LOCAL_PORT ?? 40093) }
@@ -28,7 +32,10 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { void shut
 try {
   const checks = []
   for (const origin of ['mon', 'local']) {
-    const child = start(['--import', 'tsx', 'Server/src/main.ts'], realmEnvironment(process.env, origin, tokens[origin], ports[origin]))
+    const child = start(['--import', 'tsx', 'Server/src/main.ts'], {
+      ...realmEnvironment(process.env, origin, tokens[origin], ports[origin]), EDEN_AGENT_V2_DATA_ROOT: dataRoots[origin],
+      ...(selection ? { EDEN_AGENT_RUNTIME_SELECTION: selection.filename, EDEN_AGENT_RUNTIME_SELECTION_REVISION: selection.revision } : {}),
+    })
     checks.push(waitForHealth(ports[origin], origin, child))
   }
   await Promise.all(checks)
@@ -36,8 +43,9 @@ try {
     ...process.env, EDEN_AGENT_EXTERNAL_ORIGINS: 'mon,local', EDEN_AGENT_SERVER_MODE: '',
     EDEN_AGENT_MON_PORT: String(ports.mon), EDEN_AGENT_LOCAL_PORT: String(ports.local),
     EDEN_AGENT_MON_CAPABILITY_TOKEN: tokens.mon, EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: tokens.local,
-    EDEN_AGENT_MON_TOKEN_FILE: path.join(root, 'Data/realms/mon/v2/capability.token'),
-    EDEN_AGENT_LOCAL_TOKEN_FILE: path.join(root, 'Data/realms/local/v2/capability.token'),
+    EDEN_AGENT_MON_DATA_ROOT: dataRoots.mon, EDEN_AGENT_LOCAL_DATA_ROOT: dataRoots.local,
+    EDEN_AGENT_MON_TOKEN_FILE: path.join(dataRoots.mon, 'capability.token'),
+    EDEN_AGENT_LOCAL_TOKEN_FILE: path.join(dataRoots.local, 'capability.token'),
     VITE_EDEN_AGENT_MON_BASE_URL: `http://127.0.0.1:${ports.mon}`,
     VITE_EDEN_AGENT_LOCAL_BASE_URL: `http://127.0.0.1:${ports.local}`,
     VITE_EDEN_AGENT_MON_CAPABILITY_TOKEN: tokens.mon, VITE_EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: tokens.local,

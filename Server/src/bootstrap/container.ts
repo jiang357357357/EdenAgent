@@ -23,6 +23,7 @@ import { attachWebsocket } from '../transport/websocket/upgrade.ts'
 import type { ServerConfig } from './config.ts'
 import { persistToken } from './config.ts'
 import { acquireProcessLock } from './process-lock.ts'
+import { assertRuntimeSelection } from './runtime-selection.ts'
 import { pluginRoutes } from '../transport/rpc/plugin.routes.ts'
 import { permissionRoutes } from '../transport/rpc/permission.routes.ts'
 import { workspaceRoutes } from '../transport/rpc/workspace.routes.ts'
@@ -36,6 +37,7 @@ import { memoryExtractionRoutes } from '../transport/rpc/memory-extraction.route
 
 export async function startServer(config: ServerConfig) {
   const releaseProcessLock = acquireProcessLock(config.dataRoot)
+  try { assertRuntimeSelection(config) } catch (error) { releaseProcessLock(); throw error }
   let releaseReviewLock: (() => void) | undefined
   try { if (config.migrationReview) releaseReviewLock = acquireReviewLock(config.dataRoot) }
   catch (error) { releaseProcessLock(); throw error }
@@ -59,6 +61,8 @@ export async function startServer(config: ServerConfig) {
     health(request, response)
   })
   const websocket = attachWebsocket(http, config, sessions, {
+    'memo.job.resubmit': contractHandler(rpcMethods['memo.job.resubmit'], input => services.memoJobRecovery.resubmit(input.id, input.expectedUpdatedAt, input.note)),
+    'plugin.hook.resubmit': contractHandler(rpcMethods['plugin.hook.resubmit'], input => services.pluginHooks.resubmit(input.id, input.expectedUpdatedAt, input.note)),
     'runtime.status': contractHandler(rpcMethods['runtime.status'], () => ({ mode: config.migrationReview ? 'migration-review' : 'runtime', runtimeOrigin: config.origin, automaticExecution: !config.migrationReview })),
     'migration.status': contractHandler(rpcMethods['migration.status'], async () => {
       if (!config.migrationReview) throw new Error('Migration status requires review mode')
@@ -66,12 +70,13 @@ export async function startServer(config: ServerConfig) {
     }),
     ...operationRoutes(services.repository), ...commandRoutes(services.commands), ...mcpRoutes(services.mcp, database, services.mcpResults), ...connectorRoutes(services.connectorCatalog, services.connectors, services.connectorEvents, services.connectorPermissions, services.connectorCredentials), ...mediaRoutes(services.media), ...voiceRoutes(services.voiceConfig, services.voice, services.speech), ...subagentRoutes(services.subagents), ...memoryExtractionRoutes(memoryExtractions), ...memoRoutes(services.memos, services.memoNotifications),
     ...notificationRoutes(services.desktopReminders),
-    ...selfAwakeRoutes(services.selfAwake.repository, services.selfAwakeActions),
+    ...selfAwakeRoutes(services.selfAwake.repository, services.selfAwakeActions, services.selfAwake),
     ...directorRoutes(directors), ...jobRoutes(services.jobs),
     ...questionRoutes(questions),
     ...pluginAssetRoutes(services.packageAssets), ...pluginMarketRoutes(services.pluginMarket), ...skillRoutes(services.skills), ...pluginRoutes(plugins, services.pluginMarket.installed), ...permissionRoutes(permissions), ...workspaceRoutes(workspace, sessions), ...modelRoutes(models, sessions, config.origin === 'mon' ? mon : undefined),
   }, config.migrationReview ? undefined : sessionId => services.realtimeVoice.prepare(sessionId))
   try {
+    if (!config.migrationReview) await services.skills.start()
     if (!config.migrationReview) await memoryExtractions.start()
     await new Promise<void>((resolve, reject) => {
       http.once('error', reject)

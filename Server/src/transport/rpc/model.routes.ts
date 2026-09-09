@@ -7,6 +7,15 @@ import type { MonBindingService } from '../../modules/mon/index.ts'
 
 export function modelRoutes(models: ModelService, sessions: SessionService, mon?: MonBindingService): Record<string, (value: JsonValue) => JsonValue | Promise<JsonValue>> {
   return {
+    ...(mon ? {
+      'model.mon.children.list': contractHandler(rpcMethods['model.mon.children.list'], input => mon.childProfiles(input.sessionId)),
+      'model.mon.children.catalog': contractHandler(rpcMethods['model.mon.children.catalog'], input => mon.childCatalog(input.sessionId)),
+      'model.mon.children.bind': contractHandler(rpcMethods['model.mon.children.bind'], input => mon.bindChildProfile(input.sessionId, input.entityId, input.expectedRevision)),
+      'model.mon.children.remove': contractHandler(rpcMethods['model.mon.children.remove'], input => mon.removeChildProfile(input.sessionId, input.key, input.expectedRevision)),
+    } : {}),
+    'model.local.profiles.list': contractHandler(rpcMethods['model.local.profiles.list'], () => models.localProfiles().list()),
+    'model.local.profiles.save': contractHandler(rpcMethods['model.local.profiles.save'], input => models.localProfiles().save(input.model, input.expectedRevision)),
+    'model.local.profiles.remove': contractHandler(rpcMethods['model.local.profiles.remove'], input => models.localProfiles().remove(input.key, input.expectedRevision)),
     'model.pricing.read': contractHandler(rpcMethods['model.pricing.read'], input => {
       sessions.repository.read(input.sessionId)
       if (!models.pricing) throw new Error('Model pricing storage is unavailable')

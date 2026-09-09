@@ -4,7 +4,7 @@ export const commandExecutionConfigSchema = z.object({
 }).strict()
 export const commandExecutionSetSchema = commandExecutionConfigSchema.extend({ confirmHostExecution: z.boolean() })
 export const commandExecutionInfoSchema = commandExecutionConfigSchema.extend({
-  available: z.boolean(), sandboxAvailable: z.boolean(), sandboxBackend: z.string(), shell: z.string(), detail: z.string(),
+  available: z.boolean(), hostAvailable: z.boolean(), hostShell: z.string(), sandboxAvailable: z.boolean(), sandboxBackend: z.string(), shell: z.string(), detail: z.string(),
 })
 export type CommandExecutionConfig = z.infer<typeof commandExecutionConfigSchema>
 export type CommandExecutionInfo = z.infer<typeof commandExecutionInfoSchema>

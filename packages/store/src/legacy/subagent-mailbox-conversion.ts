@@ -18,7 +18,7 @@ export async function convertLegacyAgentMailbox(db: DatabaseSync, source: Legacy
       const senderThread = sender === '/root' ? undefined : db.prepare('SELECT child_session_id FROM subagent_threads WHERE root_session_id=? AND agent_path=?').get(sessionId, sender)
       const senderSession = sender === '/root' ? sessionId : senderThread ? String(senderThread.child_session_id) : null
       // The original kind, trigger and details are not instructions to execute in the new runtime.
-      const mapped = recipient && senderSession !== null && kind === 'message' && content.trim() && content.length <= 16000
+      const mapped = recipient && senderSession !== null && ['message', 'completion'].includes(kind) && content.trim() && content.length <= 16000
       db.prepare('INSERT INTO legacy_subagent_mailbox VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(id, sessionId, sender, target, content, kind,
         Number(row.trigger_turn), legacyJson(row, 'details_json'), created, consumed, consumed !== null ? 'consumed' : mapped ? 'context_required' : 'review_required')
       if (mapped) {

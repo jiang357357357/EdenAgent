@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { inputRecoveryMethods } from './input-recovery.ts'
 import { jsonValue } from './json.ts'
 import { runtimeOriginSchema } from './runtime.ts'
 import { sessionCreateSchema, sessionListSchema, sessionIdSchema, sessionTitleSchema, sessionParticipantsSchema } from './rpc.ts'
@@ -18,6 +19,7 @@ export const sessionEventSchema = z.object({
 export type SessionEvent = z.infer<typeof sessionEventSchema>
 const eventPageSchema = z.object({ items: z.array(sessionEventSchema), hasMore: z.boolean(), nextCursor: z.string().nullable() })
 export const sessionRpcMethods = {
+  ...inputRecoveryMethods,
   'session.create': { params: sessionCreateSchema, result: sessionSummarySchema },
   'session.list': { params: sessionListSchema, result: z.array(sessionSummarySchema) },
   'session.read': { params: sessionIdSchema, result: sessionSummarySchema },

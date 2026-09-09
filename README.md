@@ -1,179 +1,87 @@
-> **迁移状态（2026-09-09）**：原 AgentCore 与 Rust Server 已[归档](Archive/2026-09-09-rust-runtime/README.md)，新 TS 宿主已能启动并运行录制模型与自编写插件测试，完整业务迁移仍在进行。当前进度以[实施跟踪](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md)为准；下文尚未更新的 Rust 说明属于历史实现。后续见 [TypeScript 宿主与 pi 实现方案](文档/技术/Eden%20Agent%20TypeScript%20宿主与%20pi%20实现方案.md)。
-
-<div align="center">
-
 # Eden Agent
 
-**本地优先、可持久化、可嵌入的 Rust 智能体运行时**
+本地优先、可持久化、可嵌入的 TypeScript 智能体宿主，使用 pi 公共 SDK。
 
-React / Vite 客户端 · Electron 桌面端 · WebSocket JSON-RPC · SQLite
-
-[![CI](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml)
-![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-dea584?logo=rust&logoColor=white)
-![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.8.0-e67700)
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-f3a712)
+React / Vite · Electron · Node.js 22.23.1 · SQLite · WebSocket JSON-RPC
 
 **简体中文** · [English](README.en.md)
 
-</div>
-
-> “要用皂荚木作一柜。”<br>
-> “我要在那里与你相会。”
->
-> ——《出埃及记》25:10、25:22（和合本）
+> TS 迁移仍在进行。源码中已有对话、扩展、双世界业务和迁移发行实现，但近期实现尚未运行验证，不能据此认定 P0–P5 已完成。进度以[实施跟踪](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md)和[业务长期计划](文档/技术/ts-migration/业务优先长期计划.md)为准。
 
 Eden Agent 的设计灵感来自《蔚蓝档案》中的“什亭之匣”。这是一个独立的源代码公开项目，与原作及其官方无关联。
 
-<p align="center">
-  <img src="docs/assets/eden-agent-runtime.png" alt="Eden Agent 运行界面" width="100%">
-</p>
+## 运行结构
 
-> [!IMPORTANT]
-> Eden Agent 正在持续开发，协议与配置格式仍可能变化。当前代码以 PolyForm Noncommercial 1.0.0 提供非商业使用，并非 OSI 定义的开源许可证；商业使用需要单独授权。
+Electron 分别监管伊甸园和尘世两个 Node Server。每个宿主通过 `packages/runtime-pi` 调用 pi；前端通过当前世界的 RPC 和 Blob 端点访问服务。
 
-## 项目简介
-
-Eden Agent 把智能体循环、工具调用、持久化和桌面体验放在本地运行。桌面端分别监管伊甸园与尘世两个 Rust Server；前端只通过生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问当前世界，不依赖 Python sidecar 或旧原生桥接层。
-
-### 核心能力
-
-| 方向 | 能力 |
+| 路径 | 职责 |
 | --- | --- |
-| 智能体运行时 | 流式对话、上下文管理、压缩、工具循环、会话恢复 |
-| 本地工作区 | 文件浏览与编辑、受控命令执行、工作区切换 |
-| 模型服务 | OpenAI、DeepSeek、Ollama 与自定义 OpenAI 兼容服务 |
-| 角色体验 | 完整角色资料、静态立绘、Spine 立绘、GSV 语音合成与语音转录配置 |
-| 扩展系统 | 技能、插件、多智能体、定时作业、MCP 与连接器 |
-| 数据与安全 | SQLite 持久化、能力令牌、权限审批、沙箱故障关闭、Blob 存储 |
-| 官方连接器 | Hearts of Iron IV、Victoria 3、OpenTTD、Lichess |
+| `Server/src` | TS 宿主、业务服务、传输和启动组装 |
+| `packages/runtime-pi` | 唯一直接导入 pi SDK 的适配包 |
+| `packages/api` | TS 协议 schema 与共享类型 |
+| `packages/store` | SQLite 连接、schema 与迁移基础设施 |
+| `packages/plugin-sdk`、`packages/plugin-host` | 智能体自写插件、版本、审批与隔离执行 |
+| `packages/execution`、`packages/integrations` | 命令边界与外部集成 |
+| `frontend/web`、`frontend/desktop` | React 客户端与 Electron 桌面壳 |
+| `Native`、`Connectors/official` | 独立 Rust helper 与官方连接器 worker |
+| `Archive/2026-09-09-rust-runtime` | 原 AgentCore、Rust Server 及历史来源 |
 
-## 架构
+新运行时不链接归档 Rust 宿主。Rust 工具链仅用于独立原生组件。
 
-```mermaid
-flowchart LR
-    Desktop[Electron 桌面壳] --> Web[React / Vite 客户端]
-    Web -->|伊甸园 RPC / Blob| Mon[伊甸园 Server :40092]
-    Web -->|尘世 RPC / Blob| Local[尘世 Server :40093]
-    Desktop -->|分别启动与监管| Mon
-    Desktop -->|分别启动与监管| Local
-    Mon --> MonStore[(mon SQLite / Blob)]
-    Local --> LocalStore[(local SQLite / Blob)]
-    Mon --> Core[AgentCore + Eden Core]
-    Local --> LocalCore[AgentCore + 本地模型]
-```
+## 双世界与模型
 
-两个世界使用不同端口、能力令牌、SQLite、Blob、日志、插件、用户技能、子智能体与连接器目录，进程也不共享模型凭据。尘世模型密钥仅保存在 `Data/realms/local/local-runtime.json`。数据库首次绑定世界后不可被另一世界打开。事件由对应 Server 先持久化再广播。`AgentCore` 保持宿主无关，不依赖 HTTP、SQLite、Electron 或具体模型供应商。
+伊甸园默认使用端口 `40092`，尘世使用 `40093`，开发 Web 使用 `40091`。两个宿主拥有独立进程、令牌、数据库、Blob、配置和外部副作用状态；事件先持久化再广播。
 
-## 仓库结构
+新数据默认位于 `Data/realms/mon/v2` 与 `Data/realms/local/v2`。旧数据不会原地升级或自动复制。数据库永久绑定世界，暂存导入尚未完成时正式宿主拒绝启动。
 
-| 路径 | 说明 |
-| --- | --- |
-| [`AgentCore`](AgentCore) | 宿主无关的 Rust library crates，包含领域类型、智能体循环、上下文与工具执行 |
-| [`Server`](https://github.com/jiang357357357/EdenAgentServer) | Rust 宿主服务子模块，负责协议、存储、模型、权限及扩展系统 |
-| [`frontend`](https://github.com/jiang357357357/EdenAgentFrontend) | React/Vite 客户端与 Electron 桌面壳子模块 |
-| [`Connectors`](Connectors) | 官方可安装连接器及其 worker |
-| [`Script`](Script) | 开发启动、配置读取、打包与迁移工具 |
-| [`文档`](文档) | 设计说明、运行手册与验收资料 |
+伊甸园模型通过 Mon Core 已验证连接绑定，支持角色和导演的独立配置。尘世使用本地配置或 `EDEN_AGENT_MODEL=provider/model`。子任务独立模型目录分别属于本世界，凭据不会跨世界继承；目录改动不自动改写已创建任务的模型快照。
 
-## 快速开始
+## 开发入口
 
-### 环境要求
+需要固定版本 Node.js 22.23.1 与 npm。构建连接器还需要 Rust 工具链。Linux 隔离执行依赖 bubblewrap 和 prlimit；Windows 已编写明确授权的本机 PowerShell 执行，未内置 Windows 沙箱；终端可接管理员配置的外部隔离器，插件/MCP/技能的跨平台隔离仍待完成，不能据桌面打包目标推断所有隔离功能可用。
 
-- Rust 1.85 或更高版本
-- Node.js 22 或更高版本
-- npm
-- Linux 或 Windows 桌面环境
-
-### 获取并启动
-
-```bash
-git clone --recurse-submodules https://github.com/jiang357357357/EdenAgent.git
-cd EdenAgent
+```sh
 npm ci
 npm --prefix frontend ci
-cp .monconfig.example .monconfig
-npm run dev
 ```
 
-默认端口：
-
-- Web 客户端：`http://127.0.0.1:40091`
-- 伊甸园 Server：`http://127.0.0.1:40092`
-- 尘世 Server：`http://127.0.0.1:40093`
-- 健康检查：`http://127.0.0.1:40092/readyz`、`http://127.0.0.1:40093/readyz`
-
-启动桌面端后，可在 **配置 → 模型服务** 中填写模型名称、API 地址与密钥。密钥只应保存在本机，不要提交 `.monconfig`、运行时配置或日志。
-
-### 分组件运行
+按项目需要从 `.monconfig.example` 配置本机 `.monconfig`。不要提交能力令牌、模型密钥、运行配置或真实 Data。
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | 启动 Web、Electron 与两个隔离的 Rust Server |
-| `npm run dev:server` | 安全启动一个 Rust Server；默认伊甸园，可用 `EDEN_AGENT_RUNTIME_ORIGIN=local` 选择尘世 |
-| `npm run dev:web` | 只启动 Web 客户端 |
+| `npm run dev` | 启动两个 TS 宿主、Web 与 Electron |
+| `npm run dev:server` | 启动单个 TS 宿主，世界由运行配置决定 |
+| `npm run dev:web` | 启动 Web |
 | `npm run dev:desktop` | 启动桌面开发环境 |
-| `npm run generate:rpc` | 从 Rust API 类型重新生成 TypeScript RPC 客户端 |
+| `npm run generate:rpc` | 从 TS 契约与浏览器模板生成客户端入口 |
+| `npm run build:server` | 构建 TS 宿主及离线迁移工具 |
 
-## 角色与视觉资源
+这些是可用脚本入口，不是本次已经执行成功的命令。当前工作顺序为先完成业务，再集中编写测试；收到明确要求后才执行测试和验收。
 
-角色二进制资源不会随代码仓库分发。请将静态图片与 Spine 导出文件放在独立的本地 `AgentAssets` 仓库中，再从 **配置 → 角色配置 → 视觉资源** 导入。
+## 自写插件
 
-迁移已有本地资源路径：
+智能体使用 `eden_plugin` 读取开发指南、新建或读取草稿、提交修订、验证、声明测试、安装和激活精确版本。插件开发页提供相同业务入口、源码编辑、差异、运行记录及编辑备份。
 
-```bash
-node Script/Project/MigrateCharacterAssets.mjs ../AgentAssets
-```
+覆盖已有草稿需要当前 `draftRevision`；构建产物另有 `revision`，安装要求对应的成功报告。工作区授权由用户明确给予，插件不能自行扩大权限。生成源码不会自动执行，模板也不会自动安装。
 
-在确认每个文件的来源及再分发权之前，请勿公开资源仓库。第三方角色、Spine、语音、模型、游戏内容和商标不在 Eden Agent 软件许可证的授权范围内。
+当前生成插件为受限单文件 TS 工具，不能把它视为任意 npm 应用。市场组件、MCP 与原生连接器有各自的包生命周期和授权边界。
 
-## 开发与验证
+## 迁移与发行
 
-```bash
-# Rust
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+- [数据迁移操作](文档/技术/ts-migration/数据迁移操作.md)：只读快照、暂存转换、恢复审阅、共同激活与数据根选择。
+- [桌面发行操作](文档/技术/ts-migration/桌面发行操作.md)：平台组装、独立签名、文件清单、版本安装和受管启动。
+- [项目脚本说明](Script/Project/README.md)：具体源码入口。
 
-# Frontend
-npm --prefix frontend/web run typecheck
-npm --prefix frontend/web test
-npm --prefix frontend/desktop test
-```
+发行工作流已改为 TS/Node/Electron 与独立 worker 组装。当前尚未产出或验收本轮签名发行包；自动解压与受管启动源码已接入；系统快捷方式、启动器升级和完整数据升级/回退协调仍需补齐。应用版本回退不会恢复数据库，旧宿主可能拒绝新 schema。
 
-GitHub Actions 会在每次推送和拉取请求中执行同样的核心检查。
+## 权限与数据边界
 
-终端执行设置、Windows 支持与 Linux 联网配置见[终端执行边界](Server/docs/command-execution.md)。
+默认沙箱不可用时拒绝执行。用户可明确开启本机命令执行，但审批策略仍独立生效；本机模式不提供两个世界之间的 OS 文件访问隔离，也不会自动允许 MCP stdio、技能或插件代码绕过沙箱。运行命令结束前不能切换执行边界。
 
-## 安全原则
+角色二进制资源不随代码仓库分发，可通过独立 `AgentAssets` 仓库管理。第三方角色、Spine、语音、模型、游戏内容和商标不包含在本项目软件授权中。
 
-- Server 默认只监听 `127.0.0.1`。
-- 两个世界使用不同的本地进程、端口、能力令牌与持久化目录。
-- 渲染进程只使用当前世界服务实例的能力令牌连接对应服务。
-- 桌面托管模式在监管器初始化时为每个世界生成随机令牌，监管器内重启 Server 会复用令牌；环境变量或外部托管模式可提供固定令牌。当前不实现独立 TTL 或自动过期。
-- 写文件、执行命令、外部通信等副作用必须经过权限策略。
-- 终端默认使用经过启动探测的 OS 沙箱；用户可在权限菜单明确开启本机执行，审批策略独立生效。MCP stdio 和技能代码仍要求沙箱。
-- 事件先持久化，再向客户端广播。
+## 项目文档与许可
 
-发现安全问题请阅读 [SECURITY.md](SECURITY.md)，不要通过公开 Issue 披露密钥或漏洞细节。
+[实现方案](文档/技术/Eden%20Agent%20TypeScript%20宿主与%20pi%20实现方案.md) · [工程约束](文档/技术/Eden%20Agent%20TypeScript%20工程约束.md) · [安全策略](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [版本记录](CHANGELOG.md)
 
-## 文档
-
-- [贡献指南](CONTRIBUTING.md)
-- [安全策略](SECURITY.md)
-- [版本记录](CHANGELOG.md)
-- [授权说明](LICENSING.md)
-- [第三方声明](THIRD-PARTY-NOTICES.md)
-- [技术文档目录](文档)
-
-## 许可证
-
-当前版本依据 [PolyForm Noncommercial License 1.0.0](LICENSE) 提供非商业源码使用。商业使用必须取得[单独书面商业授权](COMMERCIAL-LICENSE.md)。许可证迁移和历史版本适用范围见 [LICENSING.md](LICENSING.md)。
-
----
-
-<div align="center">
-
-如果 Eden Agent 对你有帮助，欢迎 Star、提交 Issue 或参与改进。
-
-</div>
+依据 [PolyForm Noncommercial License 1.0.0](LICENSE) 提供非商业源码使用，并非 OSI 定义的开源许可证。商业使用须取得[单独书面授权](COMMERCIAL-LICENSE.md)。历史版本范围见 [LICENSING.md](LICENSING.md)，第三方声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

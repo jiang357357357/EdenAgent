@@ -33,12 +33,12 @@ export class PluginService {
     this.reports = new ReportRepository(database)
   }
 
-  async validate(id: string, signal?: AbortSignal) { return this.track(id, 'validate', inner => buildPlugin(this.drafts.read(id), inner), signal) }
+  async validate(id: string, signal?: AbortSignal, expectedDraftRevision?: string) { return this.track(id, 'validate', inner => buildPlugin(this.drafts.read(id, expectedDraftRevision), inner), signal) }
   describe() { return pluginGuide() }
 
-  async test(id: string, signal?: AbortSignal, expectedRevision?: string) {
+  async test(id: string, signal?: AbortSignal, expectedRevision?: string, expectedDraftRevision?: string) {
     return this.track(id, 'test', async inner => {
-      const built = await buildPlugin(this.drafts.read(id), inner)
+      const built = await buildPlugin(this.drafts.read(id, expectedDraftRevision), inner)
       if (expectedRevision && built.revision !== expectedRevision) throw new Error('Draft changed after permission request')
       const report = await testPlugin(built, inner)
       this.reports.save(id, report)

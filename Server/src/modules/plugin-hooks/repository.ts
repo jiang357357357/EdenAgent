@@ -1,8 +1,43 @@
 import type { EdenDatabase } from '@eden/store'
+import type { JobInfo } from '@eden/api'
 import type { JobRepository } from '../jobs/index.ts'
+import { hookPayload } from './payload.ts'
 export interface HookContribution { pluginId: string; revision: string; hookId: string; event: string; skillName: string; afterRowid: number }
 export class PluginHookRepository {
   constructor(private readonly database: EdenDatabase, private readonly jobs: JobRepository) {}
+  assertEvent(job: JobInfo) {
+    const input = hookPayload.parse(job.payload)
+    const event = this.database.connection.prepare('SELECT session_id,kind,created_at FROM events WHERE id=?').get(input.eventId)
+    if (job.kind !== 'plugin.hook' || !job.sessionId || !event || event.session_id !== job.sessionId ||
+      event.kind !== input.event || event.created_at !== input.occurredAt || job.causationId !== input.eventId) {
+      throw new Error('Pinned hook event is missing or no longer matches its job')
+    }
+    return input
+  }
+  resubmit(id: string, expectedUpdatedAt: number, note: string, validate: (job: JobInfo) => void): JobInfo {
+    return this.database.transaction(() => {
+      const db = this.database.connection
+      const previous = db.prepare('SELECT * FROM plugin_hook_resubmissions WHERE source_job_id=?').get(id)
+      if (previous) {
+        if (previous.expected_updated_at !== expectedUpdatedAt || previous.note !== note) throw new Error('Hook job was already resubmitted with different evidence')
+        return this.jobs.read(String(previous.new_job_id))
+      }
+      const source = this.jobs.read(id)
+      if (source.kind !== 'plugin.hook' || !['failed', 'cancelled'].includes(source.state) || source.updatedAt !== expectedUpdatedAt) throw new Error('Stop or review the original hook job, then reload it')
+      this.assertEvent(source)
+      if (source.inputId) {
+        const input = db.prepare('SELECT state,turn_id FROM inputs WHERE id=?').get(source.inputId)
+        if (input?.state !== 'cancelled') throw new Error('Explicitly stop the original hook input before resubmitting')
+        if (db.prepare("SELECT 1 FROM tool_operations WHERE turn_id=? AND state IN ('running','unknown') LIMIT 1").get(input.turn_id!)) throw new Error('Reconcile unknown hook effects first')
+      }
+      validate(source)
+      const next = this.jobs.scheduleInTransaction({ kind: source.kind, sessionId: source.sessionId,
+        payload: source.payload, dueAt: Date.now(), key: `plugin-hook-resubmit:${id}`,
+        causationId: source.causationId, depth: source.depth })
+      db.prepare('INSERT INTO plugin_hook_resubmissions VALUES(?,?,?,?,?)').run(id, next.id, expectedUpdatedAt, note, Date.now())
+      return next
+    })
+  }
   initialize() {
     this.database.connection.prepare("INSERT OR IGNORE INTO plugin_hook_cursor(id,after_rowid) SELECT 1,COALESCE(MAX(rowid),0) FROM events").run()
   }

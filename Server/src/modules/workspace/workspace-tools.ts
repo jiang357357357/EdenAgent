@@ -25,7 +25,7 @@ export function workspaceTools(workspace: WorkspaceService, permissions: Permiss
         return workspace.mutate(root, context.signal, () => writeWorkspaceFile(root, params, context.signal))
       } },
     { name: 'eden_exec', revision: 'eden.workspace.exec.v1', executionMode: 'sequential',
-      description: 'Run /bin/sh in the selected workspace after approval. Uses the user-configured sandbox or host execution boundary, 30-second limit, 1 MiB combined output. Files in the workspace may be modified. No implicit retry.',
+      description: 'Run the OS shell in the selected workspace after approval: /bin/sh on POSIX, Windows PowerShell in Windows host mode. Uses the user-configured sandbox or host execution boundary, 30-second limit, 1 MiB combined output. Files in the workspace may be modified. No implicit retry.',
       parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'], additionalProperties: false },
       async execute(input, context) {
         const params = commandSchema.parse(input)

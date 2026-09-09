@@ -6,7 +6,7 @@ export { protocolVersion, websocketProtocol, tokenProtocolPrefix, rpcRequestSche
   sessionIdSchema, sessionCreateSchema, sessionListSchema, turnStartSchema, eventListSchema } from './rpc.ts'
 export { sessionTitleSchema, sessionParticipantsSchema, messageListSchema, sessionCompactSchema, turnQueueSchema } from './rpc.ts'
 export { workspaceSwitchSchema, workspacePathSchema } from './rpc.ts'
-export { pluginIdSchema, pluginVersionSchema, pluginActivationSchema, pluginDraftSchema, pluginInvokeSchema,
+export { pluginDraftOperationSchema, pluginIdSchema, pluginVersionSchema, pluginActivationSchema, pluginDraftSchema, pluginInvokeSchema,
   pluginGrantSchema, permissionListSchema, permissionResolveSchema, pluginManageSchema } from './plugins.ts'
 export { permissionRequestIdSchema } from './plugins.ts'
 export { configuredModelSchema, modelEndpointSchema, modelReadSchema, modelCatalogSchema } from './models.ts'
@@ -145,6 +145,15 @@ export type { SelfAwakeRunInfo } from './self-awake-rpc.ts'
 
 export { agentThreadInfoSchema } from './subagent-rpc.ts'
 export type { AgentThreadInfo } from './subagent-rpc.ts'
+export { subagentRecoverySchema } from './subagent-recovery.ts'
+export type { SubagentRecovery } from './subagent-recovery.ts'
+export { subagentPolicyRecoverySchema } from './subagent-recovery.ts'
+export type { SubagentPolicyRecovery } from './subagent-recovery.ts'
+export type { SubagentModelRecoveryPlan } from './subagent-recovery.ts'
+export type { SubagentBaselinePlan } from './subagent-recovery.ts'
+export { jobPageSchema } from './jobs.ts'
+export type { JobCursor } from './jobs.ts'
+export type { SubagentDeadlineRecovery } from './subagent-recovery.ts'
 
 export { toolInfoSchema } from './tool-rpc.ts'
 export type { ToolInfo } from './tool-rpc.ts'

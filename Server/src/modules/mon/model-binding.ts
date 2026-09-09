@@ -17,6 +17,7 @@ import type { JsonValue, MonOperationQuery, ModelSelectionTarget, AssistantTarge
 import type { ModelService } from '../models/index.ts'
 import type { SessionService } from '../sessions/index.ts'
 import { loadMonCatalog } from './model-catalog.ts'
+import { coreEntities, resolveCoreModel } from './model-schema.ts'
 import { prepareModelSelection } from './model-selection.ts'
 import { MonOperationRepository } from './operation-repository.ts'
 import { loadActorCatalog } from './actor-catalog.ts'
@@ -54,6 +55,35 @@ export class MonBindingService {
     if (this.sessions.repository.origin !== 'mon') throw new Error('Mon operations are only available in Mon')
     if (params.sessionId) this.sessions.repository.read(params.sessionId)
     return this.operations.list(params)
+  }
+
+  childProfiles(sessionId: string) {
+    this.sessions.repository.read(sessionId)
+    return this.models.monChildProfiles().list(sessionId)
+  }
+  removeChildProfile(sessionId: string, key: string, revision: string) {
+    this.sessions.repository.read(sessionId)
+    return this.models.monChildProfiles().remove(sessionId, key, revision)
+  }
+  async childCatalog(sessionId: string) {
+    const connection = this.connections?.read(sessionId)
+    if (!connection) throw new Error('Refresh the parent model catalogue to bind Mon Core first')
+    return this.run({ ...connection, sessionId }, async signal => {
+      const entities = coreEntities(await this.assistantClient(sessionId).getCollection('/api/ai/entities/', signal))
+      return toJson(entities.filter(entity => entity.status === 'active').map(entity => ({ entityId: String(entity.id),
+        key: `${entity.vendor}/${entity.ai_model}`, label: entity.ai_name || entity.ai_model })))
+    })
+  }
+  async bindChildProfile(sessionId: string, entityId: string | number, expectedRevision: string | null) {
+    const connection = this.connections?.read(sessionId)
+    if (!connection) throw new Error('Refresh the parent model catalogue to bind Mon Core first')
+    return this.run({ ...connection, sessionId }, async signal => {
+      const profiles = this.models.monChildProfiles(), hash = profiles.captureConnection(sessionId)
+      const binding = resolveCoreModel(await this.assistantClient(sessionId).get(`/api/ai/entities/${encodeURIComponent(String(entityId))}/`, signal))
+      signal.throwIfAborted()
+      if (String(binding.entityId) !== String(entityId)) throw new Error('Mon child model detail identity mismatch')
+      return toJson(profiles.save(sessionId, binding, expectedRevision, hash))
+    })
   }
 
   async select(params: CatalogRequest & { aiEntityId: string | number; target?: ModelSelectionTarget | undefined }): Promise<JsonValue> {

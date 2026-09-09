@@ -2,12 +2,18 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, chmodSync, lstatSync } from 'node:fs'
 import path from 'node:path'
 import { migrateDatabase } from './migrations.ts'
+import { assertStagingMutable, assertRuntimePublished } from './legacy/activation-guard.ts'
+import { assertPublicationGroup } from './legacy/publication-group.ts'
 
 export class EdenDatabase {
   readonly connection: DatabaseSync
   private activeTransaction = false
 
   constructor(filename: string, origin: 'mon' | 'local', mode: 'runtime' | 'migration-review' = 'runtime') {
+    if (filename !== ':memory:') {
+      if (mode === 'migration-review') assertStagingMutable(path.dirname(filename))
+      else assertRuntimePublished(filename)
+    }
     if (mode === 'migration-review') {
       const file = lstatSync(filename)
       if (!file.isFile() || file.isSymbolicLink()) throw new Error('Review requires an existing regular migration database')
@@ -23,6 +29,7 @@ export class EdenDatabase {
         this.assertOrigin(origin)
         const importing = this.connection.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()
         if (mode === 'migration-review' ? importing?.value !== 'incomplete' : importing && importing.value !== 'complete') throw new Error('Database import state does not permit this host mode')
+        if (mode === 'runtime') assertPublicationGroup(this.connection, filename, origin)
       }
       if (mode === 'migration-review' && !tables.length) throw new Error('Review requires an initialized incomplete import')
       this.connection.exec('PRAGMA journal_mode=WAL')

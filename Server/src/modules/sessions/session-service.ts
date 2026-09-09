@@ -12,6 +12,7 @@ import { SignalRepository } from './input/signal-repository.ts'
 import { modelDescriptor, assertModelSnapshot } from './turn/model-snapshot.ts'
 import { inputAttachments, type AttachmentService } from '../attachments/index.ts'
 import { InputAdmissions } from './input/admissions.ts'
+import { InputResubmissionRepository } from './input/resubmission-repository.ts'
 import type { MemoryRecall } from '../memories/index.ts'
 
 export class SessionService {
@@ -56,6 +57,30 @@ export class SessionService {
   start(sessionId: string, text: string, idempotencyKey: string = randomUUID(), environment?: JsonValue, kind: 'prompt' | 'compact' = 'prompt'): AcceptedInput {
     return this.accept(sessionId, text, idempotencyKey, environment, kind)
   }
+  resubmissionPreview(sessionId: string, sourceId: string) {
+    const { snapshots: _snapshots, ...source } = new InputResubmissionRepository(this.repository).source(sessionId, sourceId)
+    return source
+  }
+  resubmit(sessionId: string, sourceId: string, fingerprint: string, note: string): Promise<AcceptedInput> {
+    const recovery = new InputResubmissionRepository(this.repository)
+    const previous = recovery.existing(sessionId, sourceId, fingerprint, note)
+    if (previous) return Promise.resolve(previous)
+    const source = recovery.source(sessionId, sourceId)
+    if (source.fingerprint !== fingerprint) return Promise.reject(new Error('Source input changed; preview again'))
+    this.repository.assertContextReady(sessionId)
+    const captured = JSON.stringify(this.inputMetadata(sessionId, source.environment))
+    return this.admissions.submit(sessionId, async signal => {
+      if (source.attachments.length && !this.attachments) throw new Error('Attachment service unavailable')
+      const snapshots = source.attachments.length ? await this.attachments!.snapshot(source.attachments) : []
+      if (source.snapshots.length && JSON.stringify(snapshots) !== JSON.stringify(source.snapshots)) throw new Error('Original attachment snapshots no longer match')
+      signal.throwIfAborted()
+      const existing = recovery.existing(sessionId, sourceId, fingerprint, note)
+      if (existing) return existing
+      if (JSON.stringify(this.inputMetadata(sessionId, source.environment)) !== captured) throw new Error('Current session configuration changed; preview again')
+      return this.accept(sessionId, source.text, `resubmit:${sourceId}`, source.environment, source.kind, snapshots,
+        accepted => recovery.record(sessionId, sourceId, fingerprint, note, accepted))
+    })
+  }
 
   submitJob(sessionId: string, text: string, jobId: string, jobKind: string, onCommit: (input: AcceptedInput) => void): AcceptedInput {
     const metadata = { ...this.inputMetadata(sessionId), job: { id: jobId, kind: jobKind } }
@@ -88,10 +113,10 @@ export class SessionService {
     return { participants: session.participants, environment: environment === undefined ? session.environment : environment, ...this.executionSnapshot(sessionId, session.participants) }
   }
 
-  private accept(sessionId: string, text: string, idempotencyKey: string, environment: JsonValue | undefined, kind: 'prompt' | 'compact', attachments: AttachmentSnapshot[] = []): AcceptedInput {
+  private accept(sessionId: string, text: string, idempotencyKey: string, environment: JsonValue | undefined, kind: 'prompt' | 'compact', attachments: AttachmentSnapshot[] = [], onCommit?: (input: AcceptedInput) => void): AcceptedInput {
     const metadata = { ...this.inputMetadata(sessionId, environment), ...(attachments.length ? { attachments: toJson(attachments) } : {}) }
     const result = this.inputs.enqueue(sessionId, text, idempotencyKey, metadata, kind,
-      environment === undefined ? undefined : { participants: metadata.participants, environment })
+      environment === undefined ? undefined : { participants: metadata.participants, environment }, onCommit)
     this.stopping.delete(sessionId)
     this.boundaryWaiting.delete(sessionId)
     this.wake(sessionId)

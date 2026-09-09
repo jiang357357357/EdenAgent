@@ -17,15 +17,23 @@ export class SelfAwakeActionRepository {
     })
   }
   finish(id: string, result: JsonValue, error?: string): void {
-    const event = this.sessions.database.transaction(() => {
-      const row = this.sessions.database.connection.prepare('SELECT session_id,turn_id FROM self_awake_runs WHERE id=?').get(id)
+    const events = this.sessions.database.transaction(() => {
+      const row = this.sessions.database.connection.prepare('SELECT session_id,turn_id,decision_json FROM self_awake_runs WHERE id=?').get(id)
       if (!row) throw new Error('Self-awake action not found')
       const update = this.sessions.database.connection.prepare("UPDATE self_awake_runs SET state=?,action_result_json=?,last_error=?,updated_at=? WHERE id=? AND state='action_running'")
         .run(error ? 'action_failed' : 'completed', JSON.stringify(result), error ?? null, Date.now(), id)
       if (update.changes !== 1) throw new Error('Self-awake action is no longer owned')
-      return this.sessions.events.insert(String(row.session_id), String(row.turn_id), 'self_awake.action_applied', toJson({ runId: id, result, status: error ? 'failed' : 'persisted', error: error ?? null }))
+      const recorded = []
+      const decision = selfAwakeDecisionSchema.parse(JSON.parse(String(row.decision_json)))
+      if (!error && ['run_safe_check', 'sync_context'].includes(decision.action)) {
+        recorded.push(this.sessions.events.insert(String(row.session_id), row.turn_id === null ? null : String(row.turn_id),
+          decision.action === 'run_safe_check' ? 'self_awake.safe_check' : 'self_awake.sync_context',
+          { runId: id, status: 'requested', scope: 'local_runtime', note: 'Decision marker only; actual operations are recorded as approved tool executions.' }))
+      }
+      recorded.push(this.sessions.events.insert(String(row.session_id), row.turn_id === null ? null : String(row.turn_id), 'self_awake.action_applied', toJson({ runId: id, result, status: error ? 'failed' : 'persisted', error: error ?? null })))
+      return recorded
     })
-    this.sessions.events.publish(event)
+    for (const event of events) this.sessions.events.publish(event)
   }
   resume(id: string): void {
     const event = this.sessions.database.transaction(() => {

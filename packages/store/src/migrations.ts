@@ -352,7 +352,60 @@ const migrations = [
   `CREATE TABLE subagent_role_imports(id TEXT PRIMARY KEY,plan_json TEXT NOT NULL,state TEXT NOT NULL,expires_at INTEGER NOT NULL,result_json TEXT,applied_at INTEGER);`,
   `ALTER TABLE subagent_threads ADD COLUMN workspace_root TEXT;
    CREATE TABLE subagent_workspace_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),previous_root TEXT,workspace_root TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_policy_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),
+     source_hash TEXT NOT NULL,request_hash TEXT NOT NULL,review_json TEXT NOT NULL,policy_json TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_model_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),
+     fingerprint TEXT NOT NULL,snapshot_json TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_baseline_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),
+     fingerprint TEXT NOT NULL,previous_json TEXT NOT NULL,tokens INTEGER NOT NULL,cost_microusd INTEGER NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_reopen_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),
+     note TEXT NOT NULL,created_at INTEGER NOT NULL);
+   CREATE TABLE subagent_model_restoration_history(id INTEGER PRIMARY KEY AUTOINCREMENT,agent_id TEXT NOT NULL REFERENCES subagent_threads(id),
+     fingerprint TEXT NOT NULL,snapshot_json TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL,replaced_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_deadline_restorations(id TEXT PRIMARY KEY,agent_id TEXT NOT NULL REFERENCES subagent_threads(id),
+     request_json TEXT NOT NULL,previous_deadline INTEGER,deadline INTEGER NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_mailbox_restorations(id TEXT PRIMARY KEY REFERENCES legacy_subagent_mailbox(id),
+     fingerprint TEXT NOT NULL,decision TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE job_outcome_reviews(job_id TEXT PRIMARY KEY REFERENCES jobs(id),expected_updated_at INTEGER NOT NULL,
+     decision TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE input_outcome_reviews(input_id TEXT PRIMARY KEY REFERENCES inputs(id),fingerprint TEXT NOT NULL,
+     previous_state TEXT NOT NULL,decision TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE input_resubmissions(source_id TEXT PRIMARY KEY REFERENCES inputs(id),input_id TEXT NOT NULL UNIQUE REFERENCES inputs(id),
+     fingerprint TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_job_resubmissions(source_job_id TEXT PRIMARY KEY REFERENCES jobs(id),agent_id TEXT NOT NULL REFERENCES subagent_threads(id),
+     expected_updated_at INTEGER NOT NULL,new_job_id TEXT NOT NULL REFERENCES jobs(id),note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE INDEX jobs_session_history ON jobs(session_id,created_at DESC,id DESC);
+   CREATE INDEX jobs_session_kind_history ON jobs(session_id,kind,created_at DESC,id DESC);`,
+  `CREATE TABLE memo_job_resubmissions(source_job_id TEXT PRIMARY KEY REFERENCES jobs(id),new_job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id),
+     expected_updated_at INTEGER NOT NULL,snapshot_json TEXT,note TEXT NOT NULL,created_at INTEGER NOT NULL,mode TEXT NOT NULL);`,
+  `CREATE TABLE plugin_hook_resubmissions(source_job_id TEXT PRIMARY KEY REFERENCES jobs(id),new_job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id),
+     expected_updated_at INTEGER NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE self_awake_job_resubmissions(source_job_id TEXT PRIMARY KEY REFERENCES jobs(id),new_job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id),
+     fingerprint TEXT NOT NULL,author_json TEXT NOT NULL,environment_json TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE self_awake_notification_reviews(run_id TEXT PRIMARY KEY REFERENCES self_awake_notification_history(run_id),
+     fingerprint TEXT NOT NULL,previous_json TEXT NOT NULL,decision TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL,source TEXT NOT NULL);`,
+  `CREATE TABLE self_awake_run_reviews(run_id TEXT PRIMARY KEY REFERENCES self_awake_runs(id),fingerprint TEXT NOT NULL,
+     previous_json TEXT NOT NULL,decision TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_root_messages(id TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES sessions(id),
+     sender_session_id TEXT NOT NULL REFERENCES sessions(id),message TEXT NOT NULL,operation_key TEXT NOT NULL,
+     created_at INTEGER NOT NULL,read_at INTEGER,UNIQUE(session_id,operation_key));
+   CREATE INDEX subagent_root_inbox ON subagent_root_messages(session_id,read_at,created_at,id);`,
+  `CREATE TABLE subagent_mailbox_followups(id TEXT PRIMARY KEY REFERENCES legacy_subagent_mailbox(id),session_id TEXT NOT NULL REFERENCES sessions(id),
+     agent_id TEXT NOT NULL REFERENCES subagent_threads(id),fingerprint TEXT NOT NULL,note TEXT NOT NULL,
+     job_id TEXT NOT NULL REFERENCES jobs(id),created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_mailbox_abandonments(id TEXT PRIMARY KEY REFERENCES legacy_subagent_mailbox(id),
+     session_id TEXT NOT NULL REFERENCES sessions(id),fingerprint TEXT NOT NULL,previous_json TEXT NOT NULL,
+     note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `ALTER TABLE subagent_threads ADD COLUMN parent_actor_id TEXT;`,
+  `CREATE TABLE subagent_model_source_reviews(agent_id TEXT NOT NULL REFERENCES subagent_threads(id),fingerprint TEXT NOT NULL,
+     actor_id TEXT,note TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(agent_id,fingerprint));`,
+  `CREATE TABLE local_model_profiles(model_key TEXT PRIMARY KEY,configuration_json TEXT NOT NULL,revision TEXT NOT NULL,updated_at INTEGER NOT NULL);
+   ALTER TABLE local_child_models ADD COLUMN independent INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE mon_child_models(session_id TEXT NOT NULL REFERENCES sessions(id),model_key TEXT NOT NULL,entity_id TEXT NOT NULL,
+     binding_json TEXT NOT NULL,connection_hash TEXT NOT NULL,revision TEXT NOT NULL,updated_at INTEGER NOT NULL,PRIMARY KEY(session_id,model_key));`,
 ]
+
+export const databaseSchemaVersion = migrations.length
 
 export function migrateDatabase(database: DatabaseSync): void {
   const row = database.prepare('PRAGMA user_version').get()

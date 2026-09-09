@@ -1,4 +1,4 @@
-name: Windows Rust build
+name: Windows native connector build
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   build-windows-x64:
-    name: Build Windows x64 Rust services
+    name: Build Windows x64 native connectors
     runs-on: windows-latest
     timeout-minutes: 60
 
@@ -36,7 +36,6 @@ jobs:
       - name: Build Windows release executables
         run: >-
           cargo build --release --locked
-          --bin eden-agent-server
           --bin eden-agent-connector-hoi4
           --bin eden-agent-connector-lichess
           --bin eden-agent-connector-openttd
@@ -46,7 +45,6 @@ jobs:
         shell: pwsh
         run: |
           $names = @(
-            "eden-agent-server",
             "eden-agent-connector-hoi4",
             "eden-agent-connector-lichess",
             "eden-agent-connector-openttd",
@@ -75,10 +73,10 @@ jobs:
           }
           $checksums | Set-Content -Encoding ascii "dist/windows-x64/SHA256SUMS"
 
-      - name: Upload Windows x64 Rust services
+      - name: Upload Windows x64 native connectors
         uses: actions/upload-artifact@v7
         with:
-          name: eden-agent-rust-windows-x64-${{ github.sha }}
+          name: eden-agent-native-windows-x64-${{ github.sha }}
           path: dist/windows-x64/
           if-no-files-found: error
           retention-days: 7

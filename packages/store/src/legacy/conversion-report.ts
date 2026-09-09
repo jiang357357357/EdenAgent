@@ -16,7 +16,7 @@ export function conversionReport(db: DatabaseSync, origin: 'mon' | 'local', phas
     converted: tables.filter(table => table.state === 'converted').map(table => String(table.name)),
     pending: tables.filter(table => table.state !== 'converted').map(table => String(table.name)),
     tables: tables.map(table => ({ name: String(table.name), sha256: String(table.sha256), rows: Number(table.rows), state: String(table.state) })),
-    note: 'Committed table conversions only. Runtime continuation and pending domains remain incomplete. Do not start this database.' }
+    note: 'Committed table conversions only. Runtime continuation and pending domains remain incomplete. Open only with explicit migration-review mode; ordinary runtime activation is not permitted.' }
 }
 
 /** Atomic replacement keeps the last complete report visible after interruption. */

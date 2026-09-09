@@ -4,6 +4,7 @@ import path from 'node:path'
 import { migrateDatabase } from '../migrations.ts'
 import { LegacySnapshotReader } from './snapshot-reader.ts'
 import { runLegacyConversion } from './conversion-runner.ts'
+import { assertStagingMutable } from './activation-guard.ts'
 
 /** Explicit importer connection; the ordinary host keeps rejecting incomplete databases. */
 export async function resumeLegacyConversion(snapshot: string, destination: string, origin: 'mon' | 'local', blobSourceRoot?: string, pluginVersionsRoot?: string) {
@@ -16,6 +17,7 @@ export async function resumeLegacyConversion(snapshot: string, destination: stri
   try {
     await lock.writeFile('Explicit migration in progress. After a crash, confirm the importer has stopped before removing this lock.\n')
     await lock.sync()
+    assertStagingMutable(target)
     db = new DatabaseSync(filename)
     const realm = db.prepare("SELECT value FROM realm_meta WHERE key='origin'").get()
     const state = db.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()

@@ -5,6 +5,7 @@ import type { SessionService } from '../../modules/sessions/index.ts'
 import { eventPayload } from './event-payload.ts'
 import { rpcMethods } from '@eden/api'
 import { contractHandler } from './contract-handler.ts'
+import { inputRecoveryRoutes } from './input-recovery.routes.ts'
 
 export function wireEvent(event: DurableEvent): JsonValue {
   return { id: event.id, sessionId: event.sessionId, turnId: event.turnId, seq: event.seq,
@@ -62,8 +63,9 @@ export function sessionRoutes(service: SessionService): Record<string, (params: 
       return { ...page, items: page.items.map(wireEvent) }
     },
   }
-  return Object.fromEntries(Object.entries(handlers).map(([method, handler]) => {
-    const contract = Object.hasOwn(rpcMethods, method) ? rpcMethods[method as keyof typeof rpcMethods] : undefined
-    return [method, contract ? contractHandler(contract, input => handler(toJson(input))) : handler]
-  }))
+  return { ...inputRecoveryRoutes(repository, service), ...Object.fromEntries(Object.entries(handlers).map(([method, handler]) => {
+    if (!Object.hasOwn(rpcMethods, method)) throw new Error(`Missing session RPC contract: ${method}`)
+    const contract = rpcMethods[method as keyof typeof rpcMethods]
+    return [method, contractHandler(contract, input => handler(toJson(input)))]
+  })) }
 }

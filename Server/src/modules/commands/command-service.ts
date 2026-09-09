@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
 import { commandExecutionConfigSchema, commandExecutionSetSchema, type CommandExecutionConfig } from '@eden/api'
-import { probeSandbox, runWorkspaceCommand, runProcess } from '@eden/execution'
+import { probeSandbox, runWorkspaceCommand, hostCommandInfo, runHostCommand } from '@eden/execution'
+import type { configuredExternalCommandSandbox } from '@eden/execution'
 import type { EdenDatabase } from '@eden/store'
 import { workspaceRoot } from '../workspace/workspace-path.ts'
 
@@ -8,7 +8,8 @@ export class CommandService {
   private active = 0
   private generation = 0
   private probe?: ReturnType<typeof probeSandbox>
-  constructor(private readonly database: EdenDatabase, private readonly protectedRoots: readonly string[]) {}
+  constructor(private readonly database: EdenDatabase, private readonly protectedRoots: readonly string[],
+    private readonly external?: ReturnType<typeof configuredExternalCommandSandbox>) {}
 
   snapshot() {
     const row = this.database.connection.prepare("SELECT value_json FROM runtime_settings WHERE key='command.execution'").get()
@@ -18,11 +19,11 @@ export class CommandService {
   }
 
   async info() {
-    const sandbox = await (this.probe ??= probeSandbox())
+    const sandbox = await (this.probe ??= this.external ? this.external.probe() : probeSandbox())
     const { config } = this.snapshot()
-    const hostAvailable = process.platform !== 'win32' && existsSync('/bin/sh')
-    return { ...config, available: config.mode === 'host' ? hostAvailable : sandbox.available,
-      sandboxAvailable: sandbox.available, sandboxBackend: sandbox.backend, shell: '/bin/sh',
+    const host = hostCommandInfo()
+    return { ...config, available: config.mode === 'host' ? host.available : sandbox.available,
+      hostAvailable: host.available, hostShell: host.shell, sandboxAvailable: sandbox.available, sandboxBackend: sandbox.backend, shell: config.mode === 'host' || process.platform === 'win32' ? host.shell : this.external ? '/bin/bash' : '/bin/sh',
       detail: config.mode === 'host' ? 'Current OS account permissions; filesystem and network are unrestricted. 30-second and 1 MiB output limits apply.' : sandbox.detail }
   }
 
@@ -30,7 +31,8 @@ export class CommandService {
     const input = commandExecutionSetSchema.parse(raw)
     if (this.active) throw new Error('Wait for running commands before changing execution boundaries')
     if (input.mode === 'host' && !input.confirmHostExecution) throw new Error('Explicit host execution confirmation is required')
-    if (input.mode === 'host' && (process.platform === 'win32' || !existsSync('/bin/sh'))) throw new Error('Host command execution is unavailable on this platform')
+    if (input.mode === 'host' && !hostCommandInfo().available) throw new Error('Host command execution is unavailable on this platform')
+    if (this.external && input.mode === 'sandbox' && (input.networkAccess || input.writableRoots.length)) throw new Error('External sandbox access is configured by its administrator; host network and writable-root overrides are unavailable')
     const config: CommandExecutionConfig = { mode: input.mode, networkAccess: input.mode === 'host' ? true : input.networkAccess,
       writableRoots: input.mode === 'host' ? [] : [...new Set(input.writableRoots.map(root => workspaceRoot(root, this.protectedRoots)))] }
     this.database.transaction(() => {
@@ -52,10 +54,13 @@ export class CommandService {
     this.active++
     try {
       const config = snapshot.config
-      if (config.mode === 'host') return await runProcess({ executable: '/bin/sh', args: ['-c', command], cwd: root,
-        input: '', timeoutMs: 30000, maxOutputBytes: 1024 * 1024, signal })
-      const sandbox = await (this.probe ??= probeSandbox())
+      if (config.mode === 'host') return await runHostCommand(root, command, signal)
+      const sandbox = await (this.probe ??= this.external ? this.external.probe() : probeSandbox())
       if (!sandbox.available) throw new Error(`OS sandbox unavailable: ${sandbox.detail}`)
+      if (this.external) {
+        if (config.networkAccess || config.writableRoots.length) throw new Error('Clear incompatible command access overrides before using the external sandbox')
+        return await this.external.run(root, command, signal)
+      }
       const writableRoots = config.writableRoots.map(value => {
         const canonical = workspaceRoot(value, this.protectedRoots)
         if (canonical !== value) throw new Error('Writable root changed; configure it again')

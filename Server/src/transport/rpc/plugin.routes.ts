@@ -4,7 +4,7 @@ import { packagePermissionSetSchema } from '@eden/api'
 import type { InstalledPackageRepository } from '../../modules/plugin-market/index.ts'
 import { pluginDiffSchema, pluginLogQuerySchema } from '@eden/api'
 import { z } from 'zod'
-import { pluginIdSchema, pluginVersionSchema, pluginActivationSchema, pluginDraftSchema,
+import { pluginDraftOperationSchema, pluginIdSchema, pluginVersionSchema, pluginActivationSchema, pluginDraftSchema,
   pluginGrantSchema, toJson } from '@eden/api'
 import type { JsonValue } from '@eden/api'
 import type { PluginService } from '@eden/plugin-host'
@@ -14,12 +14,13 @@ export function pluginRoutes(plugins: PluginService, packages?: InstalledPackage
     'plugin.version.diff': value => { const input = pluginDiffSchema.parse(value); return toJson(plugins.management.diff(input.id, input.fromRevision, input.toRevision)) },
     'plugin.operation.list': value => { const input = pluginLogQuerySchema.parse(value); return toJson(plugins.operations.list(input.id, input.before, input.limit)) },
     'plugin.describe': () => plugins.describe(),
-    'plugin.draft.save': value => { const params = pluginDraftSchema.parse(value); return toJson(plugins.drafts.save(params.manifest, params.source)) },
+    'plugin.draft.save': value => { const params = pluginDraftSchema.parse(value); return toJson(plugins.drafts.save(params.manifest, params.source, params.expectedDraftRevision)) },
     'plugin.validate': async value => {
-      const built = await plugins.validate(pluginIdSchema.parse(value).id)
-      return { id: built.manifest.id, revision: built.revision, valid: true }
+      const input = pluginDraftOperationSchema.parse(value)
+      const built = await plugins.validate(input.id, undefined, input.expectedDraftRevision)
+      return { id: built.manifest.id, revision: built.revision, draftRevision: built.draftRevision!, valid: true }
     },
-    'plugin.test': async value => toJson(await plugins.test(pluginIdSchema.parse(value).id)),
+    'plugin.test': async value => { const input = pluginDraftOperationSchema.parse(value); return toJson(await plugins.test(input.id, undefined, undefined, input.expectedDraftRevision)) },
     'plugin.install': async value => { const params = pluginVersionSchema.parse(value); return toJson(await plugins.install(params.id, params.revision)) },
     'plugin.activate': async value => { const params = pluginActivationSchema.parse(value); return toJson(await plugins.activate(params.id, params.revision, params.readRoot)) },
     'plugin.version.activate': async value => { const input = pluginActivationSchema.parse(value); return toJson(await plugins.activate(input.id, input.revision, input.readRoot)) },

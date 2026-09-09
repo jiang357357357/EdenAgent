@@ -35,25 +35,65 @@ export class ModelService {
   }
 
   inherit(parentSessionId: string, childSessionId: string, options?: ChildModelOptions): void {
-    if (this.origin === 'local') {
-      const parent = this.resolve(parentSessionId)
-      if (!parent) throw new Error('No local model configured')
+    const snapshot = this.childSnapshot(parentSessionId, options)
+    if (snapshot.origin === 'local') {
       if (!this.localChildren) {
         if (options?.model || options?.reasoning != null) throw new Error('Durable local child model settings are unavailable')
         return
       }
-      this.localChildren.save(childSessionId, childModel(parent, options))
+      this.localChildren.save(childSessionId, snapshot.model, snapshot.independent)
       return
     }
+    this.replace(childSessionId, snapshot.binding)
+  }
+
+  /** Private snapshot for inheritance/recovery; never return this value through RPC. */
+  childSnapshot(parentSessionId: string, options?: ChildModelOptions) {
+    if (this.origin === 'local') {
+      const profile = options?.model ? this.localChildren?.profiles.resolve(options.model) : undefined
+      if (profile) return { origin: 'local' as const, model: childModel(profile, options), independent: true }
+      const parent = this.resolve(parentSessionId)
+      if (!parent) throw new Error('No local model configured')
+      if (this.localChildren?.isIndependent(parentSessionId)) return { origin: 'local' as const, model: childModel(parent, options), independent: true }
+      const { apiKey: _apiKey, ...model } = childModel(parent, options)
+      return { origin: 'local' as const, model, independent: false }
+    }
     this.refresh(parentSessionId)
-    const binding = this.bindings.get(parentSessionId)
+    const actor = options?.actorId === undefined ? undefined : this.actors.get(parentSessionId)?.get(String(options.actorId))
+    if (this.actors.has(parentSessionId) && !actor) throw new Error('Select a bound acting parent for the child model')
+    const parentBinding = actor?.main ?? this.bindings.get(parentSessionId)
+    if (!parentBinding) throw new Error('Confirm the parent model binding before creating independent children')
+    const independent = options?.model ? this.storage?.childProfiles.resolve(parentSessionId, options.model) : undefined
+    const binding = independent ?? parentBinding
     if (!binding) throw new Error('Subagent requires a bound single-actor parent model')
-    this.replace(childSessionId, { mode: 'single', main: { ...structuredClone(binding), model: childModel(binding.model, options) }, vision: structuredClone(this.visionBindings.get(parentSessionId) ?? null), visionEntityId: this.visionEntities.get(parentSessionId) ?? null })
+    return { origin: 'mon' as const, binding: { mode: 'single' as const,
+      main: { ...structuredClone(binding), model: childModel(binding.model, options) },
+      vision: structuredClone(actor ? actor.vision?.model ?? null : this.visionBindings.get(parentSessionId) ?? null), visionEntityId: actor ? actor.vision?.entityId ?? null : this.visionEntities.get(parentSessionId) ?? null } }
   }
 
   resolve(sessionId: string): RuntimeModel | undefined {
     this.refresh(sessionId)
     return this.withRates(this.origin === 'local' ? this.localChildren?.resolve(sessionId, this.configured) ?? this.configured : this.bindings.get(sessionId)?.model)
+  }
+  activateChildSnapshotInTransaction(sessionId: string, snapshot: ReturnType<ModelService['childSnapshot']>): void {
+    if (snapshot.origin !== this.origin) throw new Error('Recovered model belongs to another world')
+    if (snapshot.origin === 'local') {
+      if (!this.localChildren) throw new Error('Durable local model storage is unavailable')
+      this.localChildren.saveInTransaction(sessionId, snapshot.model, snapshot.independent)
+    } else {
+      if (!this.storage) throw new Error('Durable Mon model storage is unavailable')
+      this.storage.saveInTransaction(sessionId, snapshot.binding)
+    }
+  }
+
+  monChildProfiles() {
+    if (this.origin !== 'mon' || !this.storage) throw new Error('Mon child model storage is unavailable')
+    return this.storage.childProfiles
+  }
+
+  localProfiles() {
+    if (this.origin !== 'local' || !this.localChildren) throw new Error('Independent local model profiles are unavailable in this world')
+    return this.localChildren.profiles
   }
 
   invalidateSession(sessionId: string): void {

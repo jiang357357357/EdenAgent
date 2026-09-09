@@ -1,3 +1,4 @@
+import { MonChildModels } from './mon-child-models.ts'
 import { reconcileLegacySelections } from './legacy-selection.ts'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
@@ -33,7 +34,9 @@ function assertRoster(participants: JsonValue[], snapshot: ModelBindingSnapshot)
 
 /** Private realm storage. Callers must never project snapshot credentials into RPC or events. */
 export class ModelBindingRepository {
+  readonly childProfiles: MonChildModels
   constructor(private readonly database: EdenDatabase) {
+    this.childProfiles = new MonChildModels(database)
     if (database.connection.prepare("SELECT value FROM realm_meta WHERE key='origin'").get()?.value !== 'mon')
       throw new Error('Mon model bindings require the Mon database')
   }

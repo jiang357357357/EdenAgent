@@ -1,177 +1,80 @@
-> **Migration status (2026-09-09):** The original Rust runtime is [archived](Archive/2026-09-09-rust-runtime/README.md). The TS host and agent-authored plugin contract tests run; full business migration remains in progress. See the [implementation tracker](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md). Rust instructions below describe the historical implementation.
-
-<div align="center">
-
 # Eden Agent
 
-**A local-first, persistent, embeddable agent runtime written in Rust**
+A local-first, persistent TypeScript agent host using the public pi SDK.
 
-React / Vite client · Electron desktop app · WebSocket JSON-RPC · SQLite
-
-[![CI](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/jiang357357357/EdenAgent/actions/workflows/ci.yml)
-![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-dea584?logo=rust&logoColor=white)
-![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.8.0-e67700)
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-f3a712)
+React / Vite · Electron · Node.js 22.23.1 · SQLite · WebSocket JSON-RPC
 
 [简体中文](README.md) · **English**
 
-</div>
+> Migration is in progress. Recent business, recovery and distribution code has not been executed or accepted. Source availability does not prove completion of P0–P5. See the [implementation tracker](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md) and [business plan](文档/技术/ts-migration/业务优先长期计划.md).
 
-> “And they shall make an ark of shittim wood...”<br>
-> “And there I will meet with thee...”
->
-> — Exodus 25:10, 25:22 (KJV)
-
-Eden Agent is inspired by the “Shittim Chest” from *Blue Archive*. This is an independent source-available project and is not affiliated with or endorsed by the original work or its publishers.
-
-<p align="center">
-  <img src="docs/assets/eden-agent-runtime.png" alt="Eden Agent running interface" width="100%">
-</p>
-
-> [!IMPORTANT]
-> Eden Agent is under active development, and its protocols and configuration formats may still change. The current source is available for noncommercial use under PolyForm Noncommercial 1.0.0. This is not an OSI-approved open-source license; commercial use requires a separate license.
-
-## Overview
-
-Eden Agent runs the agent loop, tool execution, persistence, and desktop experience locally. The desktop supervises separate Rust Server processes for Eden and Local. The frontend talks only to the active realm through a generated WebSocket JSON-RPC client and Blob endpoints—there is no Python sidecar or legacy native bridge.
-
-### Capabilities
-
-| Area | Features |
-| --- | --- |
-| Agent runtime | Streaming conversations, context management, compaction, tool loops, and session recovery |
-| Local workspace | File browsing and editing, controlled command execution, and workspace switching |
-| Model services | OpenAI, DeepSeek, Ollama, and custom OpenAI-compatible services |
-| Character experience | Full character profiles, static art, Spine animation, GSV speech synthesis, and transcription settings |
-| Extensibility | Skills, plugins, multi-agent orchestration, scheduled jobs, MCP, and connectors |
-| Data and security | SQLite persistence, capability tokens, permission approval, fail-closed sandboxing, and Blob storage |
-| Official connectors | Hearts of Iron IV, Victoria 3, OpenTTD, and Lichess |
+Eden Agent draws inspiration from the Shittim Chest in Blue Archive. It is an independent source-available project, unaffiliated with the original work or its publishers.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Desktop[Electron desktop shell] --> Web[React / Vite client]
-    Web -->|Eden RPC / Blob| Mon[Eden Server :40092]
-    Web -->|Local RPC / Blob| Local[Local Server :40093]
-    Desktop -->|separately supervises| Mon
-    Desktop -->|separately supervises| Local
-    Mon --> MonStore[(mon SQLite / Blob)]
-    Local --> LocalStore[(local SQLite / Blob)]
-    Mon --> Core[AgentCore + Eden Core]
-    Local --> LocalCore[AgentCore + local model]
-```
+Electron supervises two independent Node hosts: Eden (`mon`, port 40092) and Local (`local`, port 40093). The development web client uses port 40091. Each host calls pi through `packages/runtime-pi`; the browser accesses its selected realm through JSON-RPC and Blob endpoints.
 
-The realms use different ports, capability tokens, SQLite databases, Blob roots, logs, plugins, user skills, subagents, and connector directories, and model credentials are not shared between their processes. Local model secrets live only in `Data/realms/local/local-runtime.json`. Once a database is bound to a realm, the other realm cannot open it. Each Server persists events before broadcasting them. `AgentCore` remains host-independent and has no dependency on HTTP, SQLite, Electron, or a specific model provider.
-
-## Repository layout
-
-| Path | Purpose |
+| Location | Responsibility |
 | --- | --- |
-| [`AgentCore`](AgentCore) | Host-independent Rust library crates for domain types, the agent loop, context, and tool execution |
-| [`Server`](https://github.com/jiang357357357/EdenAgentServer) | Rust host-service submodule for protocol, storage, models, permissions, and extensions |
-| [`frontend`](https://github.com/jiang357357357/EdenAgentFrontend) | React/Vite client and Electron desktop-shell submodule |
-| [`Connectors`](Connectors) | Official installable connectors and workers |
-| [`Script`](Script) | Development launchers, configuration readers, packaging, and migration tools |
-| [`文档`](文档) | Design notes, runbooks, and acceptance material |
+| `Server/src` | TypeScript host, business modules and transport |
+| `packages/runtime-pi` | The only package importing pi directly |
+| `packages/api`, `packages/store` | Protocol schemas, types, SQLite and migration infrastructure |
+| `packages/plugin-sdk`, `packages/plugin-host` | Agent-authored plugins and isolated version lifecycle |
+| `packages/execution`, `packages/integrations` | Execution boundaries and external integrations |
+| `frontend/web`, `frontend/desktop` | React client and Electron shell |
+| `Native`, `Connectors/official` | Independent Rust helpers and connector workers |
+| `Archive/2026-09-09-rust-runtime` | Historical Rust AgentCore and Server |
 
-## Quick start
+The new runtime does not link the archived Rust host. Rust remains necessary for native components.
 
-### Requirements
+## Realms and models
 
-- Rust 1.85 or newer
-- Node.js 22 or newer
-- npm
-- A Linux or Windows desktop environment
+The two hosts keep separate processes, capability tokens, databases, files and credentials. Events are committed before broadcast. Default new roots are `Data/realms/mon/v2` and `Data/realms/local/v2`; old production data is not automatically copied or migrated in place.
 
-### Clone and run
+Mon models come from verified Mon Core connections, including actor and director bindings. Local models use local configuration or `EDEN_AGENT_MODEL=provider/model`. Independent child-model profiles stay within their realm; updating a profile does not silently change existing task snapshots.
 
-```bash
-git clone --recurse-submodules https://github.com/jiang357357357/EdenAgent.git
-cd EdenAgent
+## Development
+
+Use Node.js 22.23.1 and npm. Install root dependencies and the frontend packager dependencies:
+
+```sh
 npm ci
 npm --prefix frontend ci
-cp .monconfig.example .monconfig
-npm run dev
 ```
 
-Default endpoints:
-
-- Web client: `http://127.0.0.1:40091`
-- Eden Server: `http://127.0.0.1:40092`
-- Local Server: `http://127.0.0.1:40093`
-- Health checks: `http://127.0.0.1:40092/readyz` and `http://127.0.0.1:40093/readyz`
-
-After the desktop app starts, open **Configuration → Model Service** to set the model name, API endpoint, and key. Credentials should remain local—never commit `.monconfig`, runtime configuration, or logs.
-
-### Run individual components
+Configure `.monconfig` from `.monconfig.example` as needed. Never commit real data, model credentials or capability tokens.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the Web client, Electron, and both isolated Rust Servers |
-| `npm run dev:server` | Safely start one Rust Server; Eden by default, or Local with `EDEN_AGENT_RUNTIME_ORIGIN=local` |
-| `npm run dev:web` | Start only the Web client |
+| `npm run dev` | Start the TS hosts, web client and Electron |
+| `npm run dev:server` | Start a single configured TS host |
+| `npm run dev:web` | Start the web client |
 | `npm run dev:desktop` | Start the desktop development environment |
-| `npm run generate:rpc` | Regenerate the TypeScript RPC client from Rust API types |
+| `npm run generate:rpc` | Generate the browser entry from TS contracts and template |
+| `npm run build:server` | Build the host and offline migration tools |
 
-## Character and visual assets
+These are script entry points, not claims of successful execution. Current work prioritizes business implementation, followed by writing tests; tests and acceptance runs require the user's explicit request.
 
-Character binaries are intentionally excluded from the source repositories. Keep static artwork and Spine exports in a separate local `AgentAssets` repository, then import them from **Configuration → Character Configuration → Visual Resources**.
+Linux isolation uses bubblewrap and prlimit. Explicit Windows host execution through PowerShell has been implemented in source; there is no built-in Windows sandbox. Workspace commands can use an administrator-configured external isolation adapter; plugin, MCP and skill isolation still need platform integration. Packaging for an OS does not imply every isolated feature works there. Missing sandbox support must not silently fall back to host execution.
 
-To migrate existing local asset paths:
+## Agent-authored plugins
 
-```bash
-node Script/Project/MigrateCharacterAssets.mjs ../AgentAssets
-```
+The `eden_plugin` tool and plugin development page expose guidance, draft read/write, validation, declared tests, exact-version installation and activation. Existing draft replacement requires its current `draftRevision`; compiled artifacts have a separate `revision` and require a matching successful report before installation.
 
-Do not publish an asset repository until the origin and redistribution rights of every file have been verified. Third-party character, Spine, voice, model, game, and trademark materials are not covered by the Eden Agent software license.
+Workspace access needs user authorization. Generated code and editor templates do not run automatically. Generated plugins are constrained single-file TypeScript tools, not unrestricted npm applications. Marketplace packages, MCP and native workers retain separate lifecycle and permission boundaries.
 
-## Development and verification
+## Migration and distribution
 
-```bash
-# Rust
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+See the [migration guide](文档/技术/ts-migration/数据迁移操作.md), [desktop distribution guide](文档/技术/ts-migration/桌面发行操作.md) and [script documentation](Script/Project/README.md).
 
-# Frontend
-npm --prefix frontend/web run typecheck
-npm --prefix frontend/web test
-npm --prefix frontend/desktop test
-```
+The distribution workflow assembles TS, Node, Electron and native workers. Signing, file inventories, separate version installation and managed launch tools are implemented in source. No signed release from the current changes has been built or accepted. Automatic extraction and managed launch are implemented in source. System shortcuts, launcher upgrades and complete data upgrade/rollback coordination remain unfinished. Selecting an older application does not restore its database schema.
 
-GitHub Actions runs the same core checks on every push and pull request.
+Host execution uses the current OS account and does not isolate one realm's files from the other. Permission approval remains separate, and enabling host commands does not bypass sandbox requirements for MCP stdio, skills or plugins.
 
-## Security principles
+## Documentation and licensing
 
-- The Server binds to `127.0.0.1` by default.
-- Each realm has its own local process, port, capability token, and durable data directories.
-- The renderer connects only to the active realm using the current server instance’s capability token.
-- Desktop-managed realms receive random tokens when the supervisor initializes; Server restarts within that supervisor reuse them. Environment configuration or external management can supply fixed tokens. Tokens currently have no independent TTL or automatic expiration.
-- File writes, command execution, and external communication go through the permission policy.
-- Terminal commands default to a verified OS sandbox. Users can explicitly enable host execution in the permissions menu; approval policy remains independent. MCP stdio and skill code still require a sandbox.
-- Events are persisted before they are broadcast to clients.
+[Design](文档/技术/Eden%20Agent%20TypeScript%20宿主与%20pi%20实现方案.md) · [Engineering constraints](文档/技术/Eden%20Agent%20TypeScript%20工程约束.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
-Read [SECURITY.md](SECURITY.md) before reporting a security issue. Do not disclose credentials or vulnerability details in a public Issue.
+Character binaries are managed separately, for example in a local `AgentAssets` repository. Third-party characters, Spine assets, voices, models, game content and trademarks are not covered by this project's software license.
 
-## Documentation
-
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Changelog](CHANGELOG.md)
-- [Licensing guide](LICENSING.md)
-- [Third-party notices](THIRD-PARTY-NOTICES.md)
-- [Technical documentation](文档)
-
-## License
-
-Current versions are source-available for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires a [separate written commercial license](COMMERCIAL-LICENSE.md). See [LICENSING.md](LICENSING.md) for the transition and historical-version scope.
-
----
-
-<div align="center">
-
-If Eden Agent is useful to you, consider starring the repository, opening an Issue, or contributing an improvement.
-
-</div>
+Source is available for noncommercial use under [PolyForm Noncommercial 1.0.0](LICENSE), not an OSI-approved open-source license. Commercial use requires [separate written authorization](COMMERCIAL-LICENSE.md). See [LICENSING.md](LICENSING.md) and [third-party notices](THIRD-PARTY-NOTICES.md).

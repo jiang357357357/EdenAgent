@@ -1,7 +1,7 @@
 import { configuredModelSchema } from '@eden/api'
 import type { RuntimeModel } from '@eden/runtime-pi'
 
-export interface ChildModelOptions { model: string | null; reasoning: RuntimeModel['reasoning'] | null }
+export interface ChildModelOptions { actorId?: string | number; model: string | null; reasoning: RuntimeModel['reasoning'] | null }
 export function childModel(parent: RuntimeModel, options?: ChildModelOptions): RuntimeModel {
   const model = structuredClone(parent)
   if (options?.model) {

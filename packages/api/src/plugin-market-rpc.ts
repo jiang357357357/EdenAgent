@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { jobIdSchema, jobInfoSchema } from './jobs.ts'
 import { marketKeyIdSchema, marketKeyAddSchema, marketKeyInfoSchema } from './plugin-market.ts'
 import { managedPluginInfoSchema } from './plugin-management.ts'
 import { packageAssetListSchema, packageAssetExportSchema, packageAssetInfoSchema, packageAssetExportResultSchema } from './plugin-assets.ts'
@@ -19,6 +20,8 @@ export type MarketReleaseInfo = z.infer<typeof marketReleaseInfoSchema>
 export type PluginPreviewInfo = z.infer<typeof pluginPreviewInfoSchema>
 const empty = z.object({}).strict()
 export const pluginMarketRpcMethods = {
+  'plugin.hook.resubmit': { params: jobIdSchema.extend({ expectedUpdatedAt: z.number().int().nonnegative(),
+    note: z.string().trim().min(1).max(4000), confirmResubmit: z.literal(true) }), result: jobInfoSchema },
   'plugin.recovery.permissions': { params: z.object({ sourceId: z.string().min(1).max(4096), after: z.string().max(16384).optional() }).strict(), result: z.object({
     items: z.array(z.object({ sourceId: z.string(), capability: z.string(), resource: z.string(), access: z.string(), originalDecision: z.enum(['allowed','denied']),
       originalRevision: z.string(), matchesVersion: z.boolean(), state: z.string(), currentDecision: z.enum(['allowed','denied']).nullable(), reviewedAt: z.number().nullable() })), nextCursor: z.string().nullable() }) },

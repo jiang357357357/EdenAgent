@@ -14,7 +14,7 @@ const rootOnly = ['remember_memory', 'update_memory', 'forget_memory', 'switch_w
 const readOnly = ['eden_read_file', 'eden_attachment', 'list_skills', 'read_skill', 'read_skill_file', 'search_memories',
   'list_memos', 'list_due_memos', 'get_next_memo_wake', 'get_self_awake_context', 'list_connectors', 'query_connector',
   'read_connector_events', 'list_contact_channels', 'read_qq_messages', 'analyze_screen',
-  'spawn_agent', 'send_message', 'followup_task', 'interrupt_agent', 'list_agents', 'wait_agent', 'read_agent_messages']
+  'spawn_agent', 'send_message', 'send_parent_message', 'followup_task', 'interrupt_agent', 'list_agents', 'wait_agent', 'read_agent_messages']
 
 export function rolePolicy(role: string, definition: SubagentRoleDefinition = subagentRoleDefinitionSchema.parse(subagentRole(role))): SubagentPolicy {
   const allowed = definition.sandboxMode === 'read-only' ? readOnly.filter(name => definition.allowedTools === null || definition.allowedTools.includes(name)) : definition.allowedTools

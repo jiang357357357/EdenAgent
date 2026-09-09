@@ -46,7 +46,13 @@ export class SelfAwakeActions {
 
   private async execute(action: Action, signal: AbortSignal): Promise<JsonValue> {
     const decision = action.decision, payload = object(decision.action_payload)
-    if (decision.action === 'run_safe_check' || decision.action === 'sync_context') throw new Error('Use the corresponding approved tool during the self-awake turn; final action execution is not connected yet')
+    if (decision.action === 'run_safe_check' || decision.action === 'sync_context') {
+      signal.throwIfAborted()
+      const session = this.sessions.read(action.sessionId)
+      if (session.status !== 'active' || session.participants.length > 1 || JSON.stringify(session.participants[0] ?? {}) !== JSON.stringify(action.author)) throw new Error('Self-awake author changed before recording the decision')
+      return { status: 'requested', action: decision.action, scope: 'local_runtime',
+        note: 'Decision marker only. Actual checks or synchronization require corresponding approved tools and their execution receipts.' }
+    }
     if (['chat_user', 'remind_user', 'ask_user'].includes(decision.action) && !decision.should_interrupt_user) return { status: 'not_requested' }
     if (['chat_user', 'remind_user', 'ask_user'].includes(decision.action)) {
       return executeContactAction(action, decision.action_payload, this.sessions, this.permissions, this.contact, async () => {

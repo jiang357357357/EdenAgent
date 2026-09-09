@@ -14,5 +14,10 @@ export const jobInfoSchema = jobScheduleSchema.extend({
 })
 export const jobListSchema = z.object({ sessionId: z.uuid().optional(), state: jobInfoSchema.shape.state.optional(), limit: z.number().int().min(1).max(200).default(80) }).strict()
 export const jobIdSchema = z.object({ id: z.uuid() }).strict()
+export const jobCursorSchema = z.object({ createdAt: timestamp, id: z.uuid() }).strict()
+export const jobPageSchema = z.object({ sessionId: z.uuid().optional(), kind: z.string().min(1).max(100).optional(),
+  states: z.array(jobInfoSchema.shape.state).min(1).max(7).optional(), before: jobCursorSchema.optional(),
+  limit: z.number().int().min(1).max(20).default(20) }).strict()
+export type JobCursor = z.infer<typeof jobCursorSchema>
 export type JobSchedule = z.infer<typeof jobScheduleSchema>
 export type JobInfo = z.infer<typeof jobInfoSchema>
