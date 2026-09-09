@@ -36,6 +36,8 @@ export class CommandService {
     this.database.transaction(() => {
       const previous = this.snapshot().config
       const now = Date.now()
+      this.database.connection.prepare("UPDATE legacy_app_config SET state='reconfigured',resolution_json=?,resolved_at=? WHERE target_key='command.execution' AND state IN ('confirmation_required','review_required')")
+        .run(JSON.stringify(config), now)
       this.database.connection.prepare('INSERT OR REPLACE INTO runtime_settings VALUES (?, ?, ?)').run('command.execution', JSON.stringify(config), now)
       this.database.connection.prepare('INSERT INTO runtime_setting_changes(key,previous_json,value_json,created_at) VALUES (?, ?, ?, ?)')
         .run('command.execution', JSON.stringify(previous), JSON.stringify(config), now)

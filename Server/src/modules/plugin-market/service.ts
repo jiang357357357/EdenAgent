@@ -1,3 +1,4 @@
+import type { PackageRecoveryRepository } from './packages/recovery-repository.ts'
 import { localPackageFiles } from './packages/local.ts'
 import { verifyPackageFiles } from './packages/integrity.ts'
 import type { InstalledPackageRepository } from './packages/installed-repository.ts'
@@ -9,13 +10,21 @@ export class MarketService {
   private readonly abort = new AbortController()
   private readonly pending = new Map<string, Promise<ReturnType<MarketRepository['read']>>>()
   private readonly downloads = new Set<Promise<unknown>>()
-  constructor(readonly repository: MarketRepository, readonly previews: PackagePreviewRepository, readonly installed: InstalledPackageRepository) {}
-  inspectLocal(source: string) {
+  constructor(readonly repository: MarketRepository, readonly previews: PackagePreviewRepository, readonly installed: InstalledPackageRepository, readonly recovery?: PackageRecoveryRepository) {}
+  async inspectRecovered(sourceId: string) {
+    if (!this.recovery) throw new Error('Plugin recovery is unavailable')
+    const expected = await this.recovery.source(sourceId)
+    return this.inspectLocal(expected.path, expected)
+  }
+  inspectLocal(source: string, expected?: Awaited<ReturnType<PackageRecoveryRepository['source']>>) {
     this.abort.signal.throwIfAborted()
     if (this.downloads.size >= 2) throw new Error('Plugin preview concurrency limit reached')
-    const task = localPackageFiles(source, this.abort.signal).then(({ root, files }) => {
+    const task = localPackageFiles(source, this.abort.signal, Boolean(expected)).then(({ root, files }) => {
       this.abort.signal.throwIfAborted()
+      if (expected) this.recovery!.verifyFiles(expected, files)
       const verified = verifyPackageFiles(files, id => this.repository.key(id), true)
+      if (expected && (verified.manifest.id !== expected.pluginId || verified.manifest.version !== expected.version || verified.revision !== expected.revision)) throw new Error('Recovered plugin identity or revision differs from the historical version')
+      this.repository.assertNotHistoricallyRevoked(String(verified.manifest.id), String(verified.manifest.version), verified.revision)
       return this.previews.save({ ...verified, snapshot: files, provenance: { sourceType: 'local', sourceUri: root,
         sourceId: '', pluginId: String(verified.manifest.id), version: String(verified.manifest.version), revision: verified.revision, sha256: '', epoch: '' } })
     })

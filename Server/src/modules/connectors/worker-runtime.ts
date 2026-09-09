@@ -17,13 +17,13 @@ export class ConnectorWorkerRuntime {
   private closing: Promise<void> | undefined
   constructor(private readonly id: string, private readonly generation: string, input: Writable, output: Readable,
     private readonly repository: ConnectorRepository, private readonly events: ConnectorEventRepository,
-    private readonly terminate: () => Promise<void>) {
+    private readonly terminate: () => Promise<void>, private readonly authorize?: () => void, private readonly workerKey?: string) {
     this.channel = new WorkerChannel(input, output, (method, value) => this.notify(method, value), error => this.failed(error))
   }
   async initialize(raw: unknown, originalSettings?: JsonValue) {
     const params = connectorWorkerInitializeSchema.parse(raw)
     const current = this.repository.read(this.id)
-    if (params.connectorInstanceId !== this.id || params.connectorKey !== current.connectorKey || current.generation !== this.generation || current.desiredState !== 'connected') throw new Error('Connector initialization identity changed')
+    if (params.connectorInstanceId !== this.id || params.connectorKey !== (this.workerKey ?? current.connectorKey) || current.generation !== this.generation || current.desiredState !== 'connected') throw new Error('Connector initialization identity changed')
     if (JSON.stringify(originalSettings ?? params.settings) !== JSON.stringify(current.settings)) throw new Error('Connector initialization settings changed')
     try {
       this.repository.runtimeState(this.id, this.generation, 'connecting', null)
@@ -45,6 +45,8 @@ export class ConnectorWorkerRuntime {
     return this.channel.request(method, { capability, payload, operationId }, AbortSignal.any([signal, this.controller.signal]))
   }
   private assertCurrent() {
+    try { this.authorize?.() }
+    catch (error) { this.failed(new Error('Connector authorization is no longer valid')); throw error }
     const current = this.repository.read(this.id)
     if (this.stopped || current.generation !== this.generation || current.desiredState !== 'connected') throw new Error('Connector generation is no longer active')
   }

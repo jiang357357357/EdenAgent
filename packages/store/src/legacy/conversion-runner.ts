@@ -1,3 +1,12 @@
+import { convertLegacySubagentContexts } from './subagent-context-conversion.ts'
+import { convertLegacyContexts } from './context-conversion.ts'
+import { recoverLegacyPluginFiles } from './plugin-file-recovery.ts'
+import { convertLegacyPlugins } from './plugin-conversion.ts'
+import { convertLegacyImportProvenance } from './import-provenance-conversion.ts'
+import { convertLegacyMetrics } from './metric-conversion.ts'
+import { convertLegacyAppConfig } from './app-config-conversion.ts'
+import { convertLegacySubagents } from './subagent-conversion.ts'
+import { convertLegacyAgentMailbox } from './subagent-mailbox-conversion.ts'
 import { convertLegacyCoreSync } from './core-sync-conversion.ts'
 import { convertLegacyWorkspace } from './workspace-conversion.ts'
 import { convertLegacyModelSelections } from './model-selection-conversion.ts'
@@ -24,7 +33,7 @@ import { convertLegacySession } from './session-conversion.ts'
 import { tableConverted } from './conversion-state.ts'
 import { preservePartialBlobs } from './partial-blobs.ts'
 
-export async function runLegacyConversion(db: DatabaseSync, source: LegacySnapshotReader, target: string, origin: 'mon' | 'local', blobSourceRoot?: string) {
+export async function runLegacyConversion(db: DatabaseSync, source: LegacySnapshotReader, target: string, origin: 'mon' | 'local', blobSourceRoot?: string, pluginVersionsRoot?: string) {
   let phase = 'initialize'
   const report = () => conversionReport(db, origin, phase)
   const checkpoint = () => writeConversionReport(target, report())
@@ -41,7 +50,13 @@ export async function runLegacyConversion(db: DatabaseSync, source: LegacySnapsh
     await checkpoint()
     const stages = [
       ['session_events', () => tableConverted(db, 'session_events') ? Promise.resolve() : convertLegacyEvents(db, source)],
+      ['agent_threads', () => convertLegacySubagents(db, source)],
+      ['agent_mailbox', () => convertLegacyAgentMailbox(db, source)],
       ['interactions', () => convertLegacyInteractions(db, source)],
+      ['plugins', () => convertLegacyPlugins(db, source)],
+      ['import_provenance', () => convertLegacyImportProvenance(db, source)],
+      ['runtime_metrics', () => convertLegacyMetrics(db, source)],
+      ['app_config', () => convertLegacyAppConfig(db, source)],
       ['workspace_state', () => convertLegacyWorkspace(db, source)],
       ['core_sync', () => convertLegacyCoreSync(db, source)],
       ['model_selections', () => convertLegacyModelSelections(db, source)],
@@ -67,11 +82,22 @@ export async function runLegacyConversion(db: DatabaseSync, source: LegacySnapsh
       await convertLegacyBlobs(db, source, blobSourceRoot, path.join(target, 'blobs'))
       await checkpoint()
     }
+    if (pluginVersionsRoot) {
+      phase = 'plugin_files'
+      await recoverLegacyPluginFiles(db, pluginVersionsRoot, target)
+      await checkpoint()
+    }
     phase = 'voice_speech_segments'
     await convertLegacyVoice(db, source)
     await checkpoint()
     phase = 'execution_links'
     linkLegacyExecutions(db)
+    await checkpoint()
+    phase = 'runtime_contexts'
+    convertLegacyContexts(db)
+    await checkpoint()
+    phase = 'subagent_contexts'
+    convertLegacySubagentContexts(db)
     await checkpoint()
     phase = 'awaiting_remaining_domains'
     await checkpoint()

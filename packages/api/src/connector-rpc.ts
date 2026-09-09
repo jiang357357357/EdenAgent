@@ -5,6 +5,7 @@ import { connectorPermissionReadSchema, connectorPermissionSetSchema, connectorP
 import { connectorEventListSchema, connectorEventReadSchema, connectorEventResultSchema, connectorEventPageSchema } from './connector-events.ts'
 import { connectorHistorySchema, connectorOperationPageSchema } from './connector-history.ts'
 export const connectorRpcMethods = {
+  'connector.permissions.clear': { params: connectorPermissionReadSchema.extend({ generation: z.string().min(1).max(128) }), result: connectorPermissionSnapshotSchema },
   'connector.create': { params: connectorCreateSchema, result: connectorInfoSchema },
   'connector.update': { params: connectorUpdateSchema, result: connectorInfoSchema },
   'connector.list': { params: z.object({}).strict(), result: z.array(connectorInfoSchema) },

@@ -3,3 +3,5 @@ export type { RuntimeOptions, RuntimeModel, RuntimeTool, RuntimeCallbacks, EdenR
 export { completeText, TextCompletionError } from './text-completion.ts'
 export type { TextCompletionRequest } from './text-completion.ts'
 export { publicHistoryCheckpoint } from './history-checkpoint.ts'
+
+export { legacyContextCheckpoint } from './legacy-checkpoint.ts'

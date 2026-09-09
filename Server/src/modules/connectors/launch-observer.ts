@@ -42,9 +42,17 @@ export async function launchObserver(id: string, dataRoot: string, repository: C
   await mkdir(directory, { recursive: true, mode: 0o700 })
   signal.throwIfAborted()
   if (repository.read(id).generation !== current.generation) throw new Error('Connector settings changed before launch')
+  const authorize = () => {
+    signal.throwIfAborted()
+    const latest = repository.read(id), grants = permissions.read(id)
+    if (latest.generation !== current.generation || latest.desiredState !== 'connected' || !grants.ready || grants.revision !== artifact.revision) throw new Error('Observer authorization changed')
+    const allowed = permissions.require(id, current.generation)
+    if (granted.some(original => !allowed.some(item => item.capability === original.capability && item.resource === original.resource && item.access === original.access))) throw new Error('Observer mount permission was revoked')
+  }
+  authorize()
   const process = await launchConnectorProcess({ executable: artifact.executable, sha256: artifact.sha256, args: artifact.args,
     dataDirectory: directory, readMounts: [{ source, target: '/inputs/log' }], writeMounts, signal })
-  const runtime = new ConnectorWorkerRuntime(id, current.generation, process.input, process.output, repository, events, () => process.stop())
+  const runtime = new ConnectorWorkerRuntime(id, current.generation, process.input, process.output, repository, events, () => process.stop(), authorize)
   try {
     await runtime.initialize({ protocolVersion: 1, connectorInstanceId: id, connectorKey: current.connectorKey, packageVersion: descriptor.manifest.version,
       settings: workerSettings, grantedPermissions: workerGrants, dataDirectory: '/data' }, current.settings)

@@ -1,3 +1,4 @@
+import { packageAssetFiles } from './asset-files.ts'
 import { createHash } from 'node:crypto'
 import type { InstalledPackageRepository } from './installed-repository.ts'
 import type { BlobService } from '../../blobs/index.ts'
@@ -7,7 +8,7 @@ export class PackageAssets {
   constructor(private readonly packages: InstalledPackageRepository, private readonly blobs: BlobService) {}
   list(id: string, revision: string) {
     const value = this.packages.verified(id, revision)
-    return value.manifest.assets.map(asset => {
+    return packageAssetFiles(value.manifest.assets, value.files).map(asset => {
       const bytes = value.files.get(asset.source)
       if (!bytes) throw new Error('Declared plugin asset is missing')
       return { ...asset, byteLength: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
@@ -17,7 +18,7 @@ export class PackageAssets {
     if (this.closed) throw new Error('Plugin asset service is shutting down')
     if (this.pending.size >= 2) throw new Error('Plugin asset export concurrency limit reached')
     const value = this.packages.verified(id, revision)
-    const asset = value.manifest.assets.find(item => item.source === source)
+    const asset = packageAssetFiles(value.manifest.assets, value.files).find(item => item.source === source)
     if (!asset) throw new Error('Requested file is not a declared plugin asset')
     const bytes = value.files.get(source)
     if (!bytes) throw new Error('Declared plugin asset is missing')

@@ -6,7 +6,7 @@ import { MediaService, mediaTools } from '../modules/media/index.ts'
 import { VoiceConfigRepository, VoiceService, SpeechRepository, SpeechService, RealtimeVoiceService } from '../modules/voice/index.ts'
 import { SubagentRepository, SubagentService, SubagentMailbox, SubagentLifecycle, subagentTools } from '../modules/subagents/index.ts'
 import { PluginHookRepository, PluginHookService } from '../modules/plugin-hooks/index.ts'
-import { PackageAssets, MarketRepository, MarketService, PackagePreviewRepository, InstalledPackageRepository } from '../modules/plugin-market/index.ts'
+import { PackageRecoveryRepository, PackageAssets, MarketRepository, MarketService, PackagePreviewRepository, InstalledPackageRepository } from '../modules/plugin-market/index.ts'
 import { SkillRepository, SkillService, skillTools } from '../modules/skills/index.ts'
 import { DesktopReminderRepository, desktopReminderTools } from '../modules/notifications/index.ts'
 import { SelfAwakeRepository, SelfAwakeContext, SelfAwakeBridgeRepository, SelfAwakeBridge, SelfAwakeService, SelfAwakeActions, selfAwakeTools } from '../modules/self-awake/index.ts'
@@ -35,11 +35,12 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
   database.connection.prepare("UPDATE mcp_operations SET state='unknown',error='Host restarted before MCP result confirmation' WHERE state='running'").run()
   const connectorCatalog = new ConnectorCatalog()
   const connectors = new ConnectorRepository(database, connectorCatalog)
-  const connectorCredentials = new ConnectorCredentials(database, connectors)
+  const connectorCredentials = new ConnectorCredentials(database, connectors, connectorCatalog)
   const connectorPermissions = new ConnectorPermissions(database, connectorCatalog, connectors)
   const voiceConfig = new VoiceConfigRepository(database)
   const marketRepository = new MarketRepository(database)
-  const pluginMarket = new MarketService(marketRepository, new PackagePreviewRepository(database, marketRepository), new InstalledPackageRepository(database, marketRepository))
+  const pluginMarket = new MarketService(marketRepository, new PackagePreviewRepository(database, marketRepository), new InstalledPackageRepository(database, marketRepository), new PackageRecoveryRepository(database, config.dataRoot))
+  connectorCatalog.attachNativeProvider(() => pluginMarket.installed.nativeSelectionPlans())
   const mcp = new McpLifecycle(pluginMarket.installed)
   const repository = new SessionRepository(database, config.origin)
   const desktopReminders = new DesktopReminderRepository(repository)

@@ -19,6 +19,12 @@ export type MarketReleaseInfo = z.infer<typeof marketReleaseInfoSchema>
 export type PluginPreviewInfo = z.infer<typeof pluginPreviewInfoSchema>
 const empty = z.object({}).strict()
 export const pluginMarketRpcMethods = {
+  'plugin.recovery.permissions': { params: z.object({ sourceId: z.string().min(1).max(4096), after: z.string().max(16384).optional() }).strict(), result: z.object({
+    items: z.array(z.object({ sourceId: z.string(), capability: z.string(), resource: z.string(), access: z.string(), originalDecision: z.enum(['allowed','denied']),
+      originalRevision: z.string(), matchesVersion: z.boolean(), state: z.string(), currentDecision: z.enum(['allowed','denied']).nullable(), reviewedAt: z.number().nullable() })), nextCursor: z.string().nullable() }) },
+  'plugin.recovery.list': { params: z.object({ after: z.string().max(4096).optional() }).strict(), result: z.object({
+    items: z.array(z.object({ sourceId: z.string(), pluginId: z.string(), version: z.string(), revision: z.string(), state: z.string(), copied: z.boolean(), copiedAt: z.number().nullable() })), nextCursor: z.string().nullable() }) },
+  'plugin.recovery.inspect': { params: z.object({ sourceId: z.string().min(1).max(4096) }).strict(), result: pluginPreviewInfoSchema },
   'plugin.asset.list': { params: packageAssetListSchema, result: z.array(packageAssetInfoSchema) },
   'plugin.asset.export': { params: packageAssetExportSchema, result: packageAssetExportResultSchema },
   'plugin.market.key.list': { params: empty, result: z.array(marketKeyInfoSchema) },

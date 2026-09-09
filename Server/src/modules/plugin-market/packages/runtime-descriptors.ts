@@ -8,7 +8,7 @@ const stdio = z.object({ schemaVersion: z.literal(1).default(1), command: z.stri
   cwd: z.union([z.literal('.'), relative]).default('.') }).strict()
 const http = z.object({ schemaVersion: z.literal(1).default(1), url: z.string().min(1).max(8192) }).strict()
 export function packageRuntimeDescriptors(value: Package, enabled: (id: string, fallback: boolean) => boolean) {
-  return value.manifest.components.runtimes.filter(item => enabled(item.id, item.enabledByDefault)).map(component => {
+  return value.manifest.components.runtimes.filter(item => item.kind !== 'native_worker' && enabled(item.id, item.enabledByDefault)).map(component => {
     const bytes = value.files.get(component.manifest)
     if (!bytes || bytes.length > 65536) throw new Error('Runtime descriptor is missing or too large')
     const raw: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))

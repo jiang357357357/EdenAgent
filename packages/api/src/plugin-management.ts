@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { jsonValue } from './json.ts'
 import { pluginIdSchema } from './plugins.ts'
 import { packagePermissionSetSchema } from './plugin-package-permissions.ts'
-export const managedPluginIdSchema = z.object({ id: z.union([pluginIdSchema.shape.id, z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/)]) }).strict()
+export const managedPluginIdSchema = z.object({ id: z.union([pluginIdSchema.shape.id, z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/)]) }).strict()
 const revision = z.string().regex(/^[a-f0-9]{64}$/)
 export const managedPluginInfoSchema = z.object({
   id: z.string(), name: z.string(), description: z.string(), version: z.string(), revision,

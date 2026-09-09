@@ -151,3 +151,6 @@ export { initializeResultSchema, rpcNotifications } from './connection-rpc.ts'
 export type { InitializeResult, SchemaRpcNotificationMap } from './connection-rpc.ts'
 export { monLegacySyncResolveSchema, monLegacySyncResolveResultSchema } from './mon-sync.ts'
 export { monLegacyReplaySchema, monLegacyReplayResultSchema } from './mon-sync.ts'
+
+export { connectorManifestSchema } from './connector-manifest.ts'
+export type { ConnectorManifest } from './connector-manifest.ts'

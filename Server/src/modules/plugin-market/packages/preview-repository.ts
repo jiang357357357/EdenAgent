@@ -1,3 +1,4 @@
+import { assertPackageHostVersion } from './host-version.ts'
 import { randomUUID } from 'node:crypto'
 import type { EdenDatabase } from '@eden/store'
 import { packageManifest, componentSummary } from './manifest.ts'
@@ -9,6 +10,7 @@ export class PackagePreviewRepository {
   constructor(private readonly database: EdenDatabase, private readonly market: MarketRepository) {}
   save(download: Download) {
     const manifest = packageManifest(download.manifest, download.snapshot)
+    assertPackageHostVersion(manifest.minHostVersion, manifest.maxHostVersion)
     const id = randomUUID(), expires = Date.now() + 15 * 60000
     this.database.transaction(() => {
       this.database.connection.prepare('DELETE FROM plugin_package_previews WHERE expires_at<?').run(Date.now())

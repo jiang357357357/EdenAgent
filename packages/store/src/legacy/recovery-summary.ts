@@ -1,6 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite'
 
 const domains = [
+  { key: 'runtimeContexts', table: 'legacy_runtime_contexts', id: 'session_id', where: "state='review_required'", action: 'Restore per-actor history or explicitly compact oversized historical context before continuation.' },
+  { key: 'plugins', table: 'legacy_plugin_history', id: 'source_id', where: "state IN ('files_required','files_copied_review_required','reapproval_required','key_required','source_review_required')", action: 'Restore and verify plugin files and signing keys, then explicitly select permissions; historical revocations remain enforced.' },
+  { key: 'historicalSkills', table: 'legacy_skill_installations', id: 'id', where: "migration_state IN ('requires_reinstall','unavailable')", action: 'Recover source content and inspect it through the current skill installation workflow; historical trust grants no execution permission.' },
+  { key: 'configuration', table: 'legacy_app_config', id: 'key', where: "state IN ('confirmation_required','review_required')", action: 'Review unsupported configuration or explicitly save current permission and execution settings.' },
+  { key: 'subagentContexts', table: 'legacy_subagent_context', id: 'agent_id', where: "state!='ready'", action: 'Restore historical context, policies and model ownership before reopening child sessions.' },
+  { key: 'subagentMailbox', table: 'legacy_subagent_mailbox', id: 'id', where: "state IN ('context_required','review_required')", action: 'Reconcile inbox ownership and control-message semantics before consuming or triggering work.' },
   { key: 'coreIdentities', table: 'legacy_core_identities', id: 'session_id', where: "state='rebind_required'", action: 'Reconcile the Core principal and credential reference before synchronization.' },
   { key: 'coreDeliveries', table: 'legacy_core_outbox', id: 'id', where: "state IN ('held','unknown','running')", action: 'Reconcile historical deduplication keys and delivery outcomes before replay.' },
   { key: 'inputs', table: 'inputs', id: 'id', where: "state IN ('held','interrupted')", action: 'Restore compatible runtime context and explicitly settle or resume retained inputs.' },

@@ -69,6 +69,7 @@ export class SubagentRepository {
       const existing = this.existingFollowup(id, key, message)
       if (existing) return existing
       const current = this.raw(id)
+      if (this.database.connection.prepare("SELECT 1 FROM legacy_subagent_context WHERE agent_id=? AND state!='ready'").get(id)) throw new Error('Historical subagent context and policy must be restored before follow-up')
       if (['queued', 'running'].includes(String(current.state))) throw new Error('Subagent already has an active task')
       if (Number(current.turns_used) >= Number(current.max_turns)) throw new Error('Subagent turn budget is exhausted')
       if (current.deadline_at != null && Number(current.deadline_at) <= Date.now()) throw new Error('Subagent deadline has elapsed')
@@ -99,10 +100,11 @@ export class SubagentRepository {
   raw(id: string) { const row = this.database.connection.prepare('SELECT * FROM subagent_threads WHERE id=?').get(id); if (!row) throw new Error('Subagent not found'); return row }
   read(id: string) {
     const row = this.raw(id)
+    const legacy = this.database.connection.prepare('SELECT state,coordination_batch_id FROM legacy_subagent_context WHERE agent_id=?').get(id)
     return { id, sessionId: String(row.root_session_id), childSessionId: String(row.child_session_id), parentId: row.parent_id ?? null,
       agentPath: String(row.agent_path), taskName: String(row.task_name), role: String(row.role), status: String(row.state),
       result: row.result_json ? JSON.parse(String(row.result_json)) : null, error: row.error ?? null, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
-      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: null }
+      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: legacy?.coordination_batch_id ?? null, recoveryState: legacy ? String(legacy.state) : null }
   }
   active() {
     return this.database.connection.prepare("SELECT id FROM subagent_threads WHERE state IN ('queued','running') ORDER BY created_at LIMIT 1000").all().map(row => this.read(String(row.id)))

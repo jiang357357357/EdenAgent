@@ -1,5 +1,7 @@
+import { packageAssetFiles } from './asset-files.ts'
+import { nativeWorkerDescriptor } from './native-descriptor.ts'
 import { z } from 'zod'
-const id = z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/)
+const id = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/)
 const relative = z.string().min(1).max(1024).refine(value => !value.startsWith('/') && !/[\\:\x00-\x1f]/.test(value) && value.split('/').every(part => part !== '..' && part !== '.' && part !== ''), 'Package path must be relative')
 const skill = z.object({ id, path: relative, enabledByDefault: z.boolean().default(true) }).strict()
 const runtime = z.object({ id, kind: z.enum(['native_worker', 'mcp_stdio', 'mcp_http']), manifest: relative, enabledByDefault: z.boolean().default(true) }).strict()
@@ -25,9 +27,13 @@ export function packageManifest(raw: unknown, files: Map<string, Buffer>) {
   }
   for (const item of manifest.components.skills) if (!files.has(`${item.path}/SKILL.md`)) throw new Error('Skill component has no SKILL.md')
   for (const item of manifest.components.runtimes) if (!files.has(item.manifest)) throw new Error('Runtime component manifest is missing')
+  for (const item of manifest.components.runtimes) if (item.kind === 'native_worker') {
+    const native = nativeWorkerDescriptor(files, item.manifest)
+    for (const permission of native.manifest.permissions) if (!manifest.permissions.some(declared => declared.capability === permission.capability && declared.resource === permission.resource && declared.access === permission.access && (!permission.required || declared.required))) throw new Error('Native worker permission is absent from its owning plugin manifest')
+  }
   for (const item of manifest.components.ui) if (!files.has(item.entry)) throw new Error('UI component entry is missing')
   for (const item of manifest.components.hooks) if (!manifest.components.skills.some(skill => skill.id === item.skill)) throw new Error('Hook refers to an absent skill component')
-  for (const asset of manifest.assets) if (!files.has(asset.source)) throw new Error('Plugin asset source is missing')
+  packageAssetFiles(manifest.assets, files)
   return manifest
 }
 export function componentSummary(manifest: z.infer<typeof packageManifestSchema>) {

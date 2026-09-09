@@ -4,6 +4,7 @@ export const monSyncStatusSchema = z.object({ sessionId: z.string().uuid(), befo
   legacyBefore: z.number().int().positive().safe().optional(), limit: z.number().int().min(1).max(100).default(30) }).strict()
 const legacySyncSchema = z.object({ identityState: z.string().nullable(), blocked: z.boolean(), totals: z.record(z.string(), z.number()),
   items: z.array(z.object({ id: z.number().int().positive().safe(), kind: z.string(), state: z.string(), attempts: z.number().int(),
+    replay: z.object({ requestKey: z.uuid(), state: z.enum(['running', 'unknown', 'completed']), note: z.string(), error: z.string().nullable(), updatedAt: z.number() }).nullable(),
     review: z.object({ decision: z.enum(['confirm_completed', 'abandon']), note: z.string(), createdAt: z.number() }).nullable(),
     error: z.string().nullable(), createdAt: z.number(), updatedAt: z.number() })), nextCursor: z.number().nullable() })
 export const monSyncResultSchema = z.object({ legacy: legacySyncSchema, bound: z.boolean(), totals: z.record(z.string(), z.number()),

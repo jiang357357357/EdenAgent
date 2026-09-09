@@ -1,6 +1,6 @@
 import { marketKeyAddSchema } from '@eden/api'
 import { z } from 'zod'
-const id = z.string().regex(/^[a-z0-9][a-z0-9._-]{1,127}$/)
+const id = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/)
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
 const version = z.string().regex(/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$/)
 export { marketUrlSchema as marketUrl, marketSourceSchema as sourceSchema } from '@eden/api'

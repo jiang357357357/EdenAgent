@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { ConnectorCatalog } from './catalog.ts'
 export function workerArtifact(catalog: ConnectorCatalog, key: string) {
-  const { manifest, revision, packageRoot } = catalog.descriptor(key)
+  const { manifest, revision, packageRoot, native } = catalog.descriptor(key)
+  if (native) return { executable: '', sha256: native.sha256, args: native.args, platform: native.platform, revision: native.revision }
   const platform = `${process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : process.platform}-${process.arch}`
   const entry = manifest.entrypoints[platform]
   if (!entry) throw new Error('Official connector has no worker for this platform')

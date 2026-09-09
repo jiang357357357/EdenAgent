@@ -8,6 +8,17 @@ import type { MarketService } from '../../modules/plugin-market/index.ts'
 export function pluginMarketRoutes(service: MarketService): Record<string, (input: JsonValue) => JsonValue | Promise<JsonValue>> {
   const repo = service.repository
   const handlers: Record<string, (input: JsonValue) => JsonValue | Promise<JsonValue>> = {
+    'plugin.recovery.permissions': raw => {
+      const input = rpcMethods['plugin.recovery.permissions'].params.parse(raw)
+      if (!service.recovery) throw new Error('Plugin recovery is unavailable')
+      return toJson(service.recovery.permissions(input.sourceId, input.after))
+    },
+    'plugin.recovery.list': raw => {
+      const input = rpcMethods['plugin.recovery.list'].params.parse(raw)
+      if (!service.recovery) throw new Error('Plugin recovery is unavailable')
+      return toJson(service.recovery.list(input.after))
+    },
+    'plugin.recovery.inspect': async raw => toJson(await service.inspectRecovered(rpcMethods['plugin.recovery.inspect'].params.parse(raw).sourceId)),
     'plugin.inspect': async raw => { const input = z.object({ sourceType: z.literal('local'), sourceUri: z.string().min(1).max(4096) }).strict().parse(raw); return toJson(await service.inspectLocal(input.sourceUri)) },
     'plugin.install_preview': raw => {
       const input = z.object({ previewID: z.uuid(), activate: z.boolean(), enabled: z.boolean(), requireVerified: z.boolean() }).strict().parse(raw)

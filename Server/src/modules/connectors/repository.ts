@@ -23,8 +23,11 @@ export class ConnectorRepository {
   }
   update(raw: unknown) {
     const { id, patch } = connectorUpdateSchema.parse(raw), current = this.read(id)
-    const settings = this.catalog.validate(current.connectorKey, patch.settings ?? current.settings)
-    this.validateBinding(settings)
+    const settings = patch.settings === undefined ? current.settings : this.catalog.validate(current.connectorKey, patch.settings)
+    if (patch.settings !== undefined || patch.desiredState === 'connected') {
+      this.catalog.validate(current.connectorKey, settings)
+      this.validateBinding(settings)
+    }
     const desired = patch.desiredState ?? current.desiredState
     const changed = JSON.stringify(settings) !== JSON.stringify(current.settings)
     const reset = changed || desired !== current.desiredState

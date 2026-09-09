@@ -1,3 +1,4 @@
+import { prepareWorker } from './prepare-worker.ts'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { launchConnectorProcess } from '@eden/execution'
@@ -14,8 +15,8 @@ import { lichessEndpoint, resolveLichessEndpoint } from './lichess-target.ts'
 export async function launchLichess(id: string, dataRoot: string, repository: ConnectorRepository, catalog: ConnectorCatalog,
   permissions: ConnectorPermissions, events: ConnectorEventRepository, credentials: ConnectorCredentials, signal: AbortSignal) {
   const current = repository.read(id)
-  if (current.connectorKey !== 'lichess') throw new Error('Invalid Lichess connector')
-  const endpoint = lichessEndpoint(current.settings.baseUrl), artifact = workerArtifact(catalog, 'lichess')
+  if (catalog.descriptor(current.connectorKey).manifest.id !== 'lichess') throw new Error('Invalid Lichess connector')
+  const endpoint = lichessEndpoint(current.settings.baseUrl), artifact = workerArtifact(catalog, current.connectorKey)
   const authorize = () => {
     const latest = repository.read(id), grants = permissions.read(id)
     if (latest.generation !== current.generation || latest.desiredState !== 'connected' || !grants.ready || grants.revision !== artifact.revision
@@ -30,26 +31,29 @@ export async function launchLichess(id: string, dataRoot: string, repository: Co
   const directory = path.join(dataRoot, 'connectors', id)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const bridge = await createTcpBridge(target, authorize, signal)
+  let prepared: Awaited<ReturnType<typeof prepareWorker>> | undefined
   let process: Awaited<ReturnType<typeof launchConnectorProcess>> | undefined
   try {
     authorize(); signal.throwIfAborted()
-    process = await launchConnectorProcess({ executable: artifact.executable, sha256: artifact.sha256, args: artifact.args,
+    prepared = await prepareWorker(catalog, current.connectorKey, dataRoot, artifact.revision)
+    authorize(); signal.throwIfAborted()
+    process = await launchConnectorProcess({ executable: prepared.executable, packageSnapshot: prepared.packageSnapshot, sha256: artifact.sha256, args: artifact.args,
       dataDirectory: directory, readMounts: [], httpsBridgeDirectory: bridge.directory,
       identity: { key: current.identityKey, credential }, signal })
-    const child = process, exited = child.exited.finally(() => bridge.close())
+    const child = process, exited = child.exited.finally(async () => { try { await bridge.close() } finally { await prepared?.cleanup() } })
     void exited.catch(() => { globalThis.process.stderr.write('Lichess bridge exit cleanup failed\n') })
     const runtime = new ConnectorWorkerRuntime(id, current.generation, child.input, child.output, repository, events,
-      async () => { try { await child.stop() } finally { await bridge.close() } })
+      async () => { await child.stop(); await exited }, authorize, 'lichess')
     try {
       await runtime.initialize({ protocolVersion: 1, connectorInstanceId: id, connectorKey: 'lichess',
-        packageVersion: catalog.descriptor('lichess').manifest.version,
+        packageVersion: catalog.descriptor(current.connectorKey).manifest.version,
         settings: { ...current.settings, baseUrl: endpoint.url.href.replace(/\/$/, ''), tokenEnv: 'MON_CONNECTOR_IDENTITY_CREDENTIAL' },
         grantedPermissions: permissions.require(id, current.generation), dataDirectory: '/data' }, current.settings)
       authorize()
     } catch (error) { await runtime.close(); throw error }
     return { runtime, generation: current.generation, revision: artifact.revision, exited }
   } catch (error) {
-    try { await process?.stop() } finally { await bridge.close() }
+    try { await process?.stop() } finally { try { await bridge.close() } finally { await prepared?.cleanup() } }
     throw error
   }
 }

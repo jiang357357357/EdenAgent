@@ -1,3 +1,4 @@
+import { serverVersion } from '../../version.ts'
 import type { RequestListener } from 'node:http'
 import type { RuntimeOrigin } from '@eden/api'
 
@@ -15,7 +16,7 @@ export function healthHandler(origin: RuntimeOrigin, checks: () => HealthChecks)
     const ready = (origin === 'mon' || current.model) && !current.sessionFaults && current.memoryExtraction && current.jobs !== false && current.selfAwake !== false
     const unavailable = request.url === '/readyz' && !ready
     response.writeHead(unavailable ? 503 : 200).end(JSON.stringify({
-      status: unavailable ? 'not_ready' : 'ok', runtimeOrigin: origin, serverVersion: '2.0.0-dev.0', checks: { database: true, ...current },
+      status: unavailable ? 'not_ready' : 'ok', runtimeOrigin: origin, serverVersion, checks: { database: true, ...current },
     }))
   }
 }

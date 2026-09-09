@@ -6,7 +6,7 @@ import { LegacySnapshotReader } from './snapshot-reader.ts'
 import { runLegacyConversion } from './conversion-runner.ts'
 
 /** Explicit importer connection; the ordinary host keeps rejecting incomplete databases. */
-export async function resumeLegacyConversion(snapshot: string, destination: string, origin: 'mon' | 'local', blobSourceRoot?: string) {
+export async function resumeLegacyConversion(snapshot: string, destination: string, origin: 'mon' | 'local', blobSourceRoot?: string, pluginVersionsRoot?: string) {
   const source = await LegacySnapshotReader.open(snapshot, origin), target = await realpath(destination)
   const filename = path.join(target, 'agent.sqlite'), info = await lstat(filename)
   if (!info.isFile() || info.isSymbolicLink()) throw new Error('Conversion database must be a regular file')
@@ -30,7 +30,7 @@ export async function resumeLegacyConversion(snapshot: string, destination: stri
     }
     db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL;')
     migrateDatabase(db)
-    return await runLegacyConversion(db, source, target, origin, blobSourceRoot)
+    return await runLegacyConversion(db, source, target, origin, blobSourceRoot, pluginVersionsRoot)
   } finally {
     try { db?.close() } finally { await lock.close(); await unlink(lockPath) }
   }

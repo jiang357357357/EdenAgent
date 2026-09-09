@@ -1,3 +1,5 @@
+import { packageNativePlans } from './native-plan.ts'
+import { assertPackageHostVersion } from './host-version.ts'
 import { PackagePermissionRepository } from './permission-repository.ts'
 import { packageRuntimeDescriptors } from './runtime-descriptors.ts'
 import type { PackagePermissionDecision } from '@eden/api'
@@ -14,7 +16,8 @@ export class InstalledPackageRepository {
   has(id: string) { return Boolean(this.database.connection.prepare('SELECT 1 FROM plugin_packages WHERE id=? LIMIT 1').get(id)) }
   install(preview: Preview, select: boolean, enabled: boolean) {
     if (enabled) throw new Error('Package component activation must be completed separately')
-    this.hostVersion(preview.manifest.minHostVersion, preview.manifest.maxHostVersion)
+    this.market.assertNotHistoricallyRevoked(preview.manifest.id, preview.manifest.version, preview.revision)
+    assertPackageHostVersion(preview.manifest.minHostVersion, preview.manifest.maxHostVersion)
     return this.database.transaction(() => {
       if (this.database.connection.prepare('SELECT 1 FROM plugin_versions WHERE plugin_id=? UNION SELECT 1 FROM plugin_drafts WHERE id=? LIMIT 1').get(preview.manifest.id, preview.manifest.id)) throw new Error('Plugin ID is already used by a TypeScript plugin')
       const now = Date.now()
@@ -24,6 +27,8 @@ export class InstalledPackageRepository {
       const current = this.database.connection.prepare('SELECT 1 FROM plugin_package_selection WHERE id=?').get(preview.manifest.id)
       if (select || !current) this.database.connection.prepare('INSERT INTO plugin_package_selection(id,revision,enabled) VALUES(?,?,0) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,enabled=0').run(preview.manifest.id, preview.revision)
       this.database.connection.prepare('DELETE FROM plugin_package_previews WHERE id=?').run(preview.previewID)
+      this.database.connection.prepare("UPDATE legacy_plugin_history SET state='installed_disabled' WHERE domain='plugin_versions' AND source_id=? AND state='files_copied_review_required'")
+        .run(JSON.stringify([preview.manifest.id, preview.manifest.version, preview.revision]))
       return this.read(preview.manifest.id)
     })
   }
@@ -54,6 +59,8 @@ export class InstalledPackageRepository {
   private componentPlan(id: string, revision: string) {
     const value = this.verified(id, revision), enabled = (componentId: string, fallback: boolean) => this.componentEnabled(id, revision, componentId, fallback)
     this.permissions.require(id, revision, value.manifest.permissions)
+    // Validate native executable ownership before any activation decision; the connector launcher remains separate.
+    packageNativePlans(value, enabled)
     const runtimes = packageRuntimeDescriptors(value, enabled)
     for (const runtime of runtimes) {
       if (!this.permissions.allowed(id, revision, runtime.permission)) throw new Error('MCP runtime requires an explicit command or endpoint grant')
@@ -68,6 +75,17 @@ export class InstalledPackageRepository {
     const runtimes = packageRuntimeDescriptors(value, (componentId, fallback) => this.componentEnabled(id, revision, componentId, fallback))
     for (const runtime of runtimes) if (!this.permissions.allowed(id, revision, runtime.permission)) throw new Error('MCP runtime permission is missing for this version')
     return { runtimes, files: value.files }
+  }
+  nativePlan(id: string, revision: string) {
+    const value = this.verified(id, revision)
+    this.permissions.require(id, revision, value.manifest.permissions)
+    return packageNativePlans(value, (componentId, fallback) => this.componentEnabled(id, revision, componentId, fallback))
+  }
+  nativeSelectionPlans() {
+    return this.runtimeSelections().map(selection => {
+      try { return { id: selection.id, revision: selection.revision, plans: this.nativePlan(selection.id, selection.revision), error: null } }
+      catch { return { id: selection.id, revision: selection.revision, plans: [], error: 'Native package integrity, platform executable or permissions are unavailable' } }
+    })
   }
   runtimeSelections() {
     return this.database.connection.prepare('SELECT id,revision FROM plugin_package_selection WHERE enabled=1').all()
@@ -145,17 +163,9 @@ export class InstalledPackageRepository {
     const result = verifyPackageFiles(files, key => this.market.key(key), provenance.sourceType === 'local' && row.key_id === '')
     if (result.revision !== revision || result.keyId !== row.key_id) throw new Error('Installed package integrity mismatch')
     const manifest = packageManifestSchema.parse(result.manifest)
-    this.hostVersion(manifest.minHostVersion, manifest.maxHostVersion)
+    this.market.assertNotHistoricallyRevoked(id, manifest.version, revision)
+    assertPackageHostVersion(manifest.minHostVersion, manifest.maxHostVersion)
     return { ...result, manifest, files }
   }
   private trust(id: string) { if (!id) return 'unsigned:local'; try { this.market.key(id); return `verified:${id}` } catch { return 'blocked:signing-key-revoked' } }
-  private hostVersion(minimum?: string, maximum?: string) {
-    const compare = (version: string) => {
-      if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Package host version bounds must use major.minor.patch')
-      const values = version.split('.').map(Number), host = [2, 0, 0]
-      for (let index = 0; index < 3; index++) if (host[index] !== values[index]) return host[index]! < values[index]! ? -1 : 1
-      return 0
-    }
-    if ((minimum && compare(minimum) < 0) || (maximum && compare(maximum) > 0)) throw new Error('Plugin package is not compatible with this host version')
-  }
 }

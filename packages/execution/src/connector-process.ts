@@ -1,3 +1,4 @@
+import { snapshotWorkerPackage } from './worker-package-snapshot.ts'
 import { spawn } from 'node:child_process'
 import { snapshotWorker } from './worker-snapshot.ts'
 import { lstatSync, realpathSync } from 'node:fs'
@@ -6,6 +7,7 @@ import type { Readable, Writable } from 'node:stream'
 import { sandboxArguments, sandboxExecutable } from './sandbox-arguments.ts'
 export interface ConnectorProcessRequest {
   executable: string
+  packageSnapshot?: { files: ReadonlyMap<string, Buffer>; entrypoint: string }
   sha256: string
   args?: string[]
   dataDirectory: string
@@ -34,8 +36,8 @@ function canonical(value: string, directory: boolean): string {
 export async function launchConnectorProcess(request: ConnectorProcessRequest): Promise<ConnectorProcess> {
   request.signal.throwIfAborted()
   const args = sandboxArguments()
-  const executable = canonical(request.executable, false), dataDirectory = canonical(request.dataDirectory, true)
-  if (lstatSync(executable).size > 128 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(request.sha256)) throw new Error('Invalid connector executable digest or size')
+  const executable = request.packageSnapshot ? null : canonical(request.executable, false), dataDirectory = canonical(request.dataDirectory, true)
+  if ((executable && lstatSync(executable).size > 128 * 1024 * 1024) || !/^[a-f0-9]{64}$/.test(request.sha256)) throw new Error('Invalid connector executable digest or size')
   if (request.readMounts.length > 16) throw new Error('Too many connector read grants')
   args.push('--bind', dataDirectory, '/data', '--dir', '/inputs')
   if (request.adminBridgeDirectory && request.httpsBridgeDirectory) throw new Error('Only one connector network bridge is allowed')
@@ -68,9 +70,12 @@ export async function launchConnectorProcess(request: ConnectorProcessRequest): 
   }
   const workerArgs = request.args ?? []
   if (workerArgs.length > 32 || workerArgs.some(arg => typeof arg !== 'string' || arg.length > 4096 || arg.includes('\0'))) throw new Error('Invalid connector worker arguments')
-  const snapshot = await snapshotWorker(executable, request.sha256, request.signal)
-  args.push('--dir', '/worker', '--ro-bind', snapshot.executable, '/worker/connector')
-  args.push('--chdir', '/data', '--', '/usr/bin/prlimit', '--as=1073741824:1073741824', '--nofile=128:128', '--fsize=67108864:67108864', '--', '/worker/connector', ...workerArgs)
+  const snapshot = request.packageSnapshot
+    ? await snapshotWorkerPackage(request.packageSnapshot.files, request.packageSnapshot.entrypoint, request.sha256, request.signal)
+    : { ...await snapshotWorker(executable!, request.sha256, request.signal), root: undefined, guestExecutable: '/worker/connector', cwd: '/data' }
+  if (snapshot.root) args.push('--ro-bind', snapshot.root, '/package')
+  else args.push('--dir', '/worker', '--ro-bind', snapshot.executable, '/worker/connector')
+  args.push('--chdir', snapshot.cwd, '--', '/usr/bin/prlimit', '--as=1073741824:1073741824', '--nofile=128:128', '--fsize=67108864:67108864', '--', snapshot.guestExecutable, ...workerArgs)
   const child = (() => {
     try { return spawn(sandboxExecutable, args, { env: environment, stdio: ['pipe', 'pipe', 'pipe'], detached: true }) }
     catch (error) { void snapshot.cleanup().catch(() => { process.stderr.write('Worker launch snapshot cleanup failed\n') }); throw error }

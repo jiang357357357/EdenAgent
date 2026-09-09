@@ -1,18 +1,14 @@
+import type { InstalledPackageRepository } from '../plugin-market/index.ts'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { jsonValue, toJson } from '@eden/api'
+import { connectorManifestSchema as manifestSchema, toJson } from '@eden/api'
 import path from 'node:path'
 import { officialConnectorPackage } from './package-location.ts'
-const property = z.object({ type: z.enum(['string', 'integer', 'boolean']), minLength: z.number().optional(), maxLength: z.number().optional(),
-  minimum: z.number().optional(), maximum: z.number().optional(), pattern: z.string().optional(), format: z.literal('uuid').optional() })
-const manifestSchema = z.object({ id: z.string(), name: z.string(), description: z.string(), icon: z.string(), version: z.string(),
-  entrypoints: z.record(z.string(), z.object({ path: z.string().min(1).max(4096), args: z.array(z.string().max(4096)).max(32) })),
-  permissions: z.array(z.object({ capability: z.string().min(1).max(128), resource: z.string().min(1).max(4096), access: z.string().min(1).max(64), required: z.boolean(), description: z.string().max(4000) })).max(128),
-  settingsSchema: z.object({ type: z.literal('object'), properties: z.record(z.string(), property), additionalProperties: z.literal(false) }),
-  events: z.record(z.string(), jsonValue), queries: z.record(z.string(), jsonValue), actions: z.record(z.string(), jsonValue) })
 export class ConnectorCatalog {
   private readonly entries = new Map<string, { manifest: z.infer<typeof manifestSchema>; revision: string; packageRoot: string }>()
+  private nativeProvider?: () => ReturnType<InstalledPackageRepository['nativeSelectionPlans']>
+  attachNativeProvider(provider: () => ReturnType<InstalledPackageRepository['nativeSelectionPlans']>) { this.nativeProvider = provider }
   private readonly errors: { key: string; error: string }[] = []
   constructor() {
     for (const key of ['lichess', 'openttd', 'victoria3', 'hoi4']) {
@@ -26,25 +22,29 @@ export class ConnectorCatalog {
     }
   }
   list() {
-    return { connectors: [...this.entries.values()].map(({ manifest: item, revision }) => ({ key: item.id, name: item.name,
+    const native = this.nativeProvider?.() ?? []
+    const entries = [...this.entries.entries()].map(([key, entry]) => ({ key, ...entry }))
+    entries.push(...native.flatMap(item => item.plans.map(plan => ({ key: plan.key, manifest: plan.manifest, revision: plan.revision, packageRoot: '' }))))
+    return { connectors: entries.map(({ key, manifest: item, revision }) => ({ key, name: item.name,
       description: item.description, icon: item.icon, version: item.version, revision, hot_reload: false, worker_isolated: true,
       settings_schema: toJson(item.settingsSchema), capabilities: (['events', 'queries', 'actions'] as const).flatMap(kind =>
         Object.entries(item[kind]).map(([id, schema]) => ({ id, kind: kind === 'events' ? 'event' : kind === 'queries' ? 'query' : 'action',
           direction: kind === 'events' ? 'inbound' : 'outbound', label: schema && typeof schema === 'object' && !Array.isArray(schema) && typeof schema.title === 'string' ? schema.title : id,
-          description: '', schema, invocation: null }))) })), errors: this.errors }
+          description: '', schema, invocation: null }))) })), errors: [...this.errors, ...native.filter(item => item.error).map(item => ({ key: item.id, error: item.error! }))] }
   }
   descriptor(key: string) {
     const entry = this.entries.get(key)
-    if (!entry) throw new Error('Official connector manifest is unavailable')
-    return { manifest: manifestSchema.parse(entry.manifest), revision: entry.revision, packageRoot: entry.packageRoot }
+    if (entry) return { manifest: manifestSchema.parse(entry.manifest), revision: entry.revision, packageRoot: entry.packageRoot, native: undefined }
+    const native = this.nativeProvider?.().flatMap(item => item.plans).find(plan => plan.key === key)
+    if (!native) throw new Error('Connector component is unavailable or its plugin authorization changed')
+    return { manifest: native.manifest, revision: native.revision, packageRoot: '', native }
   }
   assertEvent(key: string, eventType: string) {
-    const entry = this.entries.get(key)
-    if (!entry || !Object.hasOwn(entry.manifest.events, eventType)) throw new Error('Connector event is not declared in its manifest')
+    const entry = this.descriptor(key)
+    if (!Object.hasOwn(entry.manifest.events, eventType)) throw new Error('Connector event is not declared in its manifest')
   }
   validate(key: string, raw: unknown) {
-    const entry = this.entries.get(key)
-    if (!entry) throw new Error('Connector is not present in the official catalog')
+    const entry = this.descriptor(key)
     const shape: Record<string, z.ZodType> = {}
     for (const [name, field] of Object.entries(entry.manifest.settingsSchema.properties)) {
       if (field.type === 'boolean') shape[name] = z.boolean().optional()

@@ -1,7 +1,7 @@
 import { constants } from 'node:fs'
 import { realpath, readdir, open } from 'node:fs/promises'
 import path from 'node:path'
-export async function localPackageFiles(source: string, signal: AbortSignal) {
+export async function localPackageFiles(source: string, signal: AbortSignal, includeGit = false) {
   const root = await realpath(source), files = new Map<string, Buffer>()
   let total = 0
   async function visit(directory: string, prefix: string, depth: number): Promise<void> {
@@ -13,7 +13,7 @@ export async function localPackageFiles(source: string, signal: AbortSignal) {
     if (entries.length > 520) throw new Error('Plugin directory exceeds entry limit')
     for (const entry of entries) {
       signal.throwIfAborted()
-      if (entry.name === '.git') continue
+      if (entry.name === '.git' && !includeGit) continue
       if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())) throw new Error('Plugin cannot contain links or special files')
       const filename = path.join(directory, entry.name), relative = prefix + entry.name
       if (entry.isDirectory()) { await visit(filename, relative + '/', depth + 1); continue }

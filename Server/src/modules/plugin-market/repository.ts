@@ -54,6 +54,14 @@ export class MarketRepository {
     return this.read(id)
   }
   failure(id: string, epoch: string) { this.database.connection.prepare("UPDATE plugin_market_sources SET last_error='Index refresh failed; source or signature could not be verified' WHERE id=? AND epoch=?").run(id, epoch) }
+  historicalRevocation(pluginId: string, version: string, revision: string): string | null {
+    const row = this.database.connection.prepare('SELECT reason FROM legacy_plugin_revocations WHERE plugin_id=? AND version=? AND revision=? ORDER BY revoked_at DESC LIMIT 1')
+      .get(pluginId, version, revision)
+    return row ? String(row.reason) : null
+  }
+  assertNotHistoricallyRevoked(pluginId: string, version: string, revision: string): void {
+    if (this.historicalRevocation(pluginId, version, revision) !== null) throw new Error('This plugin release was revoked before migration')
+  }
   release(sourceId: string, pluginId: string, version: string) {
     const source = this.raw(sourceId)
     this.key(String(source.key_id))
@@ -62,6 +70,7 @@ export class MarketRepository {
     if (payload.expiresAt <= Date.now()) throw new Error('Market index expired; refresh before downloading')
     const release = payload.plugins.find(plugin => plugin.id === pluginId)?.versions.find(item => item.version === version)
     if (!release) throw new Error('Market release not found')
+    this.assertNotHistoricallyRevoked(pluginId, version, release.revision)
     if (payload.revocations.some(item => item.pluginId === pluginId && item.version === version && item.revision === release.revision)) throw new Error('Market release has been revoked')
     return { ...release, epoch: String(source.epoch), indexRevision: String(source.index_revision) }
   }
@@ -74,8 +83,9 @@ export class MarketRepository {
       if (payload.expiresAt <= Date.now()) return []
       return payload.plugins.flatMap(plugin => plugin.versions.map(release => {
         const revoked = payload.revocations.find(item => item.pluginId === plugin.id && item.version === release.version && item.revision === release.revision)
+        const historicalReason = this.historicalRevocation(plugin.id, release.version, release.revision)
         return { sourceID: String(source.id), pluginID: plugin.id, name: plugin.name, description: plugin.description, version: release.version,
-          revision: release.revision, revoked: Boolean(revoked), revocationReason: revoked?.reason ?? null }
+          revision: release.revision, revoked: Boolean(revoked) || historicalReason !== null, revocationReason: revoked?.reason ?? historicalReason }
       }))
     })
   }

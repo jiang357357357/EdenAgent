@@ -1,3 +1,4 @@
+import { legacyMetricSummary } from './metric-summary.ts'
 import { legacyRecoverySummary } from './recovery-summary.ts'
 import { randomUUID } from 'node:crypto'
 import { open, rename, unlink } from 'node:fs/promises'
@@ -11,7 +12,7 @@ export function conversionReport(db: DatabaseSync, origin: 'mon' | 'local', phas
     updatedAt: new Date().toISOString(), outcome: error === undefined ? 'staged' : 'failed',
     error: error === undefined ? null : (error instanceof Error ? error.message : String(error)).slice(0, 4000),
     modelBindingsAwaitingRefresh: recovery.items.find(item => item.key === 'modelBindings')?.count ?? 0,
-    recovery,
+    recovery, historicalMetrics: legacyMetricSummary(db),
     converted: tables.filter(table => table.state === 'converted').map(table => String(table.name)),
     pending: tables.filter(table => table.state !== 'converted').map(table => String(table.name)),
     tables: tables.map(table => ({ name: String(table.name), sha256: String(table.sha256), rows: Number(table.rows), state: String(table.state) })),

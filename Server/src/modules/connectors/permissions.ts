@@ -1,13 +1,19 @@
 import { workerArtifact } from './worker-artifact.ts'
-import { createHash } from 'node:crypto'
-import { connectorPermissionSetSchema } from '@eden/api'
+import { createHash, randomUUID } from 'node:crypto'
+import { connectorPermissionSetSchema, rpcMethods } from '@eden/api'
 import type { EdenDatabase } from '@eden/store'
 import type { ConnectorCatalog } from './catalog.ts'
 import type { ConnectorRepository } from './repository.ts'
 export class ConnectorPermissions {
   constructor(private readonly database: EdenDatabase, private readonly catalog: ConnectorCatalog, private readonly connectors: ConnectorRepository) {}
   read(id: string) {
-    const connector = this.connectors.read(id), descriptor = this.catalog.descriptor(connector.connectorKey)
+    const connector = this.connectors.read(id)
+    let descriptor: ReturnType<ConnectorCatalog['descriptor']>
+    try { descriptor = this.catalog.descriptor(connector.connectorKey) }
+    catch {
+      return { id, generation: connector.generation, revision: createHash('sha256').update(`unavailable:${connector.connectorKey}`).digest('hex'),
+        permissions: [], ready: false, worker: { available: false, sha256: null, error: 'Connector component is unavailable; disconnect or clear its previous grants before restoring it' } }
+    }
     let artifact: ReturnType<typeof workerArtifact> | undefined
     try { artifact = workerArtifact(this.catalog, connector.connectorKey) } catch { /* Missing artifacts block new grants and activation below. */ }
     const revision = artifact?.revision ?? descriptor.revision
@@ -24,6 +30,17 @@ export class ConnectorPermissions {
     return { id, generation: connector.generation, revision, permissions, worker: { available: Boolean(artifact), sha256: artifact?.sha256 ?? null,
         error: artifact ? null : 'Current platform worker artifact is missing or invalid' },
       ready: Boolean(artifact) && permissions.every(permission => !permission.required || (permission.resolvedResource !== null && permission.allowed)) }
+  }
+  clear(raw: unknown) {
+    const input = rpcMethods['connector.permissions.clear'].params.parse(raw)
+    this.database.transaction(() => {
+      const current = this.connectors.read(input.id)
+      if (current.generation !== input.generation) throw new Error('Connector changed; refresh before clearing permissions')
+      this.database.connection.prepare('DELETE FROM connector_grants WHERE connector_id=?').run(input.id)
+      this.database.connection.prepare("UPDATE connectors SET generation=?,desired_state='disconnected',runtime_state='disconnected',last_error=NULL,updated_at=? WHERE id=?")
+        .run(randomUUID(), Date.now(), input.id)
+    })
+    return this.read(input.id)
   }
   set(raw: unknown) {
     const input = connectorPermissionSetSchema.parse(raw)
