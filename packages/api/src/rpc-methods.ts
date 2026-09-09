@@ -1,4 +1,5 @@
 import { connectionRpcMethods } from './connection-rpc.ts'
+import { migrationRpcMethods } from './migration-rpc.ts'
 import { operationRpcMethods } from './operations.ts'
 import { toolRpcMethods } from './tool-rpc.ts'
 import { reasoningRpcMethods } from './reasoning-rpc.ts'
@@ -23,6 +24,7 @@ import { mcpResultReadSchema, mcpResultViewSchema, mcpResultExportSchema } from 
 
 /** Migrated methods share runtime validation and inferred browser types. Add remaining domains here. */
 export const rpcMethods = {
+  ...migrationRpcMethods,
   ...connectionRpcMethods,
   ...operationRpcMethods,
   ...toolRpcMethods,

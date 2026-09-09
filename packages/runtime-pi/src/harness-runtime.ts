@@ -22,6 +22,11 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
   const tools = (items: RuntimeTool[]) => items.map(tool => adaptTool(tool, options.callbacks, healthy, fail, options.toolCallPrefix))
   const provider = createRuntimeModels(options.model, {
     signal: () => controller.signal,
+    failed(error) { fatal = error; controller.abort() },
+    async response(snapshot) {
+      try { await options.callbacks.response?.(snapshot) }
+      catch (error) { fatal = error; controller.abort(); throw error }
+    },
     async record(snapshot) {
       healthy()
       if (++requests > (options.maxModelRequests ?? 128)) throw new Error('Model request budget exceeded')
@@ -34,13 +39,13 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
   })
   const harness = new AgentHarness({
     session: storage.session(), ...provider, systemPrompt: options.systemPrompt,
-    tools: tools(options.tools), thinkingLevel: 'off', streamOptions: { maxRetries: 0 },
+    tools: tools(options.tools), thinkingLevel: options.model.reasoning ?? 'off', streamOptions: { maxRetries: 0 },
     retry: { enabled: false, maxRetries: 0, baseDelayMs: 0 },
   })
   harness.on('context', event => ({ messages: storage.transientContext(event.messages) }))
   harness.subscribe(async event => {
     healthy()
-    try { await options.callbacks.event(event.type, toJson(event)) }
+    try { await options.callbacks.event(event.type, toJson({ ...event, costConfigured: options.model.cost !== undefined })) }
     catch (error) { fatal = error; throw error }
   })
   const run = (work: () => Promise<unknown>): Promise<JsonValue> => {

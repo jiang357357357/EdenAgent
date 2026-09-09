@@ -50,6 +50,10 @@ export function convertLegacyThread(db: DatabaseSync, row: LegacyRow): void {
       row.started_at === null ? null : legacyTime(row.started_at), row.completed_at === null ? null : legacyTime(row.completed_at),
       count(budget.max_turns, 64), count(usage.turns, 0), row.deadline_at == null ? null : legacyTime(row.deadline_at),
       count(usage.modelRequests, 0), count(usage.toolCalls, 0), 128, count(budget.max_tool_calls, 128))
+  db.prepare(`UPDATE subagent_threads SET max_tokens=?,max_cost_microusd=?,tokens_used=?,cost_microusd_used=?,usage_unknown=?,cost_unknown=? WHERE id=?`)
+    .run(count(budget.max_tokens, 1000000), count(budget.max_cost_microusd, 10000000), count(usage.tokens, 0), count(usage.costMicrousd, 0),
+      Number(usage.tokens === undefined), Number(usage.costMicrousd === undefined), id)
+  db.prepare('UPDATE subagent_threads SET legacy_usage_unknown=usage_unknown,legacy_cost_unknown=cost_unknown WHERE id=?').run(id)
   db.prepare('INSERT INTO legacy_subagent_context VALUES(?,?,?,?,?,?,?)').run(id, legacyText(row, 'prompt'),
     row.context_json === null ? null : legacyJson(row, 'context_json'), configJson, usageJson,
     row.coordination_batch_id == null ? null : legacyText(row, 'coordination_batch_id'), 'context_required')

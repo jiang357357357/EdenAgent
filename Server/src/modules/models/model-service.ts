@@ -4,6 +4,11 @@ import { configuredModelSchema, actorIdSchema } from '@eden/api'
 import type { ModelBinding, ActorModelBinding } from './contracts.ts'
 import { modelStatus } from './model-status.ts'
 import type { ModelBindingRepository, ModelBindingSnapshot } from './binding-repository.ts'
+import type { ModelPricingRepository } from './pricing-repository.ts'
+import type { ModelPricingTarget } from '@eden/api'
+import { childModel } from './child-model.ts'
+import type { ChildModelOptions } from './child-model.ts'
+import type { LocalChildModels } from './local-child-models.ts'
 
 export class ModelService {
   private readonly configured: RuntimeModel | undefined
@@ -12,7 +17,7 @@ export class ModelService {
   private readonly visionEntities = new Map<string, string | number>()
   private readonly directors = new Map<string, RuntimeModel>()
   private readonly actors = new Map<string, Map<string, ActorModelBinding>>()
-  constructor(private readonly origin: RuntimeOrigin, configured?: RuntimeModel, private readonly storage?: ModelBindingRepository) {
+  constructor(private readonly origin: RuntimeOrigin, configured?: RuntimeModel, private readonly storage?: ModelBindingRepository, readonly pricing?: ModelPricingRepository, private readonly localChildren?: LocalChildModels) {
     if (origin === 'mon' && configured) throw new Error('Mon models must be bound through the Mon integration')
     this.configured = configured ? configuredModelSchema.parse(configured) : undefined
     if (origin === 'local' && storage) throw new Error('Local models cannot restore Mon bindings')
@@ -29,20 +34,30 @@ export class ModelService {
     }
   }
 
-  inherit(parentSessionId: string, childSessionId: string): void {
-    if (this.origin === 'local') { if (!this.configured) throw new Error('No local model configured'); return }
+  inherit(parentSessionId: string, childSessionId: string, options?: ChildModelOptions): void {
+    if (this.origin === 'local') {
+      const parent = this.resolve(parentSessionId)
+      if (!parent) throw new Error('No local model configured')
+      if (!this.localChildren) {
+        if (options?.model || options?.reasoning != null) throw new Error('Durable local child model settings are unavailable')
+        return
+      }
+      this.localChildren.save(childSessionId, childModel(parent, options))
+      return
+    }
     this.refresh(parentSessionId)
     const binding = this.bindings.get(parentSessionId)
     if (!binding) throw new Error('Subagent requires a bound single-actor parent model')
-    this.replace(childSessionId, { mode: 'single', main: structuredClone(binding), vision: structuredClone(this.visionBindings.get(parentSessionId) ?? null), visionEntityId: this.visionEntities.get(parentSessionId) ?? null })
+    this.replace(childSessionId, { mode: 'single', main: { ...structuredClone(binding), model: childModel(binding.model, options) }, vision: structuredClone(this.visionBindings.get(parentSessionId) ?? null), visionEntityId: this.visionEntities.get(parentSessionId) ?? null })
   }
 
   resolve(sessionId: string): RuntimeModel | undefined {
     this.refresh(sessionId)
-    return this.origin === 'local' ? this.configured : this.bindings.get(sessionId)?.model
+    return this.withRates(this.origin === 'local' ? this.localChildren?.resolve(sessionId, this.configured) ?? this.configured : this.bindings.get(sessionId)?.model)
   }
 
   invalidateSession(sessionId: string): void {
+    this.localChildren?.remove(sessionId)
     this.storage?.remove(sessionId)
     this.clear(sessionId)
   }
@@ -71,16 +86,18 @@ export class ModelService {
 
   resolveDirector(sessionId: string): RuntimeModel | undefined {
     this.refresh(sessionId)
-    return this.origin === 'local' ? this.configured : this.directors.get(sessionId)
+    return this.withRates(this.origin === 'local' ? this.configured : this.directors.get(sessionId))
   }
 
   resolveActor(sessionId: string, assistantId: string | number): ActorModelBinding | undefined {
     this.refresh(sessionId)
-    return this.actors.get(sessionId)?.get(String(assistantId))
+    const actor = this.actors.get(sessionId)?.get(String(assistantId))
+    return actor ? { ...actor, main: { ...actor.main, model: this.withRates(actor.main.model)! },
+      ...(actor.vision ? { vision: { ...actor.vision, model: this.withRates(actor.vision.model)! } } : {}) } : undefined
   }
 
   resolveActorModel(sessionId: string, assistantId: string | number): RuntimeModel | undefined {
-    return this.origin === 'local' ? this.configured : this.resolveActor(sessionId, assistantId)?.main.model
+    return this.origin === 'local' ? this.withRates(this.configured) : this.resolveActor(sessionId, assistantId)?.main.model
   }
 
   bindVision(sessionId: string, model: RuntimeModel | undefined, entityId?: string | number | null): void {
@@ -91,7 +108,17 @@ export class ModelService {
       vision: model ? configuredModelSchema.parse(model) : null, visionEntityId: model && entityId != null ? actorIdSchema.parse(entityId) : null })
   }
 
-  resolveVision(sessionId: string): RuntimeModel | undefined { this.refresh(sessionId); return this.visionBindings.get(sessionId) }
+  resolveVision(sessionId: string): RuntimeModel | undefined { this.refresh(sessionId); return this.withRates(this.visionBindings.get(sessionId)) }
+
+  private withRates(model: RuntimeModel | undefined) { return this.pricing ? this.pricing.apply(model) : model }
+
+  pricingModel(selection: ModelPricingTarget): RuntimeModel {
+    const model = selection.target === 'main' ? this.resolve(selection.sessionId) : selection.target === 'director' ? this.resolveDirector(selection.sessionId) :
+      selection.target === 'vision' ? this.resolveVision(selection.sessionId) : selection.target === 'actor' ? this.resolveActorModel(selection.sessionId, selection.assistantId!) :
+        this.resolveActor(selection.sessionId, selection.assistantId!)?.vision?.model
+    if (!model) throw new Error('Selected model is not currently bound')
+    return model
+  }
 
   private replace(key: string, snapshot: ModelBindingSnapshot): void {
     this.storage?.save(key, snapshot)
@@ -133,7 +160,7 @@ export class ModelService {
   read(sessionId?: string, participants?: JsonValue[]) {
     this.refresh(sessionId ?? 'default')
     const binding = this.bindings.get(sessionId ?? 'default')
-    const model = this.origin === 'local' ? this.configured : binding?.model
+    const model = this.origin === 'local' ? sessionId ? this.resolve(sessionId) : this.configured : binding?.model
     const roster = participants ?? [...(this.actors.get(sessionId ?? '')?.values() ?? [])].map(actor => ({ assistantId: actor.assistantId }))
     if (!sessionId || roster.length < 2) return modelStatus(this.origin, model, binding)
     const actors = roster.map(participant => {

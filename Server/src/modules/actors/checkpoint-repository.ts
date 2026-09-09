@@ -6,7 +6,7 @@ export class ActorCheckpointRepository {
   constructor(private readonly sessions: SessionRepository) {}
 
   read(sessionId: string, assistantId: string | number): RuntimeCheckpoint | undefined {
-    this.sessions.read(sessionId)
+    this.sessions.assertContextReady(sessionId)
     const row = this.sessions.database.connection.prepare('SELECT checkpoint_json FROM actor_checkpoints WHERE session_id=? AND assistant_id=?')
       .get(sessionId, String(actorIdSchema.parse(assistantId)))
     return row ? runtimeCheckpointSchema.parse(JSON.parse(String(row.checkpoint_json))) : undefined

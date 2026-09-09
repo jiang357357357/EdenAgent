@@ -4,7 +4,7 @@ import { ConnectorCredentials, ConnectorCatalog, ConnectorRepository, ConnectorE
 import { contactTools } from '../modules/mon/index.ts'
 import { MediaService, mediaTools } from '../modules/media/index.ts'
 import { VoiceConfigRepository, VoiceService, SpeechRepository, SpeechService, RealtimeVoiceService } from '../modules/voice/index.ts'
-import { SubagentRepository, SubagentService, SubagentMailbox, SubagentLifecycle, subagentTools } from '../modules/subagents/index.ts'
+import { SubagentRepository, SubagentService, SubagentMailbox, SubagentLifecycle, subagentTools, subagentPolicy, filterSubagentTools } from '../modules/subagents/index.ts'
 import { PluginHookRepository, PluginHookService } from '../modules/plugin-hooks/index.ts'
 import { PackageRecoveryRepository, PackageAssets, MarketRepository, MarketService, PackagePreviewRepository, InstalledPackageRepository } from '../modules/plugin-market/index.ts'
 import { SkillRepository, SkillService, skillTools } from '../modules/skills/index.ts'
@@ -21,7 +21,7 @@ import { SessionRepository, SessionService } from '../modules/sessions/index.ts'
 import { pluginTools } from '../modules/plugins/index.ts'
 import type { ServerConfig } from './config.ts'
 import { WorkspaceService, workspaceTools } from '../modules/workspace/index.ts'
-import { ModelService, ModelBindingRepository } from '../modules/models/index.ts'
+import { ModelService, ModelBindingRepository, ModelPricingRepository, LocalChildModels } from '../modules/models/index.ts'
 import { MonBindingService } from '../modules/mon/index.ts'
 import { DirectorRunRepository, CompanionTurnCoordinator, CompanionSessionExtension } from '../modules/director/index.ts'
 import type { RuntimeTool } from '@eden/runtime-pi'
@@ -66,14 +66,14 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
   const directors = new DirectorRunRepository(repository)
   directors.recoverInterrupted()
   const modelBindings = config.origin === 'mon' ? new ModelBindingRepository(database) : undefined
-  const models = new ModelService(config.origin, config.model, modelBindings)
+  const models = new ModelService(config.origin, config.model, modelBindings, new ModelPricingRepository(database), config.origin === 'local' ? new LocalChildModels(database) : undefined)
   const plugins = new PluginService(database, [config.dataRoot, path.resolve('Data')])
   const commands = new CommandService(database, [config.dataRoot, path.resolve('Data')])
   const workspace = new WorkspaceService(database, [config.dataRoot, path.resolve('Data')])
   const skills = new SkillService(new SkillRepository(database, () => workspace.info().path ? workspace.root() : '', () => pluginMarket.installed.skillContributions()))
   const permissions = new PermissionService(database, repository.events)
   const questions = new QuestionService(repository)
-  const tools = (sessionId: string, turnId: string, actorId?: string | number): RuntimeTool[] => [
+  const tools = (sessionId: string, turnId: string, actorId?: string | number): RuntimeTool[] => filterSubagentTools(database, sessionId, [
     ...mcpTools(mcp, database, permissions, sessionId, turnId),
     ...connectorDiscoveryTools(connectors, connectorCatalog, sessionId),
     ...connectorCapabilityTools(database, connectors, connectorCatalog, connectorLifecycle, permissions, sessionId, turnId),
@@ -81,7 +81,7 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
     ...mediaTools(media, permissions, sessionId, turnId),
     ...subagentTools(subagents, permissions, sessionId, turnId),
     ...skillTools(skills, permissions, sessionId, turnId, skillProfile(sessionId === '00000000-0000-4000-8000-000000000000' ? null : repository.read(sessionId).environment)),
-    ...pluginTools(plugins, permissions, sessionId, turnId), ...workspaceTools(workspace, permissions, sessionId, turnId, commands),
+    ...pluginTools(plugins, permissions, sessionId, turnId), ...workspaceTools(workspace, permissions, sessionId, turnId, commands, subagentPolicy(database, sessionId)?.sandboxMode === 'workspace-write'),
     ...desktopReminderTools(desktopReminders, permissions, sessionId, turnId),
     ...selfAwakeTools(selfAwakeRepository, jobs, permissions, selfAwakeContext, sessionId, turnId),
     questionTool(questions, sessionId, turnId), ...memoTools(memos, permissions, sessionId, turnId),
@@ -89,7 +89,7 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
     ...memoryTools(memories, memoryScopes, permissions, { sessionId, turnId, ...(actorId === undefined ? {} : { actorId }) }),
     ...(config.origin === 'mon' ? contactTools(mon, permissions, sessionId, turnId) : []),
     ...(config.origin === 'mon' ? handoffTools(mon, handoffs.repository, permissions, sessionId, turnId) : []),
-  ]
+  ])
   const companion = new CompanionTurnCoordinator(repository, directors, attachments, memoryRecall)
   const handoffs = new HandoffDispatcher(repository, models, (sessionId, assistantId, signal) => mon.prepareHandoff(sessionId, assistantId, signal), modelBindings)
   const sessions = new SessionService(repository, sessionId => models.resolve(sessionId), tools,
@@ -99,7 +99,7 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
   const memoryExtractions = new MemoryExtractionService(repository, models, permissions)
   const selfAwakeActions = new SelfAwakeActions(repository, permissions, memos, desktopReminders, questions, (channel, sessionId, input, signal) => channel === 'qq' ? mon.contactOwnerByQq(sessionId, input, signal) : mon.contactOwnerByEmail(sessionId, input, signal))
   const selfAwake = new SelfAwakeService(selfAwakeRepository, jobs, sessions, () => selfAwakeActions.wake())
-  const subagents = new SubagentService(new SubagentRepository(database, jobs), sessions, models, jobs, new SubagentMailbox(database))
+  const subagents = new SubagentService(new SubagentRepository(database, jobs, () => workspace.info().path), sessions, models, jobs, new SubagentMailbox(database), skills.repository)
   const subagentLifecycle = new SubagentLifecycle(subagents)
   sessions.setDescendantStop(sessionId => subagents.stopChildren(sessionId))
   const pluginHooks = new PluginHookService(new PluginHookRepository(database, jobs), pluginMarket.installed, sessions, jobs)

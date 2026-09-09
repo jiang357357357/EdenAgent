@@ -5,3 +5,4 @@ export type { LegacyManifest, LegacyTable, LegacyRow, LegacyCell } from './legac
 export { stageLegacySessions } from './legacy/stage-sessions.ts'
 export { resumeLegacyConversion } from './legacy/resume-conversion.ts'
 export { readLegacyConversionStatus } from './legacy/conversion-status.ts'
+export { exportLegacyContextReview, applyLegacyContextSummary } from './legacy/context-review.ts'

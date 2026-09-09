@@ -17,12 +17,16 @@ export interface RuntimeModel {
   apiKey?: string
   contextWindow: number
   maxTokens: number
+  reasoning?: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  /** USD per million tokens; absence means cost is unknown, never free. */
+  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number }
 }
 
 export interface RuntimeCallbacks {
   checkpoint(snapshot: RuntimeCheckpoint): Promise<void>
   event(kind: string, payload: JsonValue): Promise<void>
   request(snapshot: JsonValue): Promise<void>
+  response?(snapshot: JsonValue): Promise<void>
   beforeTool?(name: string, callId: string, revision: string, input: Record<string, unknown>): Promise<void>
   afterTool?(callId: string, result: JsonValue, failed: boolean): Promise<void>
 }

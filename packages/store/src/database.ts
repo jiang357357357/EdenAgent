@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, chmodSync } from 'node:fs'
+import { mkdirSync, chmodSync, lstatSync } from 'node:fs'
 import path from 'node:path'
 import { migrateDatabase } from './migrations.ts'
 
@@ -7,7 +7,11 @@ export class EdenDatabase {
   readonly connection: DatabaseSync
   private activeTransaction = false
 
-  constructor(filename: string, origin: 'mon' | 'local') {
+  constructor(filename: string, origin: 'mon' | 'local', mode: 'runtime' | 'migration-review' = 'runtime') {
+    if (mode === 'migration-review') {
+      const file = lstatSync(filename)
+      if (!file.isFile() || file.isSymbolicLink()) throw new Error('Review requires an existing regular migration database')
+    }
     if (filename !== ':memory:') mkdirSync(path.dirname(filename), { recursive: true, mode: 0o700 })
     this.connection = new DatabaseSync(filename)
     try {
@@ -18,8 +22,9 @@ export class EdenDatabase {
       if (tables.length) {
         this.assertOrigin(origin)
         const importing = this.connection.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()
-        if (importing && importing.value !== 'complete') throw new Error('Legacy import is incomplete; finish conversion before starting the host')
+        if (mode === 'migration-review' ? importing?.value !== 'incomplete' : importing && importing.value !== 'complete') throw new Error('Database import state does not permit this host mode')
       }
+      if (mode === 'migration-review' && !tables.length) throw new Error('Review requires an initialized incomplete import')
       this.connection.exec('PRAGMA journal_mode=WAL')
       migrateDatabase(this.connection)
       this.transaction(() => {

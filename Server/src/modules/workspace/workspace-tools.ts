@@ -10,7 +10,7 @@ const readSchema = z.object({ path: z.string().min(1).max(4096) }).strict()
 const writeSchema = readSchema.extend({ content: z.string().max(1024 * 1024), expectedSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), createOnly: z.boolean().default(false) })
 const commandSchema = z.object({ command: z.string().min(1).max(65536) }).strict()
 
-export function workspaceTools(workspace: WorkspaceService, permissions: PermissionService, sessionId: string, turnId: string, commands: CommandService): RuntimeTool[] {
+export function workspaceTools(workspace: WorkspaceService, permissions: PermissionService, sessionId: string, turnId: string, commands: CommandService, workspaceOnly = false): RuntimeTool[] {
   return [
     { name: 'eden_read_file', revision: 'eden.workspace.read.v1', description: 'Read a file from the selected workspace. Returns at most 1 MiB; binary files have no text content.',
       parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false },
@@ -31,6 +31,7 @@ export function workspaceTools(workspace: WorkspaceService, permissions: Permiss
         const params = commandSchema.parse(input)
         const root = workspace.root()
         const snapshot = commands.snapshot()
+        if (workspaceOnly && (snapshot.config.mode !== 'sandbox' || snapshot.config.networkAccess || snapshot.config.writableRoots.length)) throw new Error('Subagent policy requires sandbox execution with no network or additional writable roots')
         await permissions.request({ ...context, sessionId, turnId }, 'command.execute', root, toJson({ ...params, execution: snapshot }))
         return workspace.mutate(root, context.signal, async () => toJson(await commands.execute(snapshot, root, params.command, context.signal)))
       } },

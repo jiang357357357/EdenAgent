@@ -319,6 +319,39 @@ const migrations = [
   `ALTER TABLE legacy_plugin_history ADD COLUMN resolution_json TEXT;
    ALTER TABLE legacy_plugin_history ADD COLUMN resolved_at INTEGER;`,
   `CREATE TABLE legacy_runtime_contexts(session_id TEXT PRIMARY KEY REFERENCES sessions(id),state TEXT NOT NULL,error TEXT,updated_at INTEGER NOT NULL);`,
+  `CREATE TABLE legacy_context_reviews(session_id TEXT PRIMARY KEY REFERENCES sessions(id),source_sha256 TEXT NOT NULL,
+     summary TEXT NOT NULL,note TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_policies(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),policy_json TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `ALTER TABLE subagent_threads ADD COLUMN max_tokens INTEGER NOT NULL DEFAULT 1000000;
+   ALTER TABLE subagent_threads ADD COLUMN max_cost_microusd INTEGER;
+   ALTER TABLE subagent_threads ADD COLUMN tokens_used INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE subagent_threads ADD COLUMN cost_microusd_used INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE subagent_threads ADD COLUMN usage_unknown INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE subagent_threads ADD COLUMN cost_unknown INTEGER NOT NULL DEFAULT 0;
+   UPDATE subagent_threads SET usage_unknown=1,cost_unknown=1 WHERE id IN (SELECT agent_id FROM legacy_subagent_context);
+   CREATE TABLE subagent_usage_receipts(turn_id TEXT NOT NULL,message_id TEXT NOT NULL,agent_id TEXT NOT NULL REFERENCES subagent_threads(id),
+     tokens INTEGER,cost_microusd INTEGER,created_at INTEGER NOT NULL,PRIMARY KEY(turn_id,message_id));`,
+  `CREATE TABLE subagent_model_requests(id TEXT PRIMARY KEY,agent_id TEXT NOT NULL REFERENCES subagent_threads(id),
+     session_id TEXT NOT NULL REFERENCES sessions(id),turn_id TEXT NOT NULL,state TEXT NOT NULL,cost_configured INTEGER NOT NULL,
+     created_at INTEGER NOT NULL,resolved_at INTEGER,note TEXT);
+   CREATE TABLE subagent_request_owners(request_id TEXT NOT NULL REFERENCES subagent_model_requests(id),
+     agent_id TEXT NOT NULL REFERENCES subagent_threads(id),PRIMARY KEY(request_id,agent_id));
+   CREATE INDEX subagent_request_owner ON subagent_request_owners(agent_id,request_id);`,
+  `ALTER TABLE subagent_threads ADD COLUMN legacy_usage_unknown INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE subagent_threads ADD COLUMN legacy_cost_unknown INTEGER NOT NULL DEFAULT 0;
+   UPDATE subagent_threads SET legacy_usage_unknown=usage_unknown,legacy_cost_unknown=cost_unknown;`,
+  `CREATE TABLE model_pricing(model_key TEXT PRIMARY KEY,rates_json TEXT,revision TEXT NOT NULL,note TEXT NOT NULL,updated_at INTEGER NOT NULL,identity_json TEXT NOT NULL);
+   CREATE TABLE model_pricing_history(revision TEXT PRIMARY KEY,model_key TEXT NOT NULL,previous_json TEXT,rates_json TEXT,note TEXT NOT NULL,created_at INTEGER NOT NULL,previous_revision TEXT);`,
+  `CREATE TABLE subagent_roles(name TEXT PRIMARY KEY,definition_json TEXT NOT NULL,revision TEXT NOT NULL,updated_at INTEGER NOT NULL);
+   CREATE TABLE subagent_role_history(revision TEXT PRIMARY KEY,name TEXT NOT NULL,previous_json TEXT,definition_json TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_role_snapshots(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),definition_json TEXT NOT NULL,skills_json TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+  `CREATE TABLE local_child_models(session_id TEXT PRIMARY KEY REFERENCES sessions(id),configuration_json TEXT NOT NULL,updated_at INTEGER NOT NULL);`,
+  `CREATE TABLE subagent_project_roles(workspace_root TEXT NOT NULL,name TEXT NOT NULL,definition_json TEXT NOT NULL,revision TEXT NOT NULL,updated_at INTEGER NOT NULL,
+     PRIMARY KEY(workspace_root,name));
+   ALTER TABLE subagent_role_history ADD COLUMN workspace_root TEXT NOT NULL DEFAULT '';`,
+  `CREATE TABLE subagent_role_imports(id TEXT PRIMARY KEY,plan_json TEXT NOT NULL,state TEXT NOT NULL,expires_at INTEGER NOT NULL,result_json TEXT,applied_at INTEGER);`,
+  `ALTER TABLE subagent_threads ADD COLUMN workspace_root TEXT;
+   CREATE TABLE subagent_workspace_restorations(agent_id TEXT PRIMARY KEY REFERENCES subagent_threads(id),previous_root TEXT,workspace_root TEXT NOT NULL,created_at INTEGER NOT NULL);`,
 ]
 
 export function migrateDatabase(database: DatabaseSync): void {

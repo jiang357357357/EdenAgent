@@ -9,6 +9,9 @@ export const modelEndpointSchema = z.string().url().superRefine((value, context)
 export const configuredModelSchema = z.object({
   provider: z.string().min(1).max(100), id: z.string().min(1).max(500), baseUrl: modelEndpointSchema,
   apiKey: z.string().min(1).optional(), contextWindow: z.number().int().positive(), maxTokens: z.number().int().positive(),
+  reasoning: z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  cost: z.object({ input: z.number().nonnegative().finite(), output: z.number().nonnegative().finite(),
+    cacheRead: z.number().nonnegative().finite(), cacheWrite: z.number().nonnegative().finite() }).strict().optional(),
 }).strict().refine(value => value.maxTokens <= value.contextWindow, 'Model output budget exceeds its context window')
   .transform(({ apiKey, ...config }) => ({ ...config, ...(apiKey ? { apiKey } : {}) }))
 export const modelReadSchema = z.object({ sessionId: z.string().uuid().nullish() }).strict()

@@ -7,6 +7,16 @@ import type { MonBindingService } from '../../modules/mon/index.ts'
 
 export function modelRoutes(models: ModelService, sessions: SessionService, mon?: MonBindingService): Record<string, (value: JsonValue) => JsonValue | Promise<JsonValue>> {
   return {
+    'model.pricing.read': contractHandler(rpcMethods['model.pricing.read'], input => {
+      sessions.repository.read(input.sessionId)
+      if (!models.pricing) throw new Error('Model pricing storage is unavailable')
+      return models.pricing.read(models.pricingModel(input))
+    }),
+    'model.pricing.set': contractHandler(rpcMethods['model.pricing.set'], input => {
+      sessions.repository.read(input.selection.sessionId)
+      if (!models.pricing) throw new Error('Model pricing storage is unavailable')
+      return models.pricing.set(models.pricingModel(input.selection), input.expectedModelKey, input.expectedRevision, input.rates, input.note)
+    }),
     'model.read': contractHandler(rpcMethods['model.read'], params => {
       const participants = params.sessionId ? sessions.repository.read(params.sessionId).participants : undefined
       return toJson(models.read(params.sessionId ?? undefined, participants))

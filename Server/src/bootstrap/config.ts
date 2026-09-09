@@ -19,16 +19,19 @@ export interface ServerConfig {
   model: RuntimeModel | undefined
   monIdentity?: MonServiceIdentity | undefined
   maxBlobBytes?: number
+  migrationReview?: boolean
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): ServerConfig {
   const origin = runtimeOriginSchema.parse(env.EDEN_AGENT_RUNTIME_ORIGIN ?? 'local')
+  const migrationReview = env.EDEN_AGENT_MIGRATION_REVIEW === '1'
+  if (migrationReview && !env.EDEN_AGENT_V2_DATA_ROOT) throw new Error('Migration review requires an explicit staging data root')
   const port = z.coerce.number().int().min(0).max(65535).parse(env.EDEN_AGENT_PORT ?? (origin === 'mon' ? 40092 : 40093))
   const dataRoot = path.resolve(env.EDEN_AGENT_V2_DATA_ROOT ?? path.join(cwd, 'Data', 'realms', origin, 'v2'))
   const token = env.EDEN_AGENT_CAPABILITY_TOKEN ?? randomBytes(32).toString('base64url')
   if (!/^[A-Za-z0-9_-]{32,}$/.test(token)) throw new Error('Capability token must contain at least 32 URL-safe characters')
   const allowedOrigins = (env.EDEN_AGENT_ALLOWED_ORIGINS ?? 'http://127.0.0.1:40091,http://localhost:40091,edenagent://app').split(',').map(value => value.trim()).filter(Boolean)
-  return { origin, host: '127.0.0.1', port, dataRoot, databasePath: path.join(dataRoot, 'eden-agent.db'), token,
+  return { origin, migrationReview, host: '127.0.0.1', port, dataRoot, databasePath: path.join(dataRoot, migrationReview ? 'agent.sqlite' : 'eden-agent.db'), token,
     allowedOrigins, monIdentity: monServiceIdentity(origin, env), maxBlobBytes: z.coerce.number().int().min(1).max(1024 * 1024 * 1024).parse(env.EDEN_AGENT_MAX_BLOB_BYTES ?? 32 * 1024 * 1024),
     model: origin === 'local' ? localModel(env) : undefined }
 }
@@ -45,6 +48,7 @@ function localModel(env: NodeJS.ProcessEnv): RuntimeModel | undefined {
     provider, id, baseUrl,
     contextWindow: z.coerce.number().int().positive().parse(env.EDEN_AGENT_CONTEXT_WINDOW ?? 32768),
     maxTokens: z.coerce.number().int().positive().parse(env.EDEN_AGENT_MAX_TOKENS ?? 4096),
+    ...(env.EDEN_AGENT_MODEL_COST ? { cost: JSON.parse(env.EDEN_AGENT_MODEL_COST) } : {}),
     ...(apiKey ? { apiKey } : {}),
   })
 }

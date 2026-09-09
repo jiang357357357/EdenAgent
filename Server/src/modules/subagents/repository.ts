@@ -1,10 +1,27 @@
 import { settleSubagentThreads } from './settlement.ts'
 import { spawnRequestHash } from './spawn-identity.ts'
 import { randomUUID } from 'node:crypto'
+import { rolePolicy, narrowPolicy, subagentPolicy } from './tool-policy.ts'
+import { SubagentRoleRepository } from './role-repository.ts'
+import { SubagentRoleImport } from './role-import.ts'
+import { restoreSubagentWorkspace, assertSubagentWorkspace } from './workspace-owner.ts'
+import { roleSkillPrompt } from './role-skills.ts'
+import type { RoleSkillSnapshot } from './role-skills.ts'
+import { SubagentRequestReview } from './request-review.ts'
+import { assertSettledSubagentRequests } from './request-repository.ts'
 import type { EdenDatabase } from '@eden/store'
 import type { JobRepository } from '../jobs/index.ts'
 export class SubagentRepository {
-  constructor(private readonly database: EdenDatabase, private readonly jobs: JobRepository) {}
+  constructor(private readonly database: EdenDatabase, private readonly jobs: JobRepository, private readonly workspace: () => string = () => '') {}
+  policy(sessionId: string) { return subagentPolicy(this.database, sessionId) }
+  restoreWorkspace(id: string, root: string) { restoreSubagentWorkspace(this.database, id, root); return this.read(id) }
+  roles() { return new SubagentRoleRepository(this.database, this.workspace) }
+  roleImport() { return new SubagentRoleImport(this.database, this.roles()) }
+  skillInstructions(id: string) {
+    const row = this.database.connection.prepare('SELECT skills_json FROM subagent_role_snapshots WHERE agent_id=?').get(id)
+    return row ? roleSkillPrompt(JSON.parse(String(row.skills_json)) as RoleSkillSnapshot[]) : ''
+  }
+  requestReview() { return new SubagentRequestReview(this.database) }
   existing(key: string, expectedHash?: string) {
     const row = this.database.connection.prepare('SELECT id,spawn_request_hash FROM subagent_threads WHERE operation_key=?').get(key)
     if (row && expectedHash !== undefined && row.spawn_request_hash !== expectedHash) {
@@ -37,9 +54,9 @@ export class SubagentRepository {
     const count = Number(this.database.connection.prepare("SELECT COUNT(*) AS n FROM subagent_threads WHERE root_session_id=? AND state IN ('queued','running')").get(rootSessionId)?.n)
     if (count >= 4) throw new Error('Subagent concurrency budget reached (four active threads)')
   }
-  create(parentSessionId: string, childSessionId: string, taskName: string, role: string, message: string, key: string, maxTurns: number, timeoutMs: number, maxModelRequests = 128, maxToolCalls = 256) {
+  create(parentSessionId: string, childSessionId: string, taskName: string, role: string, message: string, key: string, maxTurns: number, timeoutMs: number, maxModelRequests = 128, maxToolCalls = 256, maxTokens = 1000000, maxCostMicrousd: number | null = null, skillSnapshots: RoleSkillSnapshot[] = []) {
     return this.database.transaction(() => {
-      const requestHash = spawnRequestHash(parentSessionId, taskName, role, message, maxTurns, timeoutMs, maxModelRequests, maxToolCalls)
+      const requestHash = spawnRequestHash(parentSessionId, taskName, role, message, maxTurns, timeoutMs, maxModelRequests, maxToolCalls, maxTokens, maxCostMicrousd)
       const old = this.existing(key, requestHash)
       if (old) return old
       const parent = this.parent(parentSessionId), root = parent?.rootSessionId ?? parentSessionId
@@ -47,12 +64,21 @@ export class SubagentRepository {
       const depth = (parent?.depth ?? 0) + 1
       if (depth > 4) throw new Error('Subagent nesting budget reached')
       const id = randomUUID(), now = Date.now(), agentPath = `${parent?.path ?? '/root'}/${taskName}`
+      const definition = this.roles().read(role)
+      if (JSON.stringify(definition.skills) !== JSON.stringify(skillSnapshots.map(skill => skill.name))) throw new Error('Role skills changed before task creation')
+      const requestedPolicy = rolePolicy(role, definition), inheritedPolicy = subagentPolicy(this.database, parentSessionId)
+      const policy = inheritedPolicy ? narrowPolicy(inheritedPolicy, requestedPolicy) : requestedPolicy
       this.database.connection.prepare(`INSERT INTO subagent_threads(id,root_session_id,parent_session_id,child_session_id,parent_id,agent_path,task_name,role,
         depth,state,operation_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'queued',?,?,?)`).run(id, root, parentSessionId, childSessionId, parent?.id ?? null, agentPath, taskName, role, depth, key, now, now)
+      this.database.connection.prepare('INSERT INTO subagent_policies VALUES(?,?,?)').run(id, JSON.stringify(policy), now)
+      this.database.connection.prepare('UPDATE subagent_threads SET workspace_root=? WHERE id=?').run(this.workspace(), id)
+      this.database.connection.prepare('INSERT INTO subagent_role_snapshots VALUES(?,?,?,?)').run(id, JSON.stringify(definition), JSON.stringify(skillSnapshots), now)
       const parentDeadline = parent ? this.raw(parent.id).deadline_at : null
-      const deadline = Math.min(now + timeoutMs, parentDeadline == null ? Number.MAX_SAFE_INTEGER : Number(parentDeadline))
+      const deadline = Math.min(now + Math.min(timeoutMs, definition.timeoutMs), parentDeadline == null ? Number.MAX_SAFE_INTEGER : Number(parentDeadline))
       if (deadline <= now) throw new Error('Parent task deadline has elapsed')
-      this.database.connection.prepare('UPDATE subagent_threads SET max_turns=?,deadline_at=?,spawn_request_hash=?,max_model_requests=?,max_tool_calls=? WHERE id=?').run(maxTurns, deadline, requestHash, maxModelRequests, maxToolCalls, id)
+      const costLimit = maxCostMicrousd === null ? definition.maxCostMicrousd : definition.maxCostMicrousd === null ? maxCostMicrousd : Math.min(maxCostMicrousd, definition.maxCostMicrousd)
+      this.database.connection.prepare('UPDATE subagent_threads SET max_turns=?,deadline_at=?,spawn_request_hash=?,max_model_requests=?,max_tool_calls=?,max_tokens=?,max_cost_microusd=? WHERE id=?')
+        .run(Math.min(maxTurns, definition.maxTurns), deadline, requestHash, Math.min(maxModelRequests, definition.maxModelRequests), Math.min(maxToolCalls, definition.maxToolCalls), Math.min(maxTokens, definition.maxTokens), costLimit, id)
       this.schedule(id, childSessionId, message, `${key}:initial`, depth)
       return this.read(id)
     })
@@ -69,6 +95,8 @@ export class SubagentRepository {
       const existing = this.existingFollowup(id, key, message)
       if (existing) return existing
       const current = this.raw(id)
+      assertSubagentWorkspace(this.database, String(current.child_session_id))
+      assertSettledSubagentRequests(this.database, id)
       if (this.database.connection.prepare("SELECT 1 FROM legacy_subagent_context WHERE agent_id=? AND state!='ready'").get(id)) throw new Error('Historical subagent context and policy must be restored before follow-up')
       if (['queued', 'running'].includes(String(current.state))) throw new Error('Subagent already has an active task')
       if (Number(current.turns_used) >= Number(current.max_turns)) throw new Error('Subagent turn budget is exhausted')
@@ -104,7 +132,7 @@ export class SubagentRepository {
     return { id, sessionId: String(row.root_session_id), childSessionId: String(row.child_session_id), parentId: row.parent_id ?? null,
       agentPath: String(row.agent_path), taskName: String(row.task_name), role: String(row.role), status: String(row.state),
       result: row.result_json ? JSON.parse(String(row.result_json)) : null, error: row.error ?? null, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
-      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: legacy?.coordination_batch_id ?? null, recoveryState: legacy ? String(legacy.state) : null }
+      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls), maxTokens: Number(row.max_tokens), maxCostMicrousd: row.max_cost_microusd == null ? null : Number(row.max_cost_microusd) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used), tokens: Number(row.tokens_used), costMicrousd: Number(row.cost_microusd_used), tokensUnknown: Boolean(row.usage_unknown), costUnknown: Boolean(row.cost_unknown) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: legacy?.coordination_batch_id ?? null, recoveryState: legacy ? String(legacy.state) : null, workspaceRoot: row.workspace_root == null ? null : String(row.workspace_root) }
   }
   active() {
     return this.database.connection.prepare("SELECT id FROM subagent_threads WHERE state IN ('queued','running') ORDER BY created_at LIMIT 1000").all().map(row => this.read(String(row.id)))
