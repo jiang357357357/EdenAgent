@@ -1,0 +1,4 @@
+{
+  "name": "@eden/plugin-sdk", "version": "2.0.0-dev.0", "private": true, "type": "module",
+  "exports": "./src/index.ts", "dependencies": { "@eden/api": "2.0.0-dev.0", "zod": "4.1.12" }
+}

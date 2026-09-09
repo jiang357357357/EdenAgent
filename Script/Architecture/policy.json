@@ -1,0 +1,8 @@
+{
+  "roots": ["Server", "packages"],
+  "warningLines": 300,
+  "maximumLines": 500,
+  "warningFunctionLines": 60,
+  "maximumComplexity": 15,
+  "exceptions": {}
+}

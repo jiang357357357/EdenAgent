@@ -1,50 +1,36 @@
 name: Eden Agent CI
-
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
-
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  windows-command-runtime:
-    runs-on: windows-latest
-    timeout-minutes: 30
+  typescript-host:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Verify native PowerShell execution and permission boundaries
-        run: cargo test -p eden-agent-tools -p eden-agent-workspace -p eden-agent-sandbox -p eden-agent-server --locked
-
-  rust:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all --check
-      - name: Verify generated RPC client matches Rust API
-        shell: bash
-        run: |
-          generated_rpc="$RUNNER_TEMP/eden-agent-rpc.ts"
-          cargo run -p eden-agent-api --bin generate-types --locked -- "$generated_rpc"
-          diff -u --strip-trailing-cr frontend/web/src/generated/eden-agent-rpc.ts "$generated_rpc"
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
-
+          node-version: 22.23.1
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - if: runner.os == 'Linux'
+        run: node --import tsx -e "import('@eden/execution').then(async ({probeSandbox}) => { const result = await probeSandbox(); if (!result.available) throw new Error(result.detail) })"
+      - run: npm run typecheck:server
+      - run: npm run check:architecture
+      - run: npm run test:architecture
+      - run: node Script/Project/inventory-runtime.mjs --check
+      - run: npm run test:server
+      - run: npm run build:server
+      - run: node Script/Project/smoke_server_artifact.mjs
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -53,13 +39,10 @@ jobs:
           submodules: recursive
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.1
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            frontend/package-lock.json
-      - run: npm ci
-      - run: npm --prefix frontend ci
+      - run: npm ci --ignore-scripts
+      - run: npm --prefix frontend ci --ignore-scripts
       - run: npm --prefix frontend/web run typecheck
       - run: npm --prefix frontend/web test
       - run: npm --prefix frontend/desktop test

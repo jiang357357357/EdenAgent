@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "source": "frontend/web/src/generated/eden-agent-rpc.ts",
+  "archivedServerCommit": "e6c1946f72256af28268dac64698f5282e54ce17",
+  "note": "Inventory of legacy public RPC contracts and SQL tables; does not mark implementation completion.",
+  "methods": [
+    {
+      "method": "initialize",
+      "contract": "{ params: InitializeParams; result: InitializeResult }"
+    },
+    {
+      "method": "ping",
+      "contract": "{ params: Record<string, never>; result: { pong: boolean } }"
+    },
+    {
+      "method": "session.create",
+      "contract": "{ params: SessionCreateParams; result: SessionSummary }"
+    },
+    {
+      "method": "session.list",
+      "contract": "{ params: SessionListParams; result: SessionSummary[] }"
+    },
+    {
+      "method": "session.read",
+      "contract": "{ params: SessionReadParams; result: SessionSummary }"
+    },
+    {
+      "method": "session.rename",
+      "contract": "{ params: SessionTitleParams; result: SessionSummary }"
+    },
+    {
+      "method": "session.set_participants",
+      "contract": "{ params: SessionParticipantsParams; result: SessionSummary }"
+    },
+    {
+      "method": "session.close",
+      "contract": "{ params: SessionReadParams; result: { sessionId: SessionId; closed: boolean } }"
+    },
+    {
+      "method": "session.delete",
+      "contract": "{ params: SessionReadParams; result: { sessionId: SessionId; deleted: boolean } }"
+    },
+    {
+      "method": "session.compact",
+      "contract": "{ params: SessionCompactParams; result: TurnAccepted }"
+    },
+    {
+      "method": "turn.start",
+      "contract": "{ params: TurnStartParams; result: TurnAccepted }"
+    },
+    {
+      "method": "turn.steer",
+      "contract": "{ params: TurnQueueParams; result: TurnQueueResult }"
+    },
+    {
+      "method": "turn.follow_up",
+      "contract": "{ params: TurnQueueParams; result: TurnQueueResult }"
+    },
+    {
+      "method": "turn.cancel",
+      "contract": "{ params: SessionReadParams; result: { sessionId: SessionId; cancellationRequested: boolean } }"
+    },
+    {
+      "method": "event.list",
+      "contract": "{ params: EventListParams; result: EventPage }"
+    },
+    {
+      "method": "message.list",
+      "contract": "{ params: MessageListParams; result: EventPage }"
+    },
+    {
+      "method": "permission.list",
+      "contract": "{ params: PermissionListParams; result: PermissionRequestInfo[] }"
+    },
+    {
+      "method": "permission.mode.get",
+      "contract": "{ params: Record<string, never>; result: { mode: \"restricted\" | \"full_access\" | \"takeover\" } }"
+    },
+    {
+      "method": "command.execution.get",
+      "contract": "{ params: Record<string, never>; result: CommandExecutionInfo }"
+    },
+    {
+      "method": "command.execution.set",
+      "contract": "{ params: CommandExecutionSetParams; result: CommandExecutionInfo }"
+    },
+    {
+      "method": "permission.mode.set",
+      "contract": "{ params: { mode: \"restricted\" | \"full_access\" | \"takeover\" }; result: { mode: \"restricted\" | \"full_access\" | \"takeover\" } }"
+    },
+    {
+      "method": "permission.resolve",
+      "contract": "{ params: PermissionResolveParams; result: PermissionRequestInfo }"
+    },
+    {
+      "method": "operation.list",
+      "contract": "{ params: OperationListParams; result: OperationInfo[] }"
+    },
+    {
+      "method": "operation.resolve",
+      "contract": "{ params: OperationResolveParams; result: OperationInfo }"
+    },
+    {
+      "method": "question.list",
+      "contract": "{ params: QuestionListParams; result: QuestionRequestInfo[] }"
+    },
+    {
+      "method": "question.resolve",
+      "contract": "{ params: QuestionResolveParams; result: QuestionRequestInfo }"
+    },
+    {
+      "method": "question.reject",
+      "contract": "{ params: QuestionRejectParams; result: QuestionRequestInfo }"
+    },
+    {
+      "method": "skill.list",
+      "contract": "{ params: SkillListParams; result: SkillInfo[] }"
+    },
+    {
+      "method": "skill.read",
+      "contract": "{ params: SkillReadParams; result: SkillInfo }"
+    },
+    {
+      "method": "skill.install",
+      "contract": "{ params: SkillInstallParams; result: SkillInfo }"
+    },
+    {
+      "method": "skill.enable",
+      "contract": "{ params: SkillEnableParams; result: SkillInfo }"
+    },
+    {
+      "method": "skill.uninstall",
+      "contract": "{ params: SkillReadParams; result: { deleted: boolean } }"
+    },
+    {
+      "method": "skill.inspect",
+      "contract": "{ params: SkillInspectParams; result: SkillPreviewInfo }"
+    },
+    {
+      "method": "skill.install_preview",
+      "contract": "{ params: SkillPreviewInstallParams; result: SkillInfo }"
+    },
+    {
+      "method": "plugin.list",
+      "contract": "{ params: PluginListParams; result: PluginInfo[] }"
+    },
+    {
+      "method": "plugin.read",
+      "contract": "{ params: PluginReadParams; result: PluginInfo }"
+    },
+    {
+      "method": "plugin.inspect",
+      "contract": "{ params: PluginInspectParams; result: PluginPreviewInfo }"
+    },
+    {
+      "method": "plugin.install_preview",
+      "contract": "{ params: PluginPreviewInstallParams; result: PluginInfo }"
+    },
+    {
+      "method": "plugin.enable",
+      "contract": "{ params: PluginEnableParams; result: PluginInfo }"
+    },
+    {
+      "method": "plugin.activate",
+      "contract": "{ params: PluginActivateParams; result: PluginInfo }"
+    },
+    {
+      "method": "plugin.uninstall",
+      "contract": "{ params: PluginReadParams; result: PluginUninstallResult }"
+    },
+    {
+      "method": "plugin.permissions.set",
+      "contract": "{ params: PluginPermissionSetParams; result: PluginInfo }"
+    },
+    {
+      "method": "plugin.market.source.list",
+      "contract": "{ params: PluginListParams; result: PluginMarketSourceInfo[] }"
+    },
+    {
+      "method": "plugin.market.source.add",
+      "contract": "{ params: PluginMarketSourceAddParams; result: PluginMarketSourceInfo }"
+    },
+    {
+      "method": "plugin.market.source.remove",
+      "contract": "{ params: PluginMarketSourceParams; result: { deleted: boolean } }"
+    },
+    {
+      "method": "plugin.market.source.refresh",
+      "contract": "{ params: PluginMarketSourceParams; result: PluginMarketSourceInfo }"
+    },
+    {
+      "method": "plugin.market.list",
+      "contract": "{ params: PluginMarketListParams; result: PluginMarketReleaseInfo[] }"
+    },
+    {
+      "method": "plugin.market.inspect",
+      "contract": "{ params: PluginMarketInspectParams; result: PluginPreviewInfo }"
+    },
+    {
+      "method": "agent.list",
+      "contract": "{ params: AgentListParams; result: AgentThreadInfo[] }"
+    },
+    {
+      "method": "agent.read",
+      "contract": "{ params: AgentReadParams; result: AgentThreadInfo }"
+    },
+    {
+      "method": "agent.interrupt",
+      "contract": "{ params: AgentReadParams; result: AgentThreadInfo }"
+    },
+    {
+      "method": "agent.send",
+      "contract": "{ params: AgentMessageParams; result: AgentThreadInfo }"
+    },
+    {
+      "method": "agent.followup",
+      "contract": "{ params: AgentMessageParams; result: AgentThreadInfo }"
+    },
+    {
+      "method": "memo.list",
+      "contract": "{ params: MemoListParams; result: MemoInfo[] }"
+    },
+    {
+      "method": "memo.create",
+      "contract": "{ params: MemoCreateParams; result: MemoInfo }"
+    },
+    {
+      "method": "memo.update",
+      "contract": "{ params: MemoUpdateParams; result: MemoInfo }"
+    },
+    {
+      "method": "memo.complete",
+      "contract": "{ params: MemoIdParams; result: MemoInfo }"
+    },
+    {
+      "method": "memo.archive",
+      "contract": "{ params: MemoIdParams; result: MemoInfo }"
+    },
+    {
+      "method": "connector.list",
+      "contract": "{ params: Record<string, never>; result: ConnectorInfo[] }"
+    },
+    {
+      "method": "connector.catalog",
+      "contract": "{ params: Record<string, never>; result: ConnectorCatalogInfo }"
+    },
+    {
+      "method": "connector.create",
+      "contract": "{ params: ConnectorCreateParams; result: ConnectorInfo }"
+    },
+    {
+      "method": "connector.update",
+      "contract": "{ params: ConnectorUpdateParams; result: ConnectorInfo }"
+    },
+    {
+      "method": "workspace.info",
+      "contract": "{ params: Record<string, never>; result: WorkspaceInfo }"
+    },
+    {
+      "method": "workspace.switch",
+      "contract": "{ params: WorkspaceSwitchParams; result: WorkspaceSwitchResult }"
+    },
+    {
+      "method": "workspace.list",
+      "contract": "{ params: WorkspacePathParams; result: WorkspaceDirectoryInfo }"
+    },
+    {
+      "method": "workspace.read",
+      "contract": "{ params: WorkspacePathParams; result: WorkspaceFileInfo }"
+    },
+    {
+      "method": "tool.list",
+      "contract": "{ params: Record<string, never>; result: ToolInfo[] }"
+    },
+    {
+      "method": "model.read",
+      "contract": "{ params: ModelReadParams; result: RuntimeModelInfo }"
+    },
+    {
+      "method": "model.catalog",
+      "contract": "{ params: ModelCatalogParams; result: RuntimeModelCatalogInfo }"
+    },
+    {
+      "method": "model.select",
+      "contract": "{ params: ModelSelectParams; result: RuntimeModelCatalogInfo }"
+    },
+    {
+      "method": "media.list",
+      "contract": "{ params: MediaListParams; result: MediaRequestInfo[] }"
+    },
+    {
+      "method": "media.resolve",
+      "contract": "{ params: MediaResolveParams; result: MediaRequestInfo }"
+    },
+    {
+      "method": "voice.config.read",
+      "contract": "{ params: Record<string, never>; result: VoiceRuntimeConfig }"
+    },
+    {
+      "method": "voice.tts.config.update",
+      "contract": "{ params: GsvTtsConfig; result: VoiceRuntimeConfig }"
+    },
+    {
+      "method": "voice.stt.config.update",
+      "contract": "{ params: GsvSttConfig; result: VoiceRuntimeConfig }"
+    },
+    {
+      "method": "voice.gsv.discover",
+      "contract": "{ params: GsvDiscoveryParams; result: GsvDiscoveryResult }"
+    },
+    {
+      "method": "voice.gsv.preview",
+      "contract": "{ params: GsvPreviewParams; result: GsvPreviewResult }"
+    },
+    {
+      "method": "voice.stt.test",
+      "contract": "{ params: GsvSttTestParams; result: GsvConnectionTestResult }"
+    },
+    {
+      "method": "voice.tts.synthesize",
+      "contract": "{ params: VoiceTtsSynthesizeParams; result: VoiceTtsSynthesizeResult }"
+    },
+    {
+      "method": "voice.tts.list_segments",
+      "contract": "{ params: VoiceSpeechSegmentListParams; result: VoiceSpeechSegmentInfo[] }"
+    },
+    {
+      "method": "self_awake.execution",
+      "contract": "{ params: SelfAwakeExecutionParams; result: SelfAwakeExecutionInfo }"
+    },
+    {
+      "method": "self_awake.list",
+      "contract": "{ params: SelfAwakeListParams; result: SelfAwakePage }"
+    },
+    {
+      "method": "director.list",
+      "contract": "{ params: DirectorListParams; result: DirectorRunInfo[] }"
+    }
+  ],
+  "tables": [
+    "agent_mailbox",
+    "agent_threads",
+    "app_config",
+    "blobs",
+    "connector_events",
+    "connectors",
+    "core_session_identities",
+    "core_sync_outbox",
+    "desktop_reminders",
+    "jobs",
+    "legacy_import_items",
+    "legacy_session_imports",
+    "legacy_skill_installations",
+    "media_requests",
+    "memories",
+    "memos",
+    "operation_journal",
+    "permission_requests",
+    "plugin_market_revocations",
+    "plugin_market_sources",
+    "plugin_permission_grants",
+    "plugin_versions",
+    "plugins",
+    "question_requests",
+    "runtime_metric_tool_calls",
+    "runtime_metric_totals",
+    "runtime_metric_turns",
+    "self_awake_diaries",
+    "self_awake_notifications",
+    "self_awake_runs",
+    "session_actor_model_bindings",
+    "session_events",
+    "session_inputs",
+    "session_model_bindings",
+    "sessions",
+    "voice_speech_segments",
+    "workspace_state"
+  ]
+}

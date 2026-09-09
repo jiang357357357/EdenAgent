@@ -1,0 +1,17 @@
+{
+  "name": "@eden/runtime-pi",
+  "version": "2.0.0-dev.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./tests/recorded-model.ts"
+  },
+  "dependencies": {
+    "@eden/api": "2.0.0-dev.0",
+    "@earendil-works/pi-agent-core": "0.82.0",
+    "@earendil-works/pi-ai": "0.82.0",
+    "typebox": "1.1.38",
+    "zod": "4.1.12"
+  }
+}

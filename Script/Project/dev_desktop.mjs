@@ -153,8 +153,15 @@ if (await isWebReady()) {
   await waitForVite(webProc)
 }
 
+// The desktop-owned realm runs the same built entry as the packaged supervisor.
+await new Promise((resolve, reject) => {
+  const build = spawnExecutable(process.execPath, ["Script/Project/build_server.mjs"], { cwd: root, stdio: "inherit" })
+  build.once("error", reject)
+  build.once("exit", code => code === 0 ? resolve() : reject(new Error(`TS server build failed: ${code}`)))
+}).catch(async error => { await cleanup(); throw error })
+
 const desktopEnvironment = createDesktopRuntimeEnvironment({
-  environment: process.env,
+  environment: { ...process.env, EDEN_AGENT_NODE_PATH: process.env.EDEN_AGENT_NODE_PATH || process.execPath },
   agentRoot: root,
   parentPid: process.pid,
   quitFlag,

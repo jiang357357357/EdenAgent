@@ -1,3 +1,5 @@
+> **迁移状态（2026-09-09）**：原 AgentCore 与 Rust Server 已[归档](Archive/2026-09-09-rust-runtime/README.md)，新 TS 宿主已能启动并运行录制模型与自编写插件测试，完整业务迁移仍在进行。当前进度以[实施跟踪](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md)为准；下文尚未更新的 Rust 说明属于历史实现。后续见 [TypeScript 宿主与 pi 实现方案](文档/技术/Eden%20Agent%20TypeScript%20宿主与%20pi%20实现方案.md)。
+
 <div align="center">
 
 # Eden Agent

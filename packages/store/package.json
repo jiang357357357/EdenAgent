@@ -1,0 +1,7 @@
+{
+  "name": "@eden/store",
+  "version": "2.0.0-dev.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}

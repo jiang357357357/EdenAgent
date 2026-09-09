@@ -1,3 +1,5 @@
+> **Migration status (2026-09-09):** The original Rust runtime is [archived](Archive/2026-09-09-rust-runtime/README.md). The TS host and agent-authored plugin contract tests run; full business migration remains in progress. See the [implementation tracker](文档/技术/Eden%20Agent%20TS%20迁移实施跟踪.md). Rust instructions below describe the historical implementation.
+
 <div align="center">
 
 # Eden Agent

@@ -23,6 +23,9 @@
 
 | 文档 | 用途 |
 | --- | --- |
+| [TypeScript 宿主与 pi 实现方案](技术/Eden Agent%20TypeScript%20宿主与%20pi%20实现方案.md) | 当前迁移设计：TS 宿主、pi 适配、自编写插件、数据恢复和分阶段验收；实施中 |
+| [TypeScript 工程约束](技术/Eden%20Agent%20TypeScript%20工程约束.md) | 批准的目录、依赖、文件规模与 CI 门禁 |
+| [TS 迁移实施跟踪](技术/Eden%20Agent%20TS%20迁移实施跟踪.md) | 长期计划、实际验证证据、未完成项和下一批工作 |
 | [全 Rust 服务端长期架构方案](技术/Eden Agent%20全%20Rust%20服务端长期架构方案.md) | 单进程 Rust Server 的长期结构与依赖方向 |
 | [全 Rust 迁移执行记录](技术/Eden Agent%20全%20Rust%20迁移执行清单.md) | 从 Python host/sidecar 切换到 Rust 的历史记录 |
 | [完整功能迁移计划](技术/Eden Agent%20全%20Rust%20完整功能迁移计划.md) | 产品能力迁移状态与外部条件 |

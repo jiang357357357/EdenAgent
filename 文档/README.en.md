@@ -24,6 +24,9 @@ Design decisions, operations, extension protocols, and acceptance material
 | Document | Purpose | Language |
 | --- | --- | --- |
 | [Long-term all-Rust server architecture](技术/Eden Agent%20全%20Rust%20服务端长期架构方案.md) | Structure and dependency direction of the single-process Rust Server | Chinese |
+| [TypeScript host and pi implementation plan](技术/Eden Agent%20TypeScript%20宿主与%20pi%20实现方案.md) | Proposed migration: TS host, pi adapter, agent-authored plugins, data recovery, and phased acceptance; implementation in progress | Chinese |
+| [TypeScript engineering rules](技术/Eden%20Agent%20TypeScript%20工程约束.md) | Approved directory boundaries, file-size limits, and CI checks | Chinese |
+| [TS migration tracker](技术/Eden%20Agent%20TS%20迁移实施跟踪.md) | Long-term milestones, verification evidence, and remaining work | Chinese |
 | [All-Rust migration record](技术/Eden Agent%20全%20Rust%20迁移执行清单.md) | Historical switch from the Python host/sidecar to Rust | Chinese |
 | [Complete capability migration plan](技术/Eden Agent%20全%20Rust%20完整功能迁移计划.md) | Product-capability migration status and external prerequisites | Chinese |
 | [`eden-agent-app` module boundary](技术/Eden Agent%20eden-agent-app%20运行时模块边界.md) | Session runtime and application orchestration responsibilities | Chinese |

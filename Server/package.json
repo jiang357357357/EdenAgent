@@ -1,0 +1,20 @@
+{
+  "name": "@eden/server",
+  "version": "2.0.0-dev.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@eden/api": "2.0.0-dev.0",
+    "@eden/runtime-pi": "2.0.0-dev.0",
+    "@eden/store": "2.0.0-dev.0",
+    "@eden/plugin-host": "2.0.0-dev.0",
+    "@eden/execution": "2.0.0-dev.0",
+    "@eden/permissions": "2.0.0-dev.0",
+    "@eden/integrations": "2.0.0-dev.0",
+    "ws": "8.18.3",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
+  }
+}
