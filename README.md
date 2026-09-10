@@ -1,5 +1,7 @@
 # Eden Agent
 
+正式仓库: [jiang357357357/EdenAgent](https://github.com/jiang357357357/EdenAgent)
+
 本地优先、可持久化、可嵌入的 TypeScript 智能体宿主，使用 pi 公共 SDK。
 
 React / Vite · Electron · Node.js 22.23.1 · SQLite · WebSocket JSON-RPC

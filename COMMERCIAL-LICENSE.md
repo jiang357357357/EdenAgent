@@ -6,6 +6,6 @@ If an intended use falls outside the permitted purposes described by the PolyFor
 
 Commercial terms may cover matters such as the licensed product or service, users or deployments, distribution, support, updates, warranty, liability and fees. Those terms are negotiated separately. This file is an availability notice and does not itself grant commercial rights.
 
-To request commercial licensing, contact the owner through the official [Eden Agent repository](https://gitcode.com/zz357357357/opencode-assistant) profile and identify the intended product, organization, deployment model and distribution method.
+To request commercial licensing, contact the owner through the official [Eden Agent repository](https://github.com/jiang357357357/EdenAgent) profile and identify the intended product, organization, deployment model and distribution method.
 
 Third-party materials are excluded from any Eden Agent commercial license unless a signed agreement expressly identifies them and the licensor has authority to include them.

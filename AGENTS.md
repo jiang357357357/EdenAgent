@@ -1,5 +1,7 @@
 # 项目定位
 
+正式主仓库为 `https://github.com/jiang357357357/EdenAgent.git`。后续提交推送使用该仓库的 `origin/main`；`opencode-assistant` 仅保留为旧远程备用，不再作为正式发布目标。
+
 新 TS 实现必须遵循 `文档/技术/Eden Agent TypeScript 工程约束.md`。任务与证据持续维护在 `文档/技术/Eden Agent TS 迁移实施跟踪.md`。用户已授权按照实现方案推进 P0–P5，不为常规可逆实现步骤反复请求确认；真实发布、外发及超出既有授权的操作另行处理。
 
 > 2026-09-09 迁移状态：原 `AgentCore/` 和 `Server/` 已归档到 `Archive/2026-09-09-rust-runtime/`，旧 Server 保留子模块身份。新 TS 宿主已实现基础对话、隔离插件、审批和工作区工具，完整业务迁移仍在推进。实现与未完成项以实施跟踪为准，不能把旧 Rust 文档中的全部能力视为已迁移。

@@ -1,5 +1,7 @@
 # Eden Agent
 
+Canonical repository: [jiang357357357/EdenAgent](https://github.com/jiang357357357/EdenAgent)
+
 A local-first, persistent TypeScript agent host using the public pi SDK.
 
 React / Vite · Electron · Node.js 22.23.1 · SQLite · WebSocket JSON-RPC
