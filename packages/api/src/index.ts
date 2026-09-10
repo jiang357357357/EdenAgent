@@ -169,3 +169,5 @@ export { monLegacyReplaySchema, monLegacyReplayResultSchema } from './mon-sync.t
 
 export { connectorManifestSchema } from './connector-manifest.ts'
 export type { ConnectorManifest } from './connector-manifest.ts'
+
+export { modelContextUsage } from './model-context-usage.ts'
