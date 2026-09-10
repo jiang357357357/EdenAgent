@@ -1,5 +1,7 @@
 # Eden Agent
 
+Execution policy: terminals, plugins, skills, MCP and connectors run with the current OS account permissions. Sandboxing is paused and requires developer review before restoration.
+
 Canonical repository: [jiang357357357/EdenAgent](https://github.com/jiang357357357/EdenAgent)
 
 A local-first, persistent TypeScript agent host using the public pi SDK.

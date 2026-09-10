@@ -1,5 +1,7 @@
 # Eden Agent
 
+当前执行策略：终端、插件、技能、MCP 和连接器统一使用当前系统账户本机执行。沙箱已暂停，需开发者审阅后才能重新加入。
+
 正式仓库: [jiang357357357/EdenAgent](https://github.com/jiang357357357/EdenAgent)
 
 本地优先、可持久化、可嵌入的 TypeScript 智能体宿主，使用 pi 公共 SDK。

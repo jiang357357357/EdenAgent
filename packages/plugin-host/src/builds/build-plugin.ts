@@ -15,7 +15,7 @@ export async function buildPlugin(draft: PluginDraft, signal?: AbortSignal): Pro
   await typecheckPlugin(draft.source, signal)
   signal?.throwIfAborted()
   // Transform parses TypeScript without loading configuration, resolving packages,
-  // or executing the plugin. All module execution happens in the OS sandbox.
+  // or executing the plugin. All module execution happens in a separate host process.
   const result = await transform(draft.source, { loader: 'ts', format: 'esm', target: 'node22', sourcemap: false, sourcefile: 'index.ts' })
   const revision = pluginRevision({ ...draft, artifact: result.code })
   return { ...draft, artifact: result.code, revision }

@@ -1,29 +1,26 @@
 import type { ExternalCommandSandbox } from './external-command.ts'
-import { windowsProcessEnvironment, stopWindowsProcessTree } from './windows-process.ts'
+import { stopWindowsProcessTree } from './windows-process.ts'
+import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { sandboxArguments, sandboxExecutable } from './sandbox-arguments.ts'
+import { hostProcessEnvironment } from './host-environment.ts'
 
 /** Receives the verified package snapshot, never a mutable source directory or inherited environment. */
-export async function launchMcpProcess(files: ReadonlyMap<string, Buffer>, descriptor: { command: string; args: string[]; cwd: string }, signal: AbortSignal, external?: ExternalCommandSandbox) {
+export async function launchMcpProcess(files: ReadonlyMap<string, Buffer>, descriptor: { command: string; args: string[]; cwd: string }, signal: AbortSignal, _external?: ExternalCommandSandbox) {
   signal.throwIfAborted()
-  const args = external ? [] : sandboxArguments()
   if (files.size > 4096) throw new Error('MCP package contains too many files')
   const directory = await mkdtemp(path.join(tmpdir(), 'eden-mcp-'))
   try {
     await writeMcpSnapshot(files, signal, directory)
-    const { cwd, command } = mcpInvocationPaths(descriptor)
-    args.push('--ro-bind', directory, '/package', '--chdir', cwd, '--', '/usr/bin/prlimit', '--as=1073741824:1073741824', '--nofile=128:128', '--fsize=8388608:8388608', '--', command, ...descriptor.args)
+    const { cwd, command } = mcpInvocationPaths(descriptor, directory)
     signal.throwIfAborted()
-    const invocation = external ? external.program(directory,
-      cwd === '/package' ? directory : path.join(directory, cwd.slice('/package/'.length)),
-      [command === '/runtime/node' ? 'node' : command.startsWith('/package/') ? path.join(directory, command.slice('/package/'.length)) : command, ...descriptor.args], 'mcp')
-      : { executable: sandboxExecutable, args }
+    const hostPath = (value: string) => value === '/package' ? directory : value.startsWith('/package/') ? path.join(directory, value.slice('/package/'.length)) : value
+    const invocation = { executable: command === '/runtime/node' ? process.execPath : hostPath(command), args: descriptor.args.map(hostPath) }
     const child = spawn(invocation.executable, invocation.args, {
-      cwd: directory, detached: process.platform !== 'win32', windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'], env: process.platform === 'win32' ? windowsProcessEnvironment() : { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' }
+      cwd: hostPath(cwd), detached: process.platform !== 'win32', windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'], env: hostProcessEnvironment()
     })
     let ended = false, logged = 0
     let termination: Promise<void> | undefined
@@ -44,17 +41,19 @@ export async function launchMcpProcess(files: ReadonlyMap<string, Buffer>, descr
     child.stdin.on('error', kill)
     signal.addEventListener('abort', kill, { once: true })
     try {
-      await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(new Error('MCP sandbox launch failed'))) })
+      await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(new Error('MCP host process launch failed'))) })
       signal.throwIfAborted()
     } catch (error) { kill(); await exited; throw error }
     return { input: child.stdin, output: child.stdout, terminate: kill, exited, async close() { kill(); await exited } }
   } catch (error) { await rm(directory, { recursive: true, force: true }); throw error }
 }
-function mcpInvocationPaths(descriptor: { command: string; args: string[]; cwd: string }) {
+function mcpInvocationPaths(descriptor: { command: string; args: string[]; cwd: string }, directory: string) {
   const cwd = descriptor.cwd === '.' ? '/package' : packagePath(descriptor.cwd)
-  const command = descriptor.command === 'node' || descriptor.command === 'nodejs' ? '/runtime/node'
-    : descriptor.command.startsWith('/') ? descriptor.command : packagePath(descriptor.command.replace(/^\.\//, ''))
-  if (!command.startsWith('/package/') && command !== '/runtime/node' && !/^\/usr\/bin\/[a-zA-Z0-9._+-]+$/.test(command)) throw new Error('MCP executable must be bundled, Node, or a sandbox system executable')
+  const value = descriptor.command
+  if (!value || value.includes('\0')) throw new Error('Invalid MCP command')
+  const command = value === 'node' || value === 'nodejs' ? '/runtime/node'
+    : path.isAbsolute(value) ? value
+    : value.includes('/') || value.includes('\\') || existsSync(path.join(directory, value)) ? packagePath(value.replace(/^\.\//, '')) : value
   if (descriptor.args.length > 128 || descriptor.args.some(value => value.length > 8192 || value.includes('\0'))) throw new Error('Invalid MCP arguments')
   return { cwd, command }
 }

@@ -14,3 +14,7 @@ export { hostCommandInfo, runHostCommand } from './host-command.ts'
 
 export { ExternalCommandSandbox, configuredExternalCommandSandbox } from './external-command.ts'
 export { containsPath, workspaceRoot, workspaceFile } from './workspace-path.ts'
+
+export { executionPolicy, sandboxReviewNotice, probeHostExecution } from './execution-policy.ts'
+export { runHostModule } from './host-module.ts'
+export type { HostModuleRequest } from './host-module.ts'

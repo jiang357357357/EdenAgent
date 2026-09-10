@@ -1,9 +1,11 @@
-import { windowsProcessEnvironment, stopWindowsProcessTree } from './windows-process.ts'
+import { stopWindowsProcessTree } from './windows-process.ts'
+import { hostProcessEnvironment } from './host-environment.ts'
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 
 export interface ProcessResult { stdout: string; stderr: string; exitCode: number }
 export interface ProcessRequest {
+  env?: NodeJS.ProcessEnv
   cwd?: string
   executable: string
   args: string[]
@@ -18,7 +20,7 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(request.executable, request.args, {
       ...(request.cwd ? { cwd: request.cwd } : {}),
-      env: process.platform === 'win32' ? windowsProcessEnvironment() : { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      env: request.env ?? hostProcessEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     })
     let stdout = ''

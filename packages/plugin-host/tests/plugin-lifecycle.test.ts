@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { EdenDatabase } from '@eden/store'
-import { probeSandbox } from '@eden/execution'
+import { probeHostExecution } from '@eden/execution'
 import { PluginService } from '../src/index.ts'
 
 function manifest(version = '1.0.0', read = false) {
@@ -16,9 +16,9 @@ function manifest(version = '1.0.0', read = false) {
 }
 const source = `export default function(input: {text:string}) { return {words: input.text.trim().split(/\\s+/).length}; }`
 
-test('draft, sandbox tests, install, activation, restart, and rollback preserve revisions', async context => {
-  const probe = await probeSandbox()
-  if (!probe.available) { context.skip('Requires verified OS sandbox'); return }
+test('draft, host tests, install, activation, restart, and rollback preserve revisions', async context => {
+  const probe = await probeHostExecution()
+  if (!probe.available) { context.skip('Requires host runtime'); return }
   const directory = mkdtempSync(path.join(tmpdir(), 'eden-plugin-lifecycle-'))
   let database = new EdenDatabase(path.join(directory, 'state.db'), 'local')
   let plugins = new PluginService(database)
@@ -44,7 +44,7 @@ test('draft, sandbox tests, install, activation, restart, and rollback preserve 
 })
 
 test('changed drafts and failed tests cannot replace the installed version', async context => {
-  if (!(await probeSandbox()).available) { context.skip('Requires verified OS sandbox'); return }
+  if (!(await probeHostExecution()).available) { context.skip('Requires host runtime'); return }
   const database = new EdenDatabase(':memory:', 'local')
   const plugins = new PluginService(database)
   try {
@@ -60,7 +60,7 @@ test('changed drafts and failed tests cannot replace the installed version', asy
 })
 
 test('workspace capability requires a user grant tied to revision', async context => {
-  if (!(await probeSandbox()).available) { context.skip('Requires verified OS sandbox'); return }
+  if (!(await probeHostExecution()).available) { context.skip('Requires host runtime'); return }
   const directory = mkdtempSync(path.join(tmpdir(), 'eden-plugin-grant-'))
   const database = new EdenDatabase(':memory:', 'local')
   const plugins = new PluginService(database)

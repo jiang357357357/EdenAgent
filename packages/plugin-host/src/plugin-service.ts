@@ -2,7 +2,7 @@ import { PluginOperationRepository } from './management/operation-repository.ts'
 import { PluginManagementRepository } from './management/management-repository.ts'
 import type { EdenDatabase } from '@eden/store'
 import type { JsonValue } from '@eden/api'
-import { probeSandbox } from '@eden/execution'
+import { probeHostExecution } from '@eden/execution'
 import { DraftRepository } from './drafts/draft-repository.ts'
 import { buildPlugin } from './builds/build-plugin.ts'
 import { testPlugin } from './testing/test-plugin.ts'
@@ -59,9 +59,9 @@ export class PluginService {
   async activate(id: string, revision: string, readRoot?: string) {
     if (this.activeCalls.get(id)?.size) throw new Error('Plugin has active calls; wait before activating another version')
     return this.track(id, 'activate', async signal => {
-      const sandbox = await probeSandbox()
+      const execution = await probeHostExecution()
       signal.throwIfAborted()
-      if (!sandbox.available) throw new Error('OS sandbox unavailable; activation refused')
+      if (!execution.available) throw new Error('Host execution unavailable; activation refused')
       if ((this.activeCalls.get(id)?.size ?? 0) > 1) throw new Error('Plugin has active calls; activation refused')
       return this.activations.activate(id, revision, readRoot)
     }, undefined, revision)
