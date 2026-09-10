@@ -22,9 +22,9 @@ HOI4 Observer Mod
 
 ## 代码边界
 
-- `Connectors/official/hoi4/package`：可分发清单、平台入口和 HOI4 Mod 资产。
-- `Connectors/official/hoi4/worker`：Connector Protocol v1 Worker。
-- `Connectors/official/hoi4/protocol.md`：版本化日志协议。
+- `Server/connectors/official/hoi4/package`：可分发清单、平台入口和 HOI4 Mod 资产。
+- `Server/connectors/official/hoi4/worker`：Connector Protocol v1 Worker。
+- `Server/connectors/official/hoi4/protocol.md`：版本化日志协议。
 - `Server/crates/eden-agent-hoi4`：仅由官方 Worker 链接的日志解析库；Server 不链接它。
 - `Server/crates/eden-agent-connectors`：通用包生命周期、Worker 监管、事件持久化和工具路由。
 - `Script/Cmd/Win/InstallHoi4Observer.ps1`：开发 Mod 安装入口。

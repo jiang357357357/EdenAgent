@@ -22,10 +22,11 @@ Electron supervises two independent Node hosts: Eden (`mon`, port 40092) and Loc
 | `packages/plugin-sdk`, `packages/plugin-host` | Agent-authored plugins and isolated version lifecycle |
 | `packages/execution`, `packages/integrations` | Execution boundaries and external integrations |
 | `frontend/web`, `frontend/desktop` | React client and Electron shell |
-| `Native`, `Connectors/official` | Independent Rust helpers and connector workers |
+| `Server/connectors/official` | TypeScript connector plugins and assets |
+| `Archive/2026-09-10-rust-connectors` | Archived Rust workers and helpers |
 | `Archive/2026-09-09-rust-runtime` | Historical Rust AgentCore and Server |
 
-The new runtime does not link the archived Rust host. Rust remains necessary for native components.
+The host and connectors use Node/TypeScript. The separate Windows desktop pointer observer still uses Rust.
 
 ## Realms and models
 
@@ -61,13 +62,13 @@ Linux isolation uses bubblewrap and prlimit. Explicit Windows host execution thr
 
 The `eden_plugin` tool and plugin development page expose guidance, draft read/write, validation, declared tests, exact-version installation and activation. Existing draft replacement requires its current `draftRevision`; compiled artifacts have a separate `revision` and require a matching successful report before installation.
 
-Workspace access needs user authorization. Generated code and editor templates do not run automatically. Generated plugins are constrained single-file TypeScript tools, not unrestricted npm applications. Marketplace packages, MCP and native workers retain separate lifecycle and permission boundaries.
+Workspace access needs user authorization. Generated code and editor templates do not run automatically. Generated plugins are constrained single-file TypeScript tools, not unrestricted npm applications. Connector components use the unified package registry, version authorization and isolated Node workers; each instance additionally requires resolved-resource grants.
 
 ## Migration and distribution
 
 See the [migration guide](文档/技术/ts-migration/数据迁移操作.md), [desktop distribution guide](文档/技术/ts-migration/桌面发行操作.md) and [script documentation](Script/Project/README.md).
 
-The distribution workflow assembles TS, Node, Electron and native workers. Signing, file inventories, separate version installation and managed launch tools are implemented in source. No signed release from the current changes has been built or accepted. Automatic extraction and managed launch are implemented in source. System shortcuts, launcher upgrades and complete data upgrade/rollback coordination remain unfinished. Selecting an older application does not restore its database schema.
+The distribution workflow assembles TS, Node, Electron and portable connector workers. Signing, file inventories, separate version installation and managed launch tools are implemented in source. No signed release from the current changes has been built or accepted. Automatic extraction and managed launch are implemented in source. System shortcuts, launcher upgrades and complete data upgrade/rollback coordination remain unfinished. Selecting an older application does not restore its database schema.
 
 Host execution uses the current OS account and does not isolate one realm's files from the other. Permission approval remains separate, and enabling host commands does not bypass sandbox requirements for MCP stdio, skills or plugins.
 

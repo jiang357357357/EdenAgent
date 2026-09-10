@@ -2,12 +2,12 @@ import { cp, lstat, readFile, readdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 
-const official = ['hoi4', 'lichess', 'openttd', 'victoria3']
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 
 export async function copyConnectorResources(root, staging) {
   const platform = `${process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : process.platform}-${process.arch}`
   const packages = []
+  const official = (await readdir(path.join(root, 'dist/connectors'), { withFileTypes: true })).filter(entry => entry.isDirectory() && /^[a-z][a-z0-9.-]*$/.test(entry.name)).map(entry => entry.name).sort()
   for (const key of official) {
     const source = path.join(root, 'dist/connectors', key)
     const files = await packageFiles(source)
@@ -22,7 +22,7 @@ export async function copyConnectorResources(root, staging) {
       }
     }
     const manifest = JSON.parse(await readFile(path.join(source, 'connector.json'), 'utf8'))
-    const entry = manifest.entrypoints?.[platform]?.path
+    const entry = manifest.entrypoints?.[manifest.runtime === 'node' ? 'node' : platform]?.path
     if (manifest.id !== key || !actual.includes(entry)) throw new Error(`Missing ${platform} worker: ${key}`)
     const destination = path.join(staging, 'connectors', key)
     await cp(source, destination, { recursive: true, dereference: false, filter: async name => {

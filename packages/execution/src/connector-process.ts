@@ -6,6 +6,7 @@ import path from 'node:path'
 import type { Readable, Writable } from 'node:stream'
 import { sandboxArguments, sandboxExecutable } from './sandbox-arguments.ts'
 export interface ConnectorProcessRequest {
+  runtime?: 'native' | 'node'
   executable: string
   packageSnapshot?: { files: ReadonlyMap<string, Buffer>; entrypoint: string } | undefined
   sha256: string
@@ -14,6 +15,7 @@ export interface ConnectorProcessRequest {
   /** Host-created socket directory, never a user-selected filesystem grant. */
   adminBridgeDirectory?: string
   httpsBridgeDirectory?: string
+  networkBridgeDirectory?: string
   identity?: { key: string; credential: string }
   /** Trusted host has already resolved grants and rewritten worker settings to these guest paths. */
   writeMounts?: { source: string; target: string }[]
@@ -40,9 +42,10 @@ export async function launchConnectorProcess(request: ConnectorProcessRequest): 
   if ((executable && lstatSync(executable).size > 128 * 1024 * 1024) || !/^[a-f0-9]{64}$/.test(request.sha256)) throw new Error('Invalid connector executable digest or size')
   if (request.readMounts.length > 16) throw new Error('Too many connector read grants')
   args.push('--bind', dataDirectory, '/data', '--dir', '/inputs')
-  if (request.adminBridgeDirectory && request.httpsBridgeDirectory) throw new Error('Only one connector network bridge is allowed')
+  if ([request.adminBridgeDirectory, request.httpsBridgeDirectory, request.networkBridgeDirectory].filter(Boolean).length > 1) throw new Error('Only one connector network bridge is allowed')
   if (request.httpsBridgeDirectory) args.push('--ro-bind', canonical(request.httpsBridgeDirectory, true), '/network')
   if (request.adminBridgeDirectory) args.push('--ro-bind', canonical(request.adminBridgeDirectory, true), '/network')
+  if (request.networkBridgeDirectory) args.push('--ro-bind', canonical(request.networkBridgeDirectory, true), '/network')
   const environment: Record<string, string> = connectorEnvironment(request)
   connectorMountArguments(request, args)
   const workerArgs = connectorWorkerArguments(request)
@@ -51,7 +54,8 @@ export async function launchConnectorProcess(request: ConnectorProcessRequest): 
     : { ...await snapshotWorker(executable!, request.sha256, request.signal), root: undefined, guestExecutable: '/worker/connector', cwd: '/data' }
   if (snapshot.root) args.push('--ro-bind', snapshot.root, '/package')
   else args.push('--dir', '/worker', '--ro-bind', snapshot.executable, '/worker/connector')
-  args.push('--chdir', snapshot.cwd, '--', '/usr/bin/prlimit', '--as=1073741824:1073741824', '--nofile=128:128', '--fsize=67108864:67108864', '--', snapshot.guestExecutable, ...workerArgs)
+  const command = request.runtime === 'node' ? ['/runtime/node', '--jitless', '--max-old-space-size=256', snapshot.guestExecutable] : [snapshot.guestExecutable]
+  args.push('--chdir', snapshot.cwd, '--', '/usr/bin/prlimit', '--as=1073741824:1073741824', '--nofile=128:128', '--fsize=67108864:67108864', '--', ...command, ...workerArgs)
   const child = (() => {
     try { return spawn(sandboxExecutable, args, { env: environment, stdio: ['pipe', 'pipe', 'pipe'], detached: true }) }
     catch (error) { void snapshot.cleanup().catch(() => { process.stderr.write('Worker launch snapshot cleanup failed\n') }); throw error }
@@ -114,5 +118,6 @@ function connectorEnvironment(request: ConnectorProcessRequest) {
   }
   if (request.adminBridgeDirectory) environment.MON_CONNECTOR_ADMIN_SOCKET = '/network/transport.sock'
   if (request.httpsBridgeDirectory) environment.MON_CONNECTOR_HTTPS_SOCKET = '/network/transport.sock'
+  if (request.networkBridgeDirectory) environment.EDEN_CONNECTOR_NETWORK_SOCKET = '/network/transport.sock'
   return environment
 }

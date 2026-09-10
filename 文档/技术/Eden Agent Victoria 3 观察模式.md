@@ -9,7 +9,7 @@
 - `AgentCore` 保持游戏无关，不依赖 Victoria 3。
 - `eden-agent-victoria3` 负责日志路径解析、协议解析、日志跟随、最新快照、命令文件生成、Windows 控制台注入和 ACK 等待。
 - `eden-agent-connectors` 负责持久连接器生命周期、事件入库和 `query_victoria3` Agent 工具。
-- `Connectors/official/victoria3/package/assets/game-mod` 是随签名连接器包分发的 Victoria 3 1.13.x 本地 Mod 源码。
+- `Server/connectors/official/victoria3/package/assets/game-mod` 是随签名连接器包分发的 Victoria 3 1.13.x 本地 Mod 源码。
 - Electron 仍只负责捕获 Victoria 3 窗口；控制台输入由隔离的 Rust Connector Worker 执行，Server 只监管协议和权限。
 
 ## 数据流

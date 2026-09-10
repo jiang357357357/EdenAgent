@@ -24,7 +24,6 @@ function Test-EdenAgentDevProcess {
   return (
     $commandLine -match $rootPattern -or
     $commandLine -match 'eden-agent-server' -or
-    $commandLine -match 'cargo.+eden-agent-server' -or
     $commandLine -match 'frontend[\\/]web[\\/]node_modules[\\/]vite' -or
     $commandLine -match 'npm run dev'
   )

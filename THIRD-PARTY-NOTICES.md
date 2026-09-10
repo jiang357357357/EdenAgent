@@ -19,3 +19,7 @@ Character and Spine resource files are maintained outside this source repository
 The frontend depends on `@esotericsoftware/spine-pixi-v7` and related Spine Runtimes packages. These packages are Copyright © 2013–2025 Esoteric Software LLC and are distributed under the Spine Runtimes License Agreement, not the Eden Agent license. Integration and redistribution are subject to that agreement, including its Spine Editor licensing conditions. A verbatim copy shipped with the frontend is located at `frontend/licenses/SPINE-RUNTIMES-LICENSE.txt`.
 
 You are responsible for obtaining any permissions required for third-party material used with or distributed alongside Eden Agent. Removing third-party material does not change the license governing Eden Agent's original code.
+
+## TypeScript connector dependencies
+
+Portable connector workers bundle Zod 4.1.12 (MIT); Lichess also bundles chess.js 1.4.0 (BSD-2-Clause) for legal-move generation and position replay. Verbatim license notices are shipped in each applicable connector package under `licenses/`. These dependencies retain their own licenses.

@@ -23,10 +23,11 @@ Electron 分别监管伊甸园和尘世两个 Node Server。每个宿主通过 `
 | `packages/plugin-sdk`、`packages/plugin-host` | 智能体自写插件、版本、审批与隔离执行 |
 | `packages/execution`、`packages/integrations` | 命令边界与外部集成 |
 | `frontend/web`、`frontend/desktop` | React 客户端与 Electron 桌面壳 |
-| `Native`、`Connectors/official` | 独立 Rust helper 与官方连接器 worker |
+| `Server/connectors/official` | 官方 TS 连接器插件源码、清单和资产 |
+| `Archive/2026-09-10-rust-connectors` | 旧 Native helper、Rust worker 和 Cargo workspace |
 | `Archive/2026-09-09-rust-runtime` | 原 AgentCore、Rust Server 及历史来源 |
 
-新运行时不链接归档 Rust 宿主。Rust 工具链仅用于独立原生组件。
+宿主和连接器不依赖 Rust。Windows 桌面的指针观察组件仍保留独立 Rust 构建，不属于连接器机制。
 
 ## 双世界与模型
 
@@ -38,7 +39,7 @@ Electron 分别监管伊甸园和尘世两个 Node Server。每个宿主通过 `
 
 ## 开发入口
 
-需要固定版本 Node.js 22.23.1 与 npm。构建连接器还需要 Rust 工具链。Linux 隔离执行依赖 bubblewrap 和 prlimit；Windows 已编写明确授权的本机 PowerShell 执行，未内置 Windows 沙箱；终端可接管理员配置的外部隔离器，插件/MCP/技能的跨平台隔离仍待完成，不能据桌面打包目标推断所有隔离功能可用。
+需要固定版本 Node.js 22.23.1 与 npm。连接器由 esbuild 打包为隔离 Node worker，不需要 Cargo。Linux 隔离执行依赖 bubblewrap 和 prlimit；Windows 已编写明确授权的本机 PowerShell 执行，未内置 Windows 沙箱；终端可接管理员配置的外部隔离器，插件/MCP/技能的跨平台隔离仍待完成，不能据桌面打包目标推断所有隔离功能可用。
 
 ```sh
 npm ci
@@ -85,3 +86,11 @@ npm --prefix frontend ci
 [实现方案](文档/技术/Eden%20Agent%20TypeScript%20宿主与%20pi%20实现方案.md) · [工程约束](文档/技术/Eden%20Agent%20TypeScript%20工程约束.md) · [安全策略](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [版本记录](CHANGELOG.md)
 
 依据 [PolyForm Noncommercial License 1.0.0](LICENSE) 提供非商业源码使用，并非 OSI 定义的开源许可证。商业使用须取得[单独书面授权](COMMERCIAL-LICENSE.md)。历史版本范围见 [LICENSING.md](LICENSING.md)，第三方声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+## 统一连接器插件
+
+连接器使用统一插件包的 `connector` 组件，官方实现也必须经过安装、版本授权和启用。`npm run build:connectors` 自动发现并构建 `Server/connectors/official/*`，制品写入 `dist/connectors/<id>`；`npm run build:server` 同时构建连接器。
+
+在插件管理中从该制品目录预览、安装、批准包权限并启用，再配置连接器实例及具体资源授权。旧连接器实例不会自动继承新插件版本的授权。智能体通过 `eden_connector_plugin` 获取 SDK/构建流程并预览安装自己的 TS 插件，不能自行授予权限。
+
+详见 [连接器实施计划](文档/技术/ts-migration/连接器统一实施计划.md)。Linux 隔离协议已加入真实临时夹具测试；真实游戏、外部账户及 Windows/macOS 不以模拟测试代替验收。Victoria 3 控制探针已编写 TS/PowerShell 适配器并要求独立桌面输入授权，但当前宿主不支持 Windows 连接器隔离，实际 Windows 执行未验收。

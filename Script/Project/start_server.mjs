@@ -4,6 +4,8 @@ import path from 'node:path'
 import realmRoots from '../../frontend/desktop/src/processes/realm-data-roots.cjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
+const built = process.argv[2] === '--built'
+if (process.argv.length > 3 || (process.argv[2] && !built)) throw new Error('Usage: start_server.mjs [--built]')
 const origin = process.env.EDEN_AGENT_RUNTIME_ORIGIN ?? 'local'
 if (!['mon', 'local'].includes(origin)) throw new Error('Unsupported runtime origin')
 const { roots: dataRoots, selection } = realmRoots.resolveRealmSelection(process.env, {
@@ -12,7 +14,7 @@ const { roots: dataRoots, selection } = realmRoots.resolveRealmSelection(process
 if (selection && process.env.EDEN_AGENT_V2_DATA_ROOT && path.resolve(process.env.EDEN_AGENT_V2_DATA_ROOT) !== dataRoots[origin]) throw new Error('Single-host data root conflicts with runtime selection')
 const environment = { ...process.env, EDEN_AGENT_V2_DATA_ROOT: process.env.EDEN_AGENT_V2_DATA_ROOT ?? dataRoots[origin],
   ...(selection ? { EDEN_AGENT_RUNTIME_SELECTION_REVISION: selection.revision } : {}) }
-const child = spawn(process.execPath, ['--import', 'tsx', 'Server/src/main.ts'], {
+const child = spawn(process.execPath, built ? ['dist/server/main.mjs'] : ['--import', 'tsx', 'Server/src/main.ts'], {
   cwd: root, env: environment, stdio: 'inherit',
 })
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal))

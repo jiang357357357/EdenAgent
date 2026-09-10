@@ -37,10 +37,11 @@ jobs:
             package-lock.json
             frontend/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
+        if: runner.os == 'Windows'
       - uses: Swatinem/rust-cache@v2
+        if: runner.os == 'Windows'
         with:
           workspaces: |
-            . -> target
             frontend/desktop/native/win32-pointer-observer -> target
       - name: Install source dependencies
         run: npm ci --ignore-scripts
@@ -50,14 +51,6 @@ jobs:
         run: npm run generate:rpc
       - name: Build TS host and offline migration tools
         run: npm run build:server
-      - name: Build official native workers
-        run: cargo build --release --locked -p eden-agent-connector-hoi4 -p eden-agent-connector-lichess -p eden-agent-connector-openttd -p eden-agent-connector-victoria3
-      - name: Assemble official connector resources
-        run: |
-          node Script/Project/package_connector.mjs hoi4 --profile release
-          node Script/Project/package_connector.mjs lichess --profile release
-          node Script/Project/package_connector.mjs openttd --profile release
-          node Script/Project/package_connector.mjs victoria3 --profile release
       - name: Assemble private Node runtime distribution
         run: node Script/Project/package_server.mjs
       - name: Build web application

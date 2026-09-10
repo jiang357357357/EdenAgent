@@ -1,0 +1,23 @@
+[package]
+name = "eden-agent-connector-lichess"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+# Legacy integration tests depend on the archived Rust host; migrate in phase T.
+autotests = false
+
+[dependencies]
+futures.workspace = true
+eden-agent-connector-protocol = { path = "../../../../../Native/crates/eden-agent-connector-protocol" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+shakmaty.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

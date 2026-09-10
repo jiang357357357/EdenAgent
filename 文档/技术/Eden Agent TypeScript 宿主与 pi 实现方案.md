@@ -18,7 +18,7 @@
 
 旧代码位于 `Archive/2026-09-09-rust-runtime/{AgentCore,Server}`。Server 保持原 Git 子模块，旧实现不再占用根 `Server/`。
 
-尚未修复的入口包括根 Cargo workspace、`generate:rpc`、`typecheck`、connector 构建脚本、CI、Electron 的 Rust Server 监管器及部分资源路径。归档后这些入口不能代表可运行产品。`Data/` 未修改，不允许新代码原地升级旧数据库。
+以下为首次归档时的历史缺口（截至 2026-09-10 已按实施跟踪修复主要入口，连接器改为 TS；不能将本段视为当前状态）：根 Cargo workspace、`generate:rpc`、`typecheck`、connector 构建脚本、CI、Electron 的 Rust Server 监管器及部分资源路径。归档后这些入口不能代表可运行产品。`Data/` 未修改，不允许新代码原地升级旧数据库。
 
 归档说明及提交基线见 `Archive/2026-09-09-rust-runtime/README.md`。前端现有自唤醒修改须保留，迁移时对最终工作树做适配，不恢复旧版本覆盖它们。
 
@@ -44,6 +44,7 @@ Server/                         # 新主仓库跟踪的 TS 源码，不复用旧
   src/services/                 # 会话、角色、记忆、自唤醒、作业、Mon
   src/workers/                  # 后台任务入口
   tests/                        # 组合级契约与恢复测试
+  connectors/official/          # 独立构建的官方 worker、清单和游戏资源
 packages/
   api/                          # Eden wire schema、类型、生成客户端
   runtime-pi/                   # 唯一允许直接使用 pi 运行时接口的适配层
@@ -53,8 +54,7 @@ packages/
   plugin-host/                  # 草稿、构建、验证、安装、生命周期
   execution/                    # 沙箱、进程树、终端与文件能力
   integrations/                 # MCP、连接器协议、Mon 外部服务适配
-Native/                         # 确有需要的 OS helper；不承载 Agent 循环
-Connectors/                     # 现有官方 worker 按协议继续接入
+Archive/2026-09-10-rust-connectors/ # 旧 Native/worker/Cargo；不属于活动构建
 frontend/                       # 保留现有子模块
 Archive/2026-09-09-rust-runtime/
 ```

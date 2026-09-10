@@ -1,0 +1,77 @@
+{
+  "date": "2026-09-10",
+  "task": "连接器统一插件机制与官方 TS worker 迁移",
+  "baseCommit": "1d945b9",
+  "runtime": {
+    "node": "22.23.1",
+    "platform": "linux",
+    "architecture": "x64"
+  },
+  "automated": {
+    "command": "npm run test:all",
+    "groups": {
+      "architectureRules": 4,
+      "serverAndPackages": 267,
+      "web": 233,
+      "desktop": 172,
+      "project": 23,
+      "serverArtifact": 1
+    },
+    "total": 700,
+    "passed": 700,
+    "failed": 0,
+    "skipped": 0,
+    "logSha256": "e12b3cd6f805214f5b8ddf5f8136fd0ec12539cab181dfc27e5301a5b8160bf4"
+  },
+  "checks": {
+    "serverTypecheck": "passed",
+    "architecture": {
+      "files": 643,
+      "errors": 0,
+      "warnings": 12
+    },
+    "buildServerAndConnectors": "passed",
+    "diffWhitespace": "passed"
+  },
+  "additionalLiveChecks": {
+    "portablePackageAssembly": {
+      "packages": [
+        "hoi4",
+        "lichess",
+        "openttd",
+        "victoria3"
+      ],
+      "nodeEntrypoints": true,
+      "licenseFiles": true
+    },
+    "builtStartWrapper": {
+      "healthStatus": 200,
+      "exitCode": 0
+    },
+    "victoriaIsolatedWorker": {
+      "snapshot": true,
+      "ack": true,
+      "persistedEvents": 3,
+      "disabledControlRejected": true
+    }
+  },
+  "archive": {
+    "path": "Archive/2026-09-10-rust-connectors",
+    "hashVerifiedFiles": 26,
+    "inventory": "source-sha256.json"
+  },
+  "limits": [
+    "未接入真实游戏或真实 Lichess 账户；网络业务使用 loopback 模拟。",
+    "Windows/macOS 连接器隔离与实际 OS 运行未验收。",
+    "Victoria 3 TS/PowerShell 控制源码与 ACK/失败清理已测试；真实 Windows 前台窗口输入未测试且当前宿主尚无对应隔离支持。",
+    "frontend/desktop/native/win32-pointer-observer 保留独立 Rust 构建，不属于连接器重构范围。"
+  ],
+  "logs": [
+    "/tmp/eden-unified-final.log",
+    "/tmp/eden-unified-types.log",
+    "/tmp/eden-unified-architecture.log",
+    "/tmp/eden-unified-final-build.log",
+    "/tmp/eden-unified-start-package.log",
+    "/tmp/eden-unified-victoria-live.log"
+  ]
+}

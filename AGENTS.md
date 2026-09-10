@@ -14,11 +14,13 @@
 
 ## 当前结构
 
+- `Server/`：独立 Git 子模块（EdenAgentServer.git，登记名 server-ts）；旧 Rust Server 子模块固定在归档路径。构建仍依赖主仓库共享 packages 与脚本。
 - `Server/src`：Node 宿主；bootstrap 组装，transport 协议，modules 按业务拆分。
 - `packages/runtime-pi`：唯一允许导入 pi 的运行时适配包；只依赖公开 SDK。
 - `packages/api`、`store`、`permissions`、`plugin-sdk`、`plugin-host`、`execution`：协议、基础存储、权限策略、插件与隔离执行。
 - `Archive/2026-09-09-rust-runtime`：旧 Rust Core/Server 和原启动/CI 参考；新代码不得运行时依赖归档。
-- `Native/crates`：官方 worker 的独立帧协议和游戏辅助组件；根 Cargo workspace 仅包含这些组件与 `Connectors/official/*/worker`，不再组装 Rust 宿主。
+- `Server/connectors/official/*/src`：官方 TS 连接器插件；`packages/plugin-sdk/src/connector` 提供公开协议 SDK。宿主按资源声明启动，不按游戏名称分派。
+- `Archive/2026-09-10-rust-connectors`：旧 Native、四个 Rust worker 和 Cargo workspace；活动宿主/连接器不得依赖归档。Windows 桌面指针观察组件仍有独立 Rust 构建。
 - `frontend/web`：React/Vite 客户端，只使用生成的 WebSocket JSON-RPC 客户端和 Blob 端点访问 Agent Server。
 - `frontend/desktop`：Electron 桌面壳，分别启动并监管伊甸园与尘世两个 `eden-agent-server`，向渲染进程传递当前世界服务实例的能力令牌。
 - `Script/Project`：开发启动和 `.monconfig` 读取工具。

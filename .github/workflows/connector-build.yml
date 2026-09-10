@@ -1,0 +1,27 @@
+name: TypeScript connector packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck:server
+      - run: npm run check:architecture
+      - run: npm run build:connectors
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eden-agent-connector-plugins
+          path: dist/connectors/
+          if-no-files-found: error

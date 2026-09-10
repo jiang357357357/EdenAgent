@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./legacy-wire": "./src/legacy-wire.ts"
+    "./legacy-wire": "./src/legacy-wire.ts",
+    "./connector": "./src/connector-api.ts"
   },
   "dependencies": {
     "zod": "4.1.12"

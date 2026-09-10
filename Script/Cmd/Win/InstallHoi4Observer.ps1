@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $agentRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")).Path
-$source = Join-Path $agentRoot "Connectors\official\hoi4\package\assets\game-mod"
+$source = Join-Path $agentRoot "Server\connectors\official\hoi4\package\assets\game-mod"
 $modRoot = Join-Path $Hoi4UserRoot "mod"
 $target = Join-Path $modRoot "edenagent_hoi4_observer"
 $launcherDescriptor = Join-Path $modRoot "edenagent_hoi4_observer.mod"

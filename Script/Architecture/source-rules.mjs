@@ -30,7 +30,7 @@ function complexity(body) {
 
 export function inspectSource(file, content, policy) {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true)
-  const errors = []
+  const errors = source.parseDiagnostics.map(diagnostic => `syntax: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`)
   const warnings = []
   const imports = []
   const lines = content.trimEnd().split('\n').length

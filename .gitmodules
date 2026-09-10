@@ -6,3 +6,7 @@
 	path = Archive/2026-09-09-rust-runtime/Server
 	url = ../EdenAgentServer.git
 	branch = main
+[submodule "server-ts"]
+	path = Server
+	url = ../EdenAgentServer.git
+	branch = main

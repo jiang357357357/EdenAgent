@@ -1,3 +1,4 @@
+import { packageOfficialConnectors } from './package_connector.mjs'
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 import { buildMigrationTools } from './migration_artifacts.mjs'
@@ -12,3 +13,6 @@ await build({
 process.stdout.write('Built dist/server/main.mjs (pi and npm runtime dependencies remain external)\n')
 await buildMigrationTools(fileURLToPath(new URL('../../', import.meta.url)))
 process.stdout.write('Built standalone offline migration tools in dist/migration\n')
+
+await packageOfficialConnectors()
+process.stdout.write('Built portable TypeScript connector packages\n')

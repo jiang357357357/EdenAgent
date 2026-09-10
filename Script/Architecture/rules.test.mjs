@@ -4,6 +4,9 @@ import { inspectSource } from './source-rules.mjs'
 import { dependencyViolations, findCycles } from './dependency-rules.mjs'
 
 const policy = { maximumLines: 500, warningLines: 300, warningFunctionLines: 60, maximumComplexity: 15 }
+test('syntax errors cannot pass architecture inspection', () => {
+  assert.ok(inspectSource('Server/src/broken.ts', 'function broken() {', policy).errors.some(error => error.startsWith('syntax:')))
+})
 test('rejects oversized source, barrel logic, and hidden pi dependency', () => {
   assert.ok(inspectSource('Server/src/index.ts', 'export const x = 1', policy).errors.length)
   assert.ok(inspectSource('Server/src/test.ts', 'x\n'.repeat(501), policy).errors.length)
