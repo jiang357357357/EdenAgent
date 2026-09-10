@@ -6,7 +6,7 @@ import type { AgentHarnessTool } from '@earendil-works/pi-agent-core'
 import { toJson } from '@eden/api'
 import type { RuntimeCallbacks, RuntimeTool } from './contracts.ts'
 
-export function adaptTool(tool: RuntimeTool, callbacks: RuntimeCallbacks, healthy: () => void, fail: (error: unknown) => never, callPrefix = ''): AgentHarnessTool<undefined> {
+export function adaptTool<TContext extends object | undefined = undefined>(tool: RuntimeTool, callbacks: RuntimeCallbacks, healthy: () => void, fail: (error: unknown) => never, callPrefix = ''): AgentHarnessTool<TContext> {
   if (tool.parameters.type !== 'object') throw new Error('Tool parameters must have an object root')
   return {
     name: tool.name, label: tool.name, description: tool.description,

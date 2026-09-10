@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 HELPER="${AGENT_ROOT}/Script/Project/openttd_launcher.mjs"
-OPEN_TTD_BRIDGE="${AGENT_ROOT}/Server/connectors/openttd_bridge"
+OPEN_TTD_BRIDGE="${AGENT_ROOT}/Connectors/official/openttd/bridge"
 OPEN_TTD_ROOT="${MON_OPENTTD_ROOT:-${HOME}/.local/opt/openttd-15.3}"
 OPEN_TTD_BIN="${MON_OPENTTD_BIN:-${OPEN_TTD_ROOT}/openttd}"
 OPEN_TTD_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/openttd"

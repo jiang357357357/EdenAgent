@@ -6,6 +6,8 @@ export interface RuntimeTool {
   revision: string
   parameters: Record<string, JsonValue>
   executionMode?: 'parallel' | 'sequential'
+  /** Host-owned discovery instructions included in each model request. */
+  promptHint?: string
   resultImages?(result: JsonValue, signal: AbortSignal): Promise<readonly RuntimeImage[]>
   execute(input: Record<string, unknown>, context: { callId: string; signal: AbortSignal }): Promise<JsonValue>
 }
@@ -37,6 +39,7 @@ export interface RuntimeOptions {
   model: RuntimeModel
   tools: RuntimeTool[]
   callbacks: RuntimeCallbacks
+  refreshTools?(): RuntimeTool[] | Promise<RuntimeTool[]>
   checkpoint?: RuntimeCheckpoint
   maxModelRequests?: number
   toolCallPrefix?: string

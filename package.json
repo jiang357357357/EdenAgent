@@ -30,7 +30,7 @@
     "package:connector:victoria3": "node Script/Project/package_connector.mjs victoria3 --profile debug",
     "build:connectors": "cargo build -p eden-agent-connector-hoi4 -p eden-agent-connector-lichess -p eden-agent-connector-openttd -p eden-agent-connector-victoria3",
     "package:connectors": "npm run package:connector:hoi4 && npm run package:connector:lichess && npm run package:connector:openttd && npm run package:connector:victoria3",
-    "test:command-live": "cargo build -p eden-agent-server --locked && node --experimental-strip-types Script/Project/test_command_runtime_live.mjs",
+    "test:command-live": "node --import tsx --test Server/tests/workspace-tools.test.ts packages/execution/tests/external-process.test.ts",
     "test:dev-smoke": "npm --prefix frontend run test:dev-smoke",
     "test:process-runner": "npm --prefix frontend run test:process-runner",
     "test:openttd-launcher": "node --test Script/Project/openttd_launcher.test.mjs",
@@ -38,7 +38,10 @@
     "typecheck": "npm run typecheck:server && npm --prefix frontend/web run typecheck",
     "postinstall": "node -e \"console.log('Eden Agent uses isolated TypeScript hosts with pi for Eden and Local.')\"",
     "prepare": "husky",
-    "test": "npm run test:architecture && npm run test:server"
+    "test": "npm run test:architecture && npm run test:server",
+    "test:server-artifact": "npm run build:server && node --test Script/Project/server_artifact.test.mjs",
+    "test:project": "node --test Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs Script/Project/openttd_launcher.test.mjs frontend/tests/process-runner.test.mjs",
+    "test:all": "npm test && npm --prefix frontend/web test && npm --prefix frontend/desktop test && npm run test:project && npm run test:server-artifact"
   },
   "workspaces": [
     "frontend/*",

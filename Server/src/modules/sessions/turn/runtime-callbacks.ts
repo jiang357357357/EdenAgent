@@ -1,5 +1,4 @@
-import { chargeSubagentBudget } from '../../subagents/budget.ts'
-import { assertSubagentTool, recordSubagentRequest, recordSubagentResponse } from '../../subagents/index.ts'
+import { chargeSubagentBudget, assertSubagentTool, recordSubagentRequest, recordSubagentResponse } from '../../subagent-execution/index.ts'
 import { randomUUID } from 'node:crypto'
 import type { RuntimeCallbacks } from '@eden/runtime-pi'
 import { toJson } from '@eden/api'
@@ -65,8 +64,10 @@ export function runtimeCallbacks(repository: SessionRepository, input: SessionIn
       const message = value.message && typeof value.message === 'object' && !Array.isArray(value.message) ? value.message : {}
       const event = repository.database.transaction(() => {
         recordSubagentResponse(repository.database, input.sessionId, input.turnId, snapshot)
-        return repository.events.insert(input.sessionId, input.turnId, 'model.response', scoped({ requestId: value.requestId ?? null,
-          usage: message.usage ?? null, stopReason: message.stopReason ?? null, costConfigured: value.costConfigured === true }))
+        return repository.events.insert(input.sessionId, input.turnId, 'model.response', scoped({
+          requestId: value.requestId ?? null,
+          usage: message.usage ?? null, stopReason: message.stopReason ?? null, costConfigured: value.costConfigured === true
+        }))
       })
       repository.events.publish(event)
     },

@@ -11,7 +11,7 @@ import { directorRoutes } from '../src/transport/rpc/director.routes.ts'
 
 const plan = () => parseDirectorPlan('{"beats":[{"assistantId":1},{"assistantId":2}]}', [{ assistantId: 1 }, { assistantId: 2 }], 'test')
 
-test('director progress is ordered and state and events commit atomically', () => {
+test('director progress is ordered and state and events commit atomically', async () => {
   const db = new EdenDatabase(':memory:', 'local')
   const sessions = new SessionRepository(db, 'local')
   const runs = new DirectorRunRepository(sessions)
@@ -34,9 +34,9 @@ test('director progress is ordered and state and events commit atomically', () =
     assert.deepEqual(complete.completedBeatIndexes, [0, 1])
     assert.throws(() => runs.fail(run.planID, 'late failure'), /terminal/)
     const list = directorRoutes(runs)['director.list']!
-    assert.deepEqual(list({ sessionId: session.id }), [complete])
-    assert.deepEqual(list({ sessionId: sessions.create('Other').id }), [])
-    assert.throws(() => list({ sessionId: randomUUID() }), /not found/)
+    assert.deepEqual(await list({ sessionId: session.id }), [complete])
+    assert.deepEqual(await list({ sessionId: sessions.create('Other').id }), [])
+    await assert.rejects(async () => list({ sessionId: randomUUID() }), /not found/)
   } finally { db.close() }
 })
 

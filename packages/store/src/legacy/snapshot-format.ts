@@ -28,7 +28,7 @@ export function legacyRow(raw: unknown): LegacyRow {
     if (cell.type === 'null' && value === null) return [key, null]
     if (cell.type === 'text' && typeof value === 'string') return [key, value]
     if (cell.type === 'real' && typeof value === 'number' && Number.isFinite(value)) return [key, value]
-    if (cell.type === 'integer' && typeof value === 'string' && /^-?(0|[1-9]\d*)$/.test(value)) {
+    if (cell.type === 'integer' && integerEncoding(value)) {
       const integer = BigInt(value)
       if (integer >= -9223372036854775808n && integer <= 9223372036854775807n) return [key, integer]
     }
@@ -39,3 +39,5 @@ export function legacyRow(raw: unknown): LegacyRow {
     throw new Error(`Invalid legacy field encoding: ${key}`)
   }))
 }
+
+function integerEncoding(value: unknown): value is string { return typeof value === 'string' && /^-?(0|[1-9]\d*)$/.test(value) }

@@ -5,7 +5,8 @@ import { ContactNotDeliveredError } from '../mon/index.ts'
 import type { PermissionService } from '../permissions/index.ts'
 import type { SessionRepository } from '../sessions/index.ts'
 const channelSchema = z.enum(['desktop', 'qq', 'email'])
-const payloadSchema = z.object({ channel: z.enum(['desktop', 'qq', 'email', 'auto']).default('desktop'),
+const payloadSchema = z.object({
+  channel: z.enum(['desktop', 'qq', 'email', 'auto']).default('desktop'),
   fallbackChannels: z.array(channelSchema).max(3).default([]), title: z.string().trim().min(1).max(256).default('角色消息'),
   message: z.string().trim().min(1).max(16000), expiresAt: z.number().int().safe().nonnegative().optional(),
 }).passthrough()
@@ -26,8 +27,7 @@ export async function executeContactAction(action: ContactActionContext, raw: Js
       channel === 'desktop' ? 'desktop.notify' : `contact.${channel}`, action.sessionId,
       toJson({ runId: action.id, channel, title: payload.title, message: payload.message, author: action.author, selectedChannels: channels }))
     signal.throwIfAborted()
-    const session = sessions.read(action.sessionId)
-    if (session.status !== 'active' || JSON.stringify(session.participants[0] ?? {}) !== JSON.stringify(action.author)) throw new Error('Self-awake author changed during contact approval')
+    assertContactAuthor(sessions, action)
     if (payload.expiresAt !== undefined && Date.now() >= payload.expiresAt) return toJson({ status: 'suppressed', reason: 'contact_expired', attempts })
     try {
       const receipt = channel === 'desktop' ? await desktop() : await external(channel, action.sessionId,
@@ -40,4 +40,9 @@ export async function executeContactAction(action: ContactActionContext, raw: Js
     }
   }
   throw new Error('None of the selected contact channels accepted the notification')
+}
+
+function assertContactAuthor(sessions: SessionRepository, action: ContactActionContext) {
+  const session = sessions.read(action.sessionId)
+  if (session.status !== 'active' || JSON.stringify(session.participants[0] ?? {}) !== JSON.stringify(action.author)) throw new Error('Self-awake author changed during contact approval')
 }

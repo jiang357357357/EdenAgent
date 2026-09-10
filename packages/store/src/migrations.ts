@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 
-const migrations = [
+export const migrations: readonly string[] = [
   `CREATE TABLE realm_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
    CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
    CREATE TABLE sessions (

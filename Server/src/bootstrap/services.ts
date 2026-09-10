@@ -41,7 +41,7 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
   const marketRepository = new MarketRepository(database)
   const pluginMarket = new MarketService(marketRepository, new PackagePreviewRepository(database, marketRepository), new InstalledPackageRepository(database, marketRepository), new PackageRecoveryRepository(database, config.dataRoot))
   connectorCatalog.attachNativeProvider(() => pluginMarket.installed.nativeSelectionPlans())
-  const mcp = new McpLifecycle(pluginMarket.installed)
+  const mcp = new McpLifecycle(pluginMarket.installed, config.externalCommandSandbox)
   const repository = new SessionRepository(database, config.origin)
   const desktopReminders = new DesktopReminderRepository(repository)
   const blobs = new BlobService(path.join(config.dataRoot, 'blobs'), new BlobRepository(database), config.maxBlobBytes)
@@ -71,8 +71,10 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
   const commands = new CommandService(database, [config.dataRoot, path.resolve('Data')], config.externalCommandSandbox)
   const workspace = new WorkspaceService(database, [config.dataRoot, path.resolve('Data')])
   const systemSkills = new SystemSkillCatalog(config.systemSkillRoots ?? [])
+  const projectSkills = new SystemSkillCatalog(() => workspace.info().path
+    ? ['.agents/skills', '.edenagent/skills'].map(relative => path.join(workspace.root(), relative)) : [], true)
   const skills: SkillService = new SkillService(new SkillRepository(database, () => workspace.info().path ? workspace.root() : '', () => pluginMarket.installed.skillContributions(),
-    () => ({ tools: sessions.toolCatalog().map(tool => tool.name), codeToolsAvailable: skills.codeToolsAvailable }), () => systemSkills.list()), systemSkills)
+    () => ({ tools: sessions.toolCatalog().map(tool => tool.name), codeToolsAvailable: skills.codeToolsAvailable }), () => systemSkills.list(), () => projectSkills.list()), systemSkills, projectSkills, config.externalCommandSandbox)
   const permissions = new PermissionService(database, repository.events)
   const questions = new QuestionService(repository)
   const tools = (sessionId: string, turnId: string, actorId?: string | number): RuntimeTool[] => filterSubagentTools(database, sessionId, [
@@ -111,6 +113,7 @@ export function createServices(database: EdenDatabase, config: ServerConfig) {
 }
 
 function skillProfile(environment: unknown): string {
+  if (environment && typeof environment === 'object' && 'sessionPurpose' in environment && environment.sessionPurpose === 'subagent') return 'subagent'
   if (environment && typeof environment === 'object' && 'sessionPurpose' in environment && environment.sessionPurpose === 'self_awake') return 'self_awake'
   return 'user_chat'
 }

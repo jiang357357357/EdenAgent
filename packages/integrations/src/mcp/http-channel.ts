@@ -13,7 +13,7 @@ export class McpHttpChannel implements McpChannel {
   private disposal: Promise<void> | undefined
   private readonly idle = new Set<() => void>()
   constructor(private readonly endpoint: string, private readonly authorize: () => void,
-    private readonly onNotification: (method: string, params: JsonValue) => void = () => {}) {
+    private readonly onNotification: (method: string, params: JsonValue) => void = () => { }) {
     const url = new URL(endpoint)
     if (url.username || url.password || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))) throw new Error('Invalid MCP HTTP endpoint')
   }
@@ -26,33 +26,16 @@ export class McpHttpChannel implements McpChannel {
     const id = this.next++
     try {
       const response = await this.post({ jsonrpc: '2.0', id, method, params }, combined)
-      const session = response.headers.get('mcp-session-id')
-      if (session && (!/^[\x21-\x7e]{1,1024}$/.test(session) || (this.session && session !== this.session))) {
-        await response.body?.cancel(); throw new Error('MCP server changed its session identity')
-      }
-      if (method === 'initialize') this.session = session ?? undefined
+      await this.acceptSessionIdentity(response, method)
       for await (const value of mcpHttpMessages(response)) {
         this.authorize(); combined.throwIfAborted()
-        if (!value || typeof value !== 'object' || Array.isArray(value) || value.jsonrpc !== '2.0') throw new Error('Invalid MCP HTTP envelope')
+        if (!isMcpEnvelope(value)) throw new Error('Invalid MCP HTTP envelope')
         if (typeof value.method === 'string') {
-          if (Object.hasOwn(value, 'id')) {
-            if (typeof value.id !== 'string' && typeof value.id !== 'number') throw new Error('Invalid MCP server request ID')
-            await this.sendOne(value.method === 'ping' ? { jsonrpc: '2.0', id: value.id, result: {} }
-              : { jsonrpc: '2.0', id: value.id, error: { code: -32601, message: 'Client capability is not available' } }, combined)
-          } else this.onNotification(value.method, value.params ?? {})
+          await this.receiveServerRequest(value, combined)
           continue
         }
         if (value.id !== id || Object.hasOwn(value, 'result') === Object.hasOwn(value, 'error')) throw new Error('Unexpected MCP HTTP response')
-        if (Object.hasOwn(value, 'error')) {
-          const error = value.error
-          if (!error || typeof error !== 'object' || Array.isArray(error) || typeof error.code !== 'number' || !Number.isInteger(error.code)) throw new Error('Invalid MCP remote error')
-          throw new McpRemoteError(error.code)
-        }
-        if (method === 'initialize') {
-          const result = value.result
-          if (!result || typeof result !== 'object' || Array.isArray(result) || !['2025-03-26', '2025-06-18'].includes(String(result.protocolVersion))) throw new Error('Unsupported MCP HTTP protocol version')
-          this.version = String(result.protocolVersion)
-        }
+        this.validateResponseResult(value, method)
         return value.result!
       }
       throw new Error('MCP stream ended without its response')
@@ -61,6 +44,7 @@ export class McpHttpChannel implements McpChannel {
       this.close()
       throw new Error('MCP HTTP request was not confirmed; remote effects may be unknown')
     } finally { this.active--; if (!this.active) { for (const resolve of this.idle) resolve(); this.idle.clear() } }
+
   }
   async notify(method: string, params: JsonValue = {}) {
     await this.sendOne({ jsonrpc: '2.0', method, params }, AbortSignal.any([this.abort.signal, AbortSignal.timeout(15000)]))
@@ -70,13 +54,13 @@ export class McpHttpChannel implements McpChannel {
   startNotifications() {
     if (this.notifications || this.abort.signal.aborted || !this.version) return
     this.notifications = receiveMcpNotifications(this.endpoint, () => this.headers(), this.authorize, async value => {
-      if (!value || typeof value !== 'object' || Array.isArray(value) || value.jsonrpc !== '2.0' || typeof value.method !== 'string') throw new Error('Unexpected MCP notification envelope')
+      if (!isMcpEnvelope(value) || typeof value.method !== 'string') throw new Error('Unexpected MCP notification envelope')
       if (Object.hasOwn(value, 'id')) {
         if (typeof value.id !== 'number' && typeof value.id !== 'string') throw new Error('Invalid MCP server request ID')
         await this.sendOne(value.method === 'ping' ? { jsonrpc: '2.0', id: value.id, result: {} }
           : { jsonrpc: '2.0', id: value.id, error: { code: -32601, message: 'Client capability is not available' } },
           AbortSignal.any([this.abort.signal, AbortSignal.timeout(15000)]))
-      } else this.onNotification(value.method, value.params ?? {})
+      } else this.onNotification(String(value.method), value.params ?? {})
     }, this.abort.signal).catch(() => { this.close() })
   }
   dispose(): Promise<void> {
@@ -114,4 +98,41 @@ export class McpHttpChannel implements McpChannel {
     if (!response.ok) { await response.body?.cancel(); throw new Error(`MCP HTTP request rejected (${response.status})`) }
     return response
   }
+
+  private async receiveServerRequest(value: Record<string, JsonValue>, combined: AbortSignal) {
+
+    if (Object.hasOwn(value, 'id')) {
+      if (typeof value.id !== 'string' && typeof value.id !== 'number') throw new Error('Invalid MCP server request ID')
+      await this.sendOne(value.method === 'ping' ? { jsonrpc: '2.0', id: value.id, result: {} }
+        : { jsonrpc: '2.0', id: value.id, error: { code: -32601, message: 'Client capability is not available' } }, combined)
+    } else this.onNotification(String(value.method), value.params ?? {})
+
+  }
+
+  private validateResponseResult(value: Record<string, JsonValue>, method: string) {
+
+    if (Object.hasOwn(value, 'error')) {
+      const error = value.error
+      if (!error || typeof error !== 'object' || Array.isArray(error) || typeof error.code !== 'number' || !Number.isInteger(error.code)) throw new Error('Invalid MCP remote error')
+      throw new McpRemoteError(error.code)
+    }
+    if (method === 'initialize') {
+      const result = value.result
+      if (!result || typeof result !== 'object' || Array.isArray(result) || !['2025-03-26', '2025-06-18'].includes(String(result.protocolVersion))) throw new Error('Unsupported MCP HTTP protocol version')
+      this.version = String(result.protocolVersion)
+    }
+
+  }
+
+  private async acceptSessionIdentity(response: Response, method: string) {
+
+    const session = response.headers.get('mcp-session-id')
+    if (session && (!/^[\x21-\x7e]{1,1024}$/.test(session) || (this.session && session !== this.session))) {
+      await response.body?.cancel(); throw new Error('MCP server changed its session identity')
+    }
+    if (method === 'initialize') this.session = session ?? undefined
+
+  }
 }
+
+function isMcpEnvelope(value: JsonValue): value is Record<string, JsonValue> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && value !== null && value.jsonrpc === '2.0' }

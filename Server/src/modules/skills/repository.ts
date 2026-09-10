@@ -10,7 +10,8 @@ type Row = Record<string, SQLOutputValue>
 export class SkillRepository {
   constructor(private readonly database: EdenDatabase, private readonly workspace: () => string = () => '', private readonly contributions: () => ContributedSkill[] = () => [],
     private readonly capabilities: () => SkillCapabilities = () => ({ tools: [], codeToolsAvailable: false }),
-    private readonly systemSkills: () => readonly SkillSnapshot[] = () => []) {}
+    private readonly systemSkills: () => readonly SkillSnapshot[] = () => [],
+    private readonly projectSkills: () => readonly SkillSnapshot[] = () => []) {}
   target(scope: string): string {
     if (scope === 'user') return ''
     if (scope !== 'project') throw new Error('Unsupported skill scope')
@@ -50,13 +51,13 @@ export class SkillRepository {
   discardPreview(previewId: string) {
     this.database.connection.prepare('DELETE FROM skill_previews WHERE id=?').run(previewId)
   }
-  list() {
+  list(withCapabilities = true) {
     const root = this.workspace()
     const rows = this.database.connection.prepare(`SELECT * FROM installed_skills WHERE workspace_root='' OR workspace_root=?
       ORDER BY name,CASE WHEN workspace_root='' THEN 1 ELSE 0 END`).all(root)
     const seen = new Set<string>()
-    return [...rows, ...this.contributedRows(), ...this.systemRows()].filter(row => { const name = String(row.name); if (seen.has(name)) return false; seen.add(name); return true })
-      .map(row => this.describe(row, false))
+    return [...rows.filter(row => row.workspace_root !== ''), ...this.discoveredProjectRows(), ...rows.filter(row => row.workspace_root === ''), ...this.contributedRows(), ...this.systemRows()].filter(row => { const name = String(row.name); if (seen.has(name)) return false; seen.add(name); return true })
+      .map(row => this.describe(row, false, withCapabilities))
   }
   read(name: string, includeContent = true, expected: Expected = {}) {
     const row = this.resolve(name)
@@ -73,7 +74,7 @@ export class SkillRepository {
     const capabilities = this.capabilities(), host = new Set(capabilities.tools)
     const local = new Set(capabilities.codeToolsAvailable ? (data.codeTools ?? []).map(tool => tool.name) : [])
     return data.tools.map(tool => ({ name: tool, alternatives: [
-      ...(host.has(tool) ? [tool] : []), ...(local.has(tool) && host.has('run_skill_tool') ? ['run_skill_tool'] : []),
+      ...(host.has(tool) ? [tool] : []), ...(local.has(tool) && host.has('run_skill_tool') ? [tool, 'run_skill_tool'] : []),
     ] }))
   }
   file(name: string, filename: string, expected: Expected = {}) {
@@ -89,7 +90,7 @@ export class SkillRepository {
     this.assertExpected(row, expected)
     if (row.builtin) {
       this.database.connection.prepare('INSERT OR REPLACE INTO runtime_settings(key,value_json,updated_at) VALUES(?,?,?)')
-        .run(`skill.system.enabled:${name}`, JSON.stringify(enabled), Date.now())
+        .run(this.discoveredEnabledKey(row), JSON.stringify(enabled), Date.now())
       return this.read(name)
     }
     this.database.connection.prepare('UPDATE installed_skills SET enabled=?,updated_at=? WHERE name=? AND workspace_root=?')
@@ -99,7 +100,7 @@ export class SkillRepository {
   uninstall(name: string, expected: Expected = {}) {
     const row = this.resolve(name)
     if (row.contributed) throw new Error('Manage this skill through its owning plugin component')
-    if (row.builtin) throw new Error('System skills cannot be uninstalled; disable the skill or change its administrator-configured source')
+    if (row.builtin) throw new Error('Discovered skills cannot be uninstalled; disable the skill or remove its source directory')
     this.assertExpected(row, expected)
     return { name, deleted: this.database.connection.prepare('DELETE FROM installed_skills WHERE name=? AND workspace_root=?').run(name, row.workspace_root!).changes > 0 }
   }
@@ -111,7 +112,7 @@ export class SkillRepository {
     }
   }
   private resolve(name: string): Row {
-    const root = this.workspace(), row = (root ? this.exact(name, root) : undefined) ?? this.exact(name, '') ?? this.contributedRows().find(item => item.name === name) ?? this.systemRows().find(item => item.name === name)
+    const root = this.workspace(), row = (root ? this.exact(name, root) : undefined) ?? this.discoveredProjectRows().find(item => item.name === name) ?? this.exact(name, '') ?? this.contributedRows().find(item => item.name === name) ?? this.systemRows().find(item => item.name === name)
     if (!row) throw new Error('Skill not installed in this world and workspace')
     return row
   }
@@ -124,6 +125,23 @@ export class SkillRepository {
         source_json: JSON.stringify({ type: 'marketplace', uri: `plugin:${item.pluginId}`, ref: item.revision, subpath: item.componentId }), scope: 'system', enabled: 1, contributed: 1 }
     })
   }
+  private discoveredEnabledKey(row: Row) {
+    return row.scope === 'project' ? `skill.project.enabled:${JSON.stringify([row.workspace_root, row.name])}` : `skill.system.enabled:${row.name}`
+  }
+  private discoveredProjectRows(): Row[] {
+    const root = this.workspace()
+    return this.projectSkills().map(data => {
+      const row: Row = { name: data.name, workspace_root: root, snapshot_json: JSON.stringify(data),
+        source_json: JSON.stringify({ type: 'local', uri: '', ref: data.contentHash, subpath: '' }), scope: 'project', enabled: 1, builtin: 1 }
+      const saved = this.database.connection.prepare('SELECT value_json FROM runtime_settings WHERE key=?').get(this.discoveredEnabledKey(row))
+      if (saved) {
+        const enabled: unknown = JSON.parse(String(saved.value_json))
+        if (typeof enabled !== 'boolean') throw new Error('Invalid project skill enabled state')
+        row.enabled = Number(enabled)
+      }
+      return row
+    })
+  }
   private systemRows(): Row[] {
     return this.systemSkills().map(data => {
       const saved = this.database.connection.prepare('SELECT value_json FROM runtime_settings WHERE key=?').get(`skill.system.enabled:${data.name}`)
@@ -134,10 +152,10 @@ export class SkillRepository {
     })
   }
   private exact(name: string, root: string) { return this.database.connection.prepare('SELECT * FROM installed_skills WHERE name=? AND workspace_root=?').get(name, root) }
-  private describe(row: Row, includeContent: boolean) {
+  private describe(row: Row, includeContent: boolean, withCapabilities = true) {
     const data: SkillSnapshot = JSON.parse(String(row.snapshot_json)), source: SkillSource = JSON.parse(String(row.source_json))
     return { ...data, files: Object.keys(data.files), content: includeContent ? data.content : null, enabled: Boolean(row.enabled),
-      ...skillAvailability(data, this.capabilities()), scope: String(row.scope), workspaceRoot: String(row.workspace_root), sourceType: source.type, manifest: { source, workspaceRoot: String(row.workspace_root) } }
+      ...(withCapabilities ? skillAvailability(data, this.capabilities()) : { available: false, missingTools: [] }), scope: String(row.scope), workspaceRoot: String(row.workspace_root), sourceType: source.type, manifest: { source, discovered: Boolean(row.builtin), workspaceRoot: String(row.workspace_root) } }
   }
   private hash(name: string, root: string): string | null {
     const row = this.exact(name, root)

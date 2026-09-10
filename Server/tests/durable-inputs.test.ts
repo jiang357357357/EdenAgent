@@ -33,7 +33,7 @@ test('recovery interrupts in-flight work and marks uncertain effects unknown', (
   try {
     inputs.enqueue(session.id, 'Effect', 'one')
     const input = inputs.claim(session.id)!
-    database.connection.prepare('INSERT INTO tool_operations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    database.connection.prepare('INSERT INTO tool_operations(id,session_id,turn_id,tool_name,revision,state,result_json,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run('effect', session.id, input.turnId, 'external', '1', 'running', null, 1, 1)
     assert.equal(inputs.recoverInterrupted(), 1)
     assert.equal(inputs.claim(session.id), undefined)

@@ -23,7 +23,7 @@ export class InstalledPackageRepository {
       const now = Date.now()
       this.database.connection.prepare(`INSERT OR IGNORE INTO plugin_packages(id,revision,manifest_json,files_json,provenance_json,key_id,installed_at)
         VALUES(?,?,?,?,?,?,?)`).run(preview.manifest.id, preview.revision, JSON.stringify(preview.manifest),
-          JSON.stringify(Object.fromEntries([...preview.files].map(([name, bytes]) => [name, bytes.toString('base64')]))), JSON.stringify(preview.provenance), preview.keyId, now)
+        JSON.stringify(Object.fromEntries([...preview.files].map(([name, bytes]) => [name, bytes.toString('base64')]))), JSON.stringify(preview.provenance), preview.keyId, now)
       const current = this.database.connection.prepare('SELECT 1 FROM plugin_package_selection WHERE id=?').get(preview.manifest.id)
       if (select || !current) this.database.connection.prepare('INSERT INTO plugin_package_selection(id,revision,enabled) VALUES(?,?,0) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,enabled=0').run(preview.manifest.id, preview.revision)
       this.database.connection.prepare('DELETE FROM plugin_package_previews WHERE id=?').run(preview.previewID)
@@ -45,12 +45,16 @@ export class InstalledPackageRepository {
       try { uiContributions = this.componentPlan(id, String(row.revision)).ui }
       catch { trustState = 'blocked:component-unavailable' }
     }
-    return { id, name: manifest.name, description: manifest.description, version: manifest.version, revision: String(row.revision), enabled: Boolean(selected?.enabled) && (trustState.startsWith('verified:') || trustState === 'unsigned:local'),
+    return {
+      id, name: manifest.name, description: manifest.description, version: manifest.version, revision: String(row.revision), enabled: Boolean(selected?.enabled) && (trustState.startsWith('verified:') || trustState === 'unsigned:local'),
       trustState, sourceType: provenance.sourceType ?? 'marketplace', sourceUri: provenance.sourceUri ?? `market:${provenance.sourceId}/${id}@${manifest.version}#${String(row.revision)}`,
       components: componentSummary(manifest).map(component => ({ ...component, enabled: this.componentEnabled(id, String(row.revision), component.id, component.enabledByDefault) })), uiContributions, permissions: manifest.permissions, permissionGrants: this.permissions.list(id, String(row.revision)),
-      versions: rows.map(item => ({ version: packageManifestSchema.parse(JSON.parse(String(item.manifest_json))).version, revision: String(item.revision),
-        active: item.revision === selected?.revision, trustState: this.trust(String(item.key_id)), sourceType: (JSON.parse(String(item.provenance_json)) as Preview['provenance']).sourceType ?? 'marketplace', sourceUri: (JSON.parse(String(item.provenance_json)) as Preview['provenance']).sourceUri ?? '', installedAt: Number(item.installed_at) })),
-      manifest, createdAt: Number(rows.at(-1)!.installed_at), updatedAt: Number(row.installed_at) }
+      versions: rows.map(item => ({
+        version: packageManifestSchema.parse(JSON.parse(String(item.manifest_json))).version, revision: String(item.revision),
+        active: item.revision === selected?.revision, trustState: this.trust(String(item.key_id)), sourceType: (JSON.parse(String(item.provenance_json)) as Preview['provenance']).sourceType ?? 'marketplace', sourceUri: (JSON.parse(String(item.provenance_json)) as Preview['provenance']).sourceUri ?? '', installedAt: Number(item.installed_at)
+      })),
+      manifest, createdAt: Number(rows.at(-1)!.installed_at), updatedAt: Number(row.installed_at)
+    }
   }
   private componentEnabled(id: string, revision: string, componentId: string, fallback: boolean): boolean {
     const row = this.database.connection.prepare('SELECT enabled FROM plugin_package_components WHERE id=? AND revision=? AND component_id=?').get(id, revision, componentId)

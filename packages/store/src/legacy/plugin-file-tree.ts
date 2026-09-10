@@ -27,8 +27,7 @@ export async function copyLegacyPluginTree(source: string, target: string) {
   let total = 0, entries = 0
   const visit = async (directory: string, output: string, relative: string, depth: number): Promise<void> => {
     if (depth > 16) throw new Error('Historical plugin exceeds directory depth limit')
-    const before = await lstat(directory), canonical = await realpath(directory)
-    if (!before.isDirectory() || before.isSymbolicLink() || (canonical !== source && !canonical.startsWith(source + path.sep))) throw new Error('Unsafe historical plugin directory')
+    const before = await assertPluginDirectory(directory, source)
     await mkdir(output, { mode: 0o700 })
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (++entries > 1024 || /[\\:\x00-\x1f]/.test(entry.name)) throw new Error('Historical plugin exceeds entry limit or contains unsafe names')
@@ -36,27 +35,7 @@ export async function copyLegacyPluginTree(source: string, target: string) {
       if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())) throw new Error('Historical plugin contains links or special files')
       if (entry.isDirectory()) { await visit(filename, destination, name + '/', depth + 1); continue }
       if (Object.keys(files).length >= 520) throw new Error('Historical plugin exceeds file limit')
-      const input = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
-      try {
-        const start = await input.stat(), resolved = await realpath(filename)
-        if (!start.isFile() || !resolved.startsWith(source + path.sep) || start.size + total > 64 * 1024 * 1024) throw new Error('Historical plugin file is unsafe or exceeds 64 MiB')
-        const outputFile = await open(destination, 'wx', 0o600)
-        try {
-          const digest = createHash('sha256'), buffer = Buffer.alloc(65536)
-          let size = 0
-          while (true) {
-            const { bytesRead } = await input.read(buffer, 0, buffer.length, size)
-            if (!bytesRead) break
-            size += bytesRead
-            if (size > start.size) throw new Error('Historical plugin grew during copy')
-            digest.update(buffer.subarray(0, bytesRead)); await outputFile.writeFile(buffer.subarray(0, bytesRead))
-          }
-          const end = await input.stat()
-          if (size !== start.size || start.mtimeMs !== end.mtimeMs || start.ctimeMs !== end.ctimeMs) throw new Error('Historical plugin changed during copy')
-          await outputFile.sync(); total += size
-          files[name] = { bytes: size, sha256: digest.digest('hex') }
-        } finally { await outputFile.close() }
-      } finally { await input.close() }
+      total = await copyPluginFile(filename, source, total, destination, files, name)
     }
     const after = await lstat(directory)
     if (after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs || after.ino !== before.ino) throw new Error('Historical plugin directory changed during copy')
@@ -64,4 +43,35 @@ export async function copyLegacyPluginTree(source: string, target: string) {
   }
   await visit(source, target, '', 0)
   return { files, totalBytes: total }
+}
+
+async function assertPluginDirectory(directory: string, source: string) {
+  const before = await lstat(directory), canonical = await realpath(directory)
+  if (!before.isDirectory() || before.isSymbolicLink() || (canonical !== source && !canonical.startsWith(source + path.sep))) throw new Error('Unsafe historical plugin directory')
+  return before
+}
+
+async function copyPluginFile(filename: string, source: string, total: number, destination: string, files: Record<string, { bytes: number; sha256: string }>, name: string) {
+  const input = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+  try {
+    const start = await input.stat(), resolved = await realpath(filename)
+    if (!start.isFile() || !resolved.startsWith(source + path.sep) || start.size + total > 64 * 1024 * 1024) throw new Error('Historical plugin file is unsafe or exceeds 64 MiB')
+    const outputFile = await open(destination, 'wx', 0o600)
+    try {
+      const digest = createHash('sha256'), buffer = Buffer.alloc(65536)
+      let size = 0
+      while (true) {
+        const { bytesRead } = await input.read(buffer, 0, buffer.length, size)
+        if (!bytesRead) break
+        size += bytesRead
+        if (size > start.size) throw new Error('Historical plugin grew during copy')
+        digest.update(buffer.subarray(0, bytesRead)); await outputFile.writeFile(buffer.subarray(0, bytesRead))
+      }
+      const end = await input.stat()
+      if (size !== start.size || start.mtimeMs !== end.mtimeMs || start.ctimeMs !== end.ctimeMs) throw new Error('Historical plugin changed during copy')
+      await outputFile.sync(); total += size
+      files[name] = { bytes: size, sha256: digest.digest('hex') }
+    } finally { await outputFile.close() }
+  } finally { await input.close() }
+  return total
 }

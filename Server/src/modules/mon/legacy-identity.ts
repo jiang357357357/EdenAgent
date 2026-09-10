@@ -10,18 +10,14 @@ function scalar(value: unknown): string | undefined {
 /** Verify the old account before loading models or committing replacement credentials. */
 export async function prepareLegacyIdentity(database: EdenDatabase, sessionId: string | undefined,
   coreBaseUrl: string, token: string, signal: AbortSignal): Promise<() => void> {
-  if (!sessionId) return () => {}
+  if (!sessionId) return () => { }
   const row = database.connection.prepare('SELECT * FROM legacy_core_identities WHERE session_id=?').get(sessionId)
-  if (!row) return () => {}
+  if (!row) return () => { }
   const normalized = base(coreBaseUrl)
   if (normalized !== base(String(row.core_base_url))) throw new Error('Imported session belongs to a different Core endpoint')
   const principal = String(row.principal_key)
   if (principal.startsWith('user:')) {
-    const raw = await new MonClient(coreBaseUrl, token).get('/api/users/me/profile/', signal)
-    const profile = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
-    const user = profile.user && typeof profile.user === 'object' && !Array.isArray(profile.user) ? profile.user : {}
-    const id = scalar(profile.id) ?? scalar(user.id) ?? scalar(profile.username)
-    if (!id || `user:${id}` !== principal) throw new Error('Core credential does not match the imported session principal')
+    await verifyAccountPrincipal(coreBaseUrl, token, signal, principal)
   } else if (principal.startsWith('credential:')) {
     const secret = token.trim().replace(/^(Token |Bearer )/, '').trim()
     const reference = `core:${createHash('sha256').update(normalized).update('\0').update(secret).digest('hex')}`
@@ -35,4 +31,12 @@ export async function prepareLegacyIdentity(database: EdenDatabase, sessionId: s
       .run(sessionId, row.core_base_url!, row.principal_key!, row.credential_ref!, row.state!)
     if (updated.changes !== 1) throw new Error('Historical Core identity changed during verification')
   }
+}
+
+async function verifyAccountPrincipal(coreBaseUrl: string, token: string, signal: AbortSignal, principal: string) {
+  const raw = await new MonClient(coreBaseUrl, token).get('/api/users/me/profile/', signal)
+  const profile = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+  const user = profile.user && typeof profile.user === 'object' && !Array.isArray(profile.user) ? profile.user : {}
+  const id = scalar(profile.id) ?? scalar(user.id) ?? scalar(profile.username)
+  if (!id || `user:${id}` !== principal) throw new Error('Core credential does not match the imported session principal')
 }

@@ -33,11 +33,11 @@ test('Mon operation query filters durable outcomes without requiring Core creden
     assert.equal(filtered[0]?.error, 'Response lost')
     assert.deepEqual(await list({ sessionId: first.id, state: 'unknown' }), [])
     assert.equal((await list({ limit: 1 }) as unknown[]).length, 1)
-    assert.throws(() => list({ limit: 101 }))
-    assert.throws(() => list({ state: 'retry' }))
-    assert.throws(() => list({ sessionId: '00000000-0000-4000-8000-000000000000' }), /not found/)
+    await assert.rejects(async () => list({ limit: 101 }))
+    await assert.rejects(async () => list({ state: 'retry' }))
+    await assert.rejects(async () => list({ sessionId: '00000000-0000-4000-8000-000000000000' }), /not found/)
     await mon.close()
-    assert.throws(() => list({}), /shutting down/)
+    await assert.rejects(async () => list({}), /shutting down/)
   } finally { await mon.close(); await sessions.close(); database.close() }
 })
 

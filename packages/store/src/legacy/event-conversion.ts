@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { LegacySnapshotReader } from './snapshot-reader.ts'
 import { applyLegacyEventPatch } from './event-patch.ts'
+import type { LegacyRow } from './snapshot-format.ts'
 
 export async function convertLegacyEvents(db: DatabaseSync, source: LegacySnapshotReader) {
   db.exec('BEGIN IMMEDIATE')
@@ -11,10 +12,8 @@ export async function convertLegacyEvents(db: DatabaseSync, source: LegacySnapsh
       if (typeof row.seq !== 'bigint' || row.seq < 1n || row.seq >= 9223372036854775806n || typeof row.created_at !== 'bigint'
         || !Number.isSafeInteger(Number(row.created_at))) throw new Error('Invalid legacy event sequence or timestamp')
       if (row.turn_id != null && typeof row.turn_id !== 'string') throw new Error('Invalid legacy event turn ID')
-      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      for (const key of ['id', 'session_id', 'turn_id']) if (row[key] != null && !uuid.test(String(row[key]))) throw new Error('Invalid legacy event UUID')
-      const base = row.payload_base_seq ?? null
-      if (base !== null && (typeof base !== 'bigint' || base < 1n || base >= row.seq)) throw new Error('Invalid legacy event base sequence')
+      assertEventIdentifiers(row)
+      const base = eventBaseSequence(row, row.seq)
       db.prepare('INSERT INTO legacy_event_staging VALUES(?,?,?,?,?,?,?,?)').run(row.id!, row.session_id!, row.seq, row.turn_id ?? null,
         row.event_type!, row.payload_json!, row.created_at, base)
     })
@@ -39,4 +38,15 @@ export async function convertLegacyEvents(db: DatabaseSync, source: LegacySnapsh
     db.prepare("UPDATE legacy_conversion_tables SET state='converted' WHERE name='session_events'").run()
     db.exec('DROP TABLE legacy_event_staging; COMMIT')
   } catch (error) { db.exec('ROLLBACK'); throw error }
+}
+
+function eventBaseSequence(row: LegacyRow, sequence: bigint) {
+  const base = row.payload_base_seq ?? null
+  if (base !== null && (typeof base !== 'bigint' || base < 1n || base >= sequence)) throw new Error('Invalid legacy event base sequence')
+  return base
+}
+
+function assertEventIdentifiers(row: LegacyRow) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  for (const key of ['id', 'session_id', 'turn_id']) if (row[key] != null && !uuid.test(String(row[key]))) throw new Error('Invalid legacy event UUID')
 }

@@ -24,7 +24,7 @@ import { assertSettledSubagentRequests } from './request-repository.ts'
 import type { EdenDatabase } from '@eden/store'
 import type { JobRepository } from '../jobs/index.ts'
 export class SubagentRepository {
-  constructor(private readonly database: EdenDatabase, private readonly jobs: JobRepository, private readonly workspace: () => string = () => '') {}
+  constructor(private readonly database: EdenDatabase, private readonly jobs: JobRepository, private readonly workspace: () => string = () => '') { }
   policy(sessionId: string) { return subagentPolicy(this.database, sessionId) }
   recoveryStatus(id: string) { return subagentRecoveryStatus(this.database, id) }
   modelRecovery(models: ModelService) { return new SubagentModelRecovery(this.database, models) }
@@ -66,7 +66,7 @@ export class SubagentRepository {
   assertDescendant(sessionId: string, agentId: string): void {
     let current = this.raw(agentId)
     const visited = new Set<string>()
-    for (let depth = 0; depth < 4; depth++) {
+    for (let depth = 0;depth < 4;depth++) {
       const id = String(current.id)
       if (visited.has(id)) throw new Error('Subagent parent relationship contains a cycle')
       visited.add(id)
@@ -118,7 +118,7 @@ export class SubagentRepository {
     if (row.message !== message) throw new Error('Follow-up key belongs to different content')
     return this.read(id)
   }
-  followup(id: string, message: string, key = randomUUID(), onCommit?: () => void) {
+  followup(id: string, message: string, key: string = randomUUID(), onCommit?: () => void) {
     return this.database.transaction(() => {
       const existing = this.existingFollowup(id, key, message)
       if (existing) { onCommit?.(); return existing }
@@ -158,10 +158,12 @@ export class SubagentRepository {
   read(id: string) {
     const row = this.raw(id)
     const legacy = this.database.connection.prepare('SELECT state,coordination_batch_id FROM legacy_subagent_context WHERE agent_id=?').get(id)
-    return { id, sessionId: String(row.root_session_id), childSessionId: String(row.child_session_id), parentId: row.parent_id ?? null, parentActorId: row.parent_actor_id == null ? null : String(row.parent_actor_id),
+    return {
+      id, sessionId: String(row.root_session_id), childSessionId: String(row.child_session_id), parentId: row.parent_id ?? null, parentActorId: row.parent_actor_id == null ? null : String(row.parent_actor_id),
       agentPath: String(row.agent_path), taskName: String(row.task_name), role: String(row.role), status: String(row.state),
       result: row.result_json ? JSON.parse(String(row.result_json)) : null, error: row.error ?? null, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
-      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls), maxTokens: Number(row.max_tokens), maxCostMicrousd: row.max_cost_microusd == null ? null : Number(row.max_cost_microusd) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used), tokens: Number(row.tokens_used), costMicrousd: Number(row.cost_microusd_used), tokensUnknown: Boolean(row.usage_unknown), costUnknown: Boolean(row.cost_unknown) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: legacy?.coordination_batch_id ?? null, recoveryState: legacy ? String(legacy.state) : null, workspaceRoot: row.workspace_root == null ? null : String(row.workspace_root) }
+      startedAt: row.started_at ?? null, completedAt: row.completed_at ?? null, config: { depth: Number(row.depth), maxTurns: Number(row.max_turns), maxModelRequests: Number(row.max_model_requests), maxToolCalls: Number(row.max_tool_calls), maxTokens: Number(row.max_tokens), maxCostMicrousd: row.max_cost_microusd == null ? null : Number(row.max_cost_microusd) }, usage: { turns: Number(row.turns_used), modelRequests: Number(row.model_requests_used), toolCalls: Number(row.tool_calls_used), tokens: Number(row.tokens_used), costMicrousd: Number(row.cost_microusd_used), tokensUnknown: Boolean(row.usage_unknown), costUnknown: Boolean(row.cost_unknown) }, deadlineAt: row.deadline_at ?? null, coordinationBatchId: legacy?.coordination_batch_id ?? null, recoveryState: legacy ? String(legacy.state) : null, workspaceRoot: row.workspace_root == null ? null : String(row.workspace_root)
+    }
   }
   active() {
     return this.database.connection.prepare("SELECT id FROM subagent_threads WHERE state IN ('queued','running') ORDER BY created_at LIMIT 1000").all().map(row => this.read(String(row.id)))

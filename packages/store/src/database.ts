@@ -23,15 +23,7 @@ export class EdenDatabase {
     try {
       this.connection.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL;')
       // Refuse legacy/foreign databases before migrations can change their schema.
-      const tables = this.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()
-      if (tables.length && !tables.some(row => row.name === 'realm_meta')) throw new Error('Legacy or foreign database requires explicit import')
-      if (tables.length) {
-        this.assertOrigin(origin)
-        const importing = this.connection.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()
-        if (mode === 'migration-review' ? importing?.value !== 'incomplete' : importing && importing.value !== 'complete') throw new Error('Database import state does not permit this host mode')
-        if (mode === 'runtime') assertPublicationGroup(this.connection, filename, origin)
-      }
-      if (mode === 'migration-review' && !tables.length) throw new Error('Review requires an initialized incomplete import')
+      this.assertExistingDatabase(origin, mode, filename)
       this.connection.exec('PRAGMA journal_mode=WAL')
       migrateDatabase(this.connection)
       this.transaction(() => {
@@ -43,6 +35,18 @@ export class EdenDatabase {
       this.connection.close()
       throw error
     }
+  }
+
+  private assertExistingDatabase(origin: 'mon' | 'local', mode: 'runtime' | 'migration-review', filename: string) {
+    const tables = this.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()
+    if (tables.length && !tables.some(row => row.name === 'realm_meta')) throw new Error('Legacy or foreign database requires explicit import')
+    if (tables.length) {
+      this.assertOrigin(origin)
+      const importing = this.connection.prepare("SELECT value FROM realm_meta WHERE key='legacy_import_state'").get()
+      if (mode === 'migration-review' ? importing?.value !== 'incomplete' : importing && importing.value !== 'complete') throw new Error('Database import state does not permit this host mode')
+      if (mode === 'runtime') assertPublicationGroup(this.connection, filename, origin)
+    }
+    if (mode === 'migration-review' && !tables.length) throw new Error('Review requires an initialized incomplete import')
   }
 
   private assertOrigin(origin: string): void {

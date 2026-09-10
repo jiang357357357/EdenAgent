@@ -12,8 +12,10 @@ function options(raw: unknown, key: string): Option[] {
     const name = row.name ?? row.value ?? row.label
     if (typeof name !== 'string' || !name.trim()) return []
     const label = row.label ?? row.name
-    return [{ id: typeof row.id === 'string' || typeof row.id === 'number' ? String(row.id) : '',
-      label: typeof label === 'string' ? label : name.trim(), value: name.trim() }]
+    return [{
+      id: typeof row.id === 'string' || typeof row.id === 'number' ? String(row.id) : '',
+      label: typeof label === 'string' ? label : name.trim(), value: name.trim()
+    }]
   })
 }
 export async function discoverGsv(raw: unknown, signal: AbortSignal) {
@@ -27,14 +29,7 @@ export async function discoverGsv(raw: unknown, signal: AbortSignal) {
   let versions: Option[] = [], worlds: Option[] = [], roles: Option[] = [], emotions: Option[] = []
   let version = config.version, world = config.world
   let selected: Option | undefined = config.roleId ? { id: config.roleId, value: config.role, label: config.role } : undefined
-  if (stage === 'all' || stage === 'catalog') {
-    versions = await request('/api/models/versions/from-enum/', 'versions')
-    if (!versions.some(option => option.value === version)) version = versions[0]?.value ?? version
-  }
-  if (['all', 'catalog', 'worlds'].includes(stage) && version) {
-    worlds = await request('/api/world/list/', 'worlds', { version })
-    if (!worlds.some(option => option.value === world)) world = worlds[0]?.value ?? world
-  }
+    ; ({ versions, version, worlds, world } = await discoverCatalog(stage, versions, request, version, worlds, world))
   if ((stage === 'all' || stage === 'roles' || (stage === 'emotions' && !selected)) && version && world) {
     roles = await request('/api/role/list/', 'roles', { version, world_name: world })
     selected = roles.find(option => option.id === config.roleId) ?? roles.find(option => option.value === config.role) ?? roles[0]
@@ -43,4 +38,16 @@ export async function discoverGsv(raw: unknown, signal: AbortSignal) {
     emotions = await request('/api/role/emotions/', 'emotions', { role_id: selected.id })
   }
   return { ok: true, latencyMs: Date.now() - started, versions, worlds, roles, emotions, selectedRoleId: selected?.id ?? '' }
+}
+
+async function discoverCatalog(stage: string, versions: Option[], request: (path: string, key: string, query?: Record<string, string>) => Promise<Option[]>, version: string, worlds: Option[], world: string) {
+  if (stage === 'all' || stage === 'catalog') {
+    versions = await request('/api/models/versions/from-enum/', 'versions')
+    if (!versions.some(option => option.value === version)) version = versions[0]?.value ?? version
+  }
+  if (['all', 'catalog', 'worlds'].includes(stage) && version) {
+    worlds = await request('/api/world/list/', 'worlds', { version })
+    if (!worlds.some(option => option.value === world)) world = worlds[0]?.value ?? world
+  }
+  return { versions, version, worlds, world }
 }

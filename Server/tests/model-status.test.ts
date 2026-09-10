@@ -16,13 +16,13 @@ test('model status matches the legacy read contract without disclosing credentia
   try {
     const session = sessions.repository.create('Model status')
     const routes = modelRoutes(models, sessions)
-    const result = routes['model.read']!({ sessionId: session.id }) as Record<string, unknown>
+    const result = await routes['model.read']!({ sessionId: session.id }) as Record<string, unknown>
     assert.equal(result.id, model.id)
     assert.equal(result.source, 'env')
     assert.equal(result.available, true)
     assert.equal(result.contextWindow, 32000)
     assert.doesNotMatch(JSON.stringify(result), /apiKey|test-private-credential/)
-    assert.throws(() => routes['model.read']!({ sessionId: '00000000-0000-4000-8000-000000000000' }), /not found/)
+    await assert.rejects(async () => routes['model.read']!({ sessionId: '00000000-0000-4000-8000-000000000000' }), /not found/)
     assert.equal(new ModelService('local').read().available, false)
     assert.equal(new ModelService('mon').read().available, false)
     assert.throws(() => new ModelService('mon', model), /Mon integration/)

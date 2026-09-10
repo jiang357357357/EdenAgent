@@ -50,13 +50,7 @@ export class ModelService {
   /** Private snapshot for inheritance/recovery; never return this value through RPC. */
   childSnapshot(parentSessionId: string, options?: ChildModelOptions) {
     if (this.origin === 'local') {
-      const profile = options?.model ? this.localChildren?.profiles.resolve(options.model) : undefined
-      if (profile) return { origin: 'local' as const, model: childModel(profile, options), independent: true }
-      const parent = this.resolve(parentSessionId)
-      if (!parent) throw new Error('No local model configured')
-      if (this.localChildren?.isIndependent(parentSessionId)) return { origin: 'local' as const, model: childModel(parent, options), independent: true }
-      const { apiKey: _apiKey, ...model } = childModel(parent, options)
-      return { origin: 'local' as const, model, independent: false }
+      return this.localChildSnapshot(parentSessionId, options)
     }
     this.refresh(parentSessionId)
     const actor = options?.actorId === undefined ? undefined : this.actors.get(parentSessionId)?.get(String(options.actorId))
@@ -66,9 +60,27 @@ export class ModelService {
     const independent = options?.model ? this.storage?.childProfiles.resolve(parentSessionId, options.model) : undefined
     const binding = independent ?? parentBinding
     if (!binding) throw new Error('Subagent requires a bound single-actor parent model')
-    return { origin: 'mon' as const, binding: { mode: 'single' as const,
-      main: { ...structuredClone(binding), model: childModel(binding.model, options) },
-      vision: structuredClone(actor ? actor.vision?.model ?? null : this.visionBindings.get(parentSessionId) ?? null), visionEntityId: actor ? actor.vision?.entityId ?? null : this.visionEntities.get(parentSessionId) ?? null } }
+    return {
+      origin: 'mon' as const, binding: {
+        mode: 'single' as const,
+        main: { ...structuredClone(binding), model: childModel(binding.model, options) },
+        vision: structuredClone(this.childVision(parentSessionId, actor)), visionEntityId: actor ? actor.vision?.entityId ?? null : this.visionEntities.get(parentSessionId) ?? null
+      }
+    }
+  }
+
+  private localChildSnapshot(parentSessionId: string, options?: ChildModelOptions) {
+    const profile = options?.model ? this.localChildren?.profiles.resolve(options.model) : undefined
+    if (profile) return { origin: 'local' as const, model: childModel(profile, options), independent: true }
+    const parent = this.resolve(parentSessionId)
+    if (!parent) throw new Error('No local model configured')
+    if (this.localChildren?.isIndependent(parentSessionId)) return { origin: 'local' as const, model: childModel(parent, options), independent: true }
+    const { apiKey: _apiKey, ...model } = childModel(parent, options)
+    return { origin: 'local' as const, model, independent: false }
+  }
+
+  private childVision(sessionId: string, actor: ActorModelBinding | undefined) {
+    return actor ? actor.vision?.model ?? null : this.visionBindings.get(sessionId) ?? null
   }
 
   resolve(sessionId: string): RuntimeModel | undefined {
@@ -116,12 +128,16 @@ export class ModelService {
     for (const binding of bindings) {
       const key = String(binding.assistantId)
       if (actors.has(key)) throw new Error('Duplicate actor model binding')
-      actors.set(key, { ...binding, main: { ...binding.main, model: configuredModelSchema.parse(binding.main.model) },
-        vision: binding.vision ? { ...binding.vision, model: configuredModelSchema.parse(binding.vision.model) } : undefined })
+      actors.set(key, {
+        ...binding, main: { ...binding.main, model: configuredModelSchema.parse(binding.main.model) },
+        vision: binding.vision ? { ...binding.vision, model: configuredModelSchema.parse(binding.vision.model) } : undefined
+      })
     }
     const directorModel = director ? configuredModelSchema.parse(director) : undefined
-    this.replace(sessionId, { mode: 'multi', director: directorModel ?? null,
-      actors: [...actors.values()].map(actor => ({ ...actor, vision: actor.vision ?? null })) })
+    this.replace(sessionId, {
+      mode: 'multi', director: directorModel ?? null,
+      actors: [...actors.values()].map(actor => ({ ...actor, vision: actor.vision ?? null }))
+    })
   }
 
   resolveDirector(sessionId: string): RuntimeModel | undefined {
@@ -132,8 +148,10 @@ export class ModelService {
   resolveActor(sessionId: string, assistantId: string | number): ActorModelBinding | undefined {
     this.refresh(sessionId)
     const actor = this.actors.get(sessionId)?.get(String(assistantId))
-    return actor ? { ...actor, main: { ...actor.main, model: this.withRates(actor.main.model)! },
-      ...(actor.vision ? { vision: { ...actor.vision, model: this.withRates(actor.vision.model)! } } : {}) } : undefined
+    return actor ? {
+      ...actor, main: { ...actor.main, model: this.withRates(actor.main.model)! },
+      ...(actor.vision ? { vision: { ...actor.vision, model: this.withRates(actor.vision.model)! } } : {})
+    } : undefined
   }
 
   resolveActorModel(sessionId: string, assistantId: string | number): RuntimeModel | undefined {
@@ -144,8 +162,10 @@ export class ModelService {
     if (this.origin !== 'mon') throw new Error('Local vision models cannot be configured from Mon')
     this.refresh(sessionId)
     if (this.actors.has(sessionId)) throw new Error('Multi-actor vision models require actor bindings')
-    this.replace(sessionId, { mode: 'single', main: this.bindings.get(sessionId) ?? null,
-      vision: model ? configuredModelSchema.parse(model) : null, visionEntityId: model && entityId != null ? actorIdSchema.parse(entityId) : null })
+    this.replace(sessionId, {
+      mode: 'single', main: this.bindings.get(sessionId) ?? null,
+      vision: model ? configuredModelSchema.parse(model) : null, visionEntityId: model && entityId != null ? actorIdSchema.parse(entityId) : null
+    })
   }
 
   resolveVision(sessionId: string): RuntimeModel | undefined { this.refresh(sessionId); return this.withRates(this.visionBindings.get(sessionId)) }
@@ -207,12 +227,15 @@ export class ModelService {
       const value = participant && typeof participant === 'object' && !Array.isArray(participant) ? participant : {}
       const id = actorIdSchema.safeParse(value.assistantId)
       const actor = id.success ? this.resolveActor(sessionId, id.data) : undefined
-      return { assistantID: id.success ? id.data : null,
-        ...modelStatus(this.origin, id.success ? this.resolveActorModel(sessionId, id.data) : undefined, actor?.main) }
+      return {
+        assistantID: id.success ? id.data : null,
+        ...modelStatus(this.origin, id.success ? this.resolveActorModel(sessionId, id.data) : undefined, actor?.main)
+      }
     })
     const director = modelStatus(this.origin, this.resolveDirector(sessionId))
     const available = director.available && actors.length <= 32 && actors.every(actor => actor.available) && new Set(actors.map(actor => String(actor.assistantID))).size === actors.length
-    return { ...modelStatus(this.origin), mode: 'multi_actor', actors, director, available,
+    return {
+      ...modelStatus(this.origin), mode: 'multi_actor', actors, director, available,
       label: `${actors.filter(actor => actor.available).length}/${actors.length} actor models configured`,
       error: available ? null : 'Bind a director and a model for every distinct session participant before starting a conversation',
     }

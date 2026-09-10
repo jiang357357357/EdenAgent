@@ -3,7 +3,8 @@ import { jsonValue, toJson } from '@eden/api'
 import type { JsonValue } from '@eden/api'
 import { validateToolSchema } from '@eden/plugin-sdk'
 const command = z.array(z.string().min(1).max(4096)).min(1).max(64)
-const schema = z.object({ schemaVersion: z.literal(1), name: z.string().regex(/^[a-z_][a-z0-9_]{1,63}$/),
+const schema = z.object({
+  schemaVersion: z.literal(1), name: z.string().regex(/^[a-z_][a-z0-9_]{1,63}$/),
   label: z.string().max(256).optional(), description: z.string().trim().min(1).max(4000),
   parameters: jsonValue.default({ type: 'object', properties: {}, additionalProperties: false }),
   outputSchema: jsonValue.optional(), command, testCommand: command.optional(), timeoutSeconds: z.number().int().min(1).max(120).default(30),
@@ -23,15 +24,21 @@ export function codeManifests(files: Record<string, string>): SkillCodeTool[] {
     validateToolSchema(input.parameters)
     if (input.parameters.type !== 'object') throw new Error('Skill tool input must be an object schema')
     if (input.outputSchema !== undefined) validateToolSchema(input.outputSchema)
-    for (const tokens of [input.command, input.testCommand ?? []]) for (const token of tokens) {
-      if (token.startsWith('-') || !/[\\/]/.test(token)) continue
-      if (token.startsWith('/') || token.includes('\\') || token.split('/').includes('..') || !Object.hasOwn(files, token.replace(/^\.\//, ''))) {
-        throw new Error(`Skill command path is outside its snapshot or absent: ${token}`)
-      }
-    }
-    result.push({ name: input.name, label: input.label ?? input.name, description: input.description, parameters: input.parameters,
+    assertSnapshotCommands(input, files)
+    result.push({
+      name: input.name, label: input.label ?? input.name, description: input.description, parameters: input.parameters,
       ...(input.outputSchema === undefined ? {} : { outputSchema: toJson(input.outputSchema) as Record<string, JsonValue> }),
-      command: input.command, testCommand: input.testCommand ?? [], timeoutSeconds: input.timeoutSeconds })
+      command: input.command, testCommand: input.testCommand ?? [], timeoutSeconds: input.timeoutSeconds
+    })
   }
   return result
+}
+
+function assertSnapshotCommands(input: { schemaVersion: 1; name: string; description: string; parameters: JsonValue; command: string[]; timeoutSeconds: number; label?: string | undefined; outputSchema?: JsonValue | undefined; testCommand?: string[] | undefined }, files: Record<string, string>) {
+  for (const tokens of [input.command, input.testCommand ?? []]) for (const token of tokens) {
+    if (token.startsWith('-') || !/[\\/]/.test(token)) continue
+    if (token.startsWith('/') || token.includes('\\') || token.split('/').includes('..') || !Object.hasOwn(files, token.replace(/^\.\//, ''))) {
+      throw new Error(`Skill command path is outside its snapshot or absent: ${token}`)
+    }
+  }
 }

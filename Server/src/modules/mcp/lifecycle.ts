@@ -1,3 +1,4 @@
+import type { ExternalCommandSandbox } from '@eden/execution'
 import type { InstalledPackageRepository } from '../plugin-market/index.ts'
 import { connectMcpStdio } from './stdio-runtime.ts'
 import { connectMcpHttp } from './http-runtime.ts'
@@ -12,10 +13,16 @@ export class McpLifecycle {
   private readonly retry = new Map<string, number>()
   private timer: ReturnType<typeof setInterval> | undefined
   private task: Promise<void> | undefined
-  constructor(private readonly packages: InstalledPackageRepository) {}
-  list() { return { runtimes: [...this.active].map(([id, runtime]) => ({ id, pluginId: runtime.component.pluginId, componentId: runtime.component.componentId,
-    revision: runtime.component.revision, kind: runtime.component.kind,
-    server: runtime.server.serverInfo })), errors: [...this.errors].map(([id, error]) => ({ id, error })) } }
+  constructor(private readonly packages: InstalledPackageRepository, private readonly external?: ExternalCommandSandbox) { }
+  list() {
+    return {
+      runtimes: [...this.active].map(([id, runtime]) => ({
+        id, pluginId: runtime.component.pluginId, componentId: runtime.component.componentId,
+        revision: runtime.component.revision, kind: runtime.component.kind,
+        server: runtime.server.serverInfo
+      })), errors: [...this.errors].map(([id, error]) => ({ id, error }))
+    }
+  }
   get(id: string, revision?: string) {
     const runtime = this.active.get(id)
     if (!runtime || (revision && runtime.component.revision !== revision)) throw new Error('MCP runtime is not available for this version')
@@ -50,23 +57,9 @@ export class McpLifecycle {
       let plan: ReturnType<InstalledPackageRepository['runtimePlan']>
       try { plan = this.packages.runtimePlan(selection.id, selection.revision); this.errors.delete(selection.id) }
       catch { this.errors.set(selection.id, 'MCP package integrity, descriptor or permission is unavailable'); continue }
-      for (const component of plan.runtimes) {
-        const id = `${component.pluginId}:${component.componentId}`
-        if (this.active.has(id) || this.active.size >= 8 || (this.retry.get(id) ?? 0) > Date.now()) continue
-        try {
-          const authorize = () => this.authorize(component)
-          const runtime = component.kind === 'mcp_stdio'
-            ? await connectMcpStdio(component, plan.files, authorize, this.abort.signal)
-            : await connectMcpHttp(component, authorize, this.abort.signal)
-          try { await this.refreshCatalog(id, runtime); authorize() } catch (error) { this.catalog.remove(id); await runtime.close(); throw error }
-          this.active.set(id, runtime); this.errors.delete(id)
-          void runtime.exited.finally(() => {
-            if (this.active.get(id) === runtime) { this.active.delete(id); this.catalog.remove(id) }
-            this.retry.set(id, Date.now() + 15000)
-          }).catch(() => { process.stderr.write('MCP runtime exit cleanup failed\n') })
-        } catch { this.retry.set(id, Date.now() + 15000); this.errors.set(id, 'MCP initialization failed; check component configuration and permissions') }
-      }
+      await this.connectComponents(plan)
     }
+
   }
   private async refreshCatalog(id: string, runtime: Runtime) {
     const definitions = await runtime.client.tools(this.abort.signal)
@@ -79,5 +72,26 @@ export class McpLifecycle {
     await Promise.allSettled([...this.active.values()].map(runtime => runtime.close()))
     for (const id of this.active.keys()) this.catalog.remove(id)
     this.active.clear()
+  }
+
+  private async connectComponents(plan: ReturnType<InstalledPackageRepository['runtimePlan']>) {
+
+    for (const component of plan.runtimes) {
+      const id = `${component.pluginId}:${component.componentId}`
+      if (this.active.has(id) || this.active.size >= 8 || (this.retry.get(id) ?? 0) > Date.now()) continue
+      try {
+        const authorize = () => this.authorize(component)
+        const runtime = component.kind === 'mcp_stdio'
+          ? await connectMcpStdio(component, plan.files, authorize, this.abort.signal, this.external)
+          : await connectMcpHttp(component, authorize, this.abort.signal)
+        try { await this.refreshCatalog(id, runtime); authorize() } catch (error) { this.catalog.remove(id); await runtime.close(); throw error }
+        this.active.set(id, runtime); this.errors.delete(id)
+        void runtime.exited.finally(() => {
+          if (this.active.get(id) === runtime) { this.active.delete(id); this.catalog.remove(id) }
+          this.retry.set(id, Date.now() + 15000)
+        }).catch(() => { process.stderr.write('MCP runtime exit cleanup failed\n') })
+      } catch { this.retry.set(id, Date.now() + 15000); this.errors.set(id, 'MCP initialization failed; check component configuration and permissions') }
+    }
+
   }
 }

@@ -24,6 +24,34 @@ export async function launchObserver(id: string, dataRoot: string, repository: C
   const writeMounts: { source: string; target: string }[] = []
   const workerSettings = { ...current.settings, logPath: '/inputs/log', controlEnabled: false }
   const workerGrants = [{ capability: 'filesystem.read', resource: '/inputs/log', access: 'read' }]
+  await configureObserverControl(current, granted, dataRoot, writeMounts, workerSettings, workerGrants)
+  const directory = path.join(dataRoot, 'connectors', id)
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  signal.throwIfAborted()
+  if (repository.read(id).generation !== current.generation) throw new Error('Connector settings changed before launch')
+  const authorize = () => {
+    signal.throwIfAborted()
+    const latest = repository.read(id), grants = permissions.read(id)
+    if (latest.generation !== current.generation || latest.desiredState !== 'connected' || !grants.ready || grants.revision !== artifact.revision) throw new Error('Observer authorization changed')
+    const allowed = permissions.require(id, current.generation)
+    if (granted.some(original => !allowed.some(item => item.capability === original.capability && item.resource === original.resource && item.access === original.access))) throw new Error('Observer mount permission was revoked')
+  }
+  authorize()
+  const process = await launchConnectorProcess({
+    executable: artifact.executable, sha256: artifact.sha256, args: artifact.args,
+    dataDirectory: directory, readMounts: [{ source, target: '/inputs/log' }], writeMounts, signal
+  })
+  const runtime = new ConnectorWorkerRuntime(id, current.generation, process.input, process.output, repository, events, () => process.stop(), authorize)
+  try {
+    await runtime.initialize({
+      protocolVersion: 1, connectorInstanceId: id, connectorKey: current.connectorKey, packageVersion: descriptor.manifest.version,
+      settings: workerSettings, grantedPermissions: workerGrants, dataDirectory: '/data'
+    }, current.settings)
+  } catch (error) { await runtime.close(); throw error }
+  return { runtime, generation: current.generation, revision: snapshot.revision, exited: process.exited }
+}
+
+async function configureObserverControl(current: ReturnType<ConnectorRepository['read']>, granted: ReturnType<ConnectorPermissions['require']>, dataRoot: string, writeMounts: { source: string; target: string }[], workerSettings: Record<string, unknown>, workerGrants: { capability: string; resource: string; access: string }[]) {
   if (current.connectorKey === 'victoria3' && current.settings.controlEnabled === true) {
     const write = granted.find(item => item.capability === 'filesystem.write' && item.access === 'write' && item.resource === current.settings.commandDirectory)
     if (!write) throw new Error('Victoria 3 control requires an approved command directory')
@@ -38,24 +66,4 @@ export async function launchObserver(id: string, dataRoot: string, repository: C
     workerSettings.commandDirectory = '/outputs/commands'
     workerGrants.push({ capability: 'filesystem.write', resource: '/outputs/commands', access: 'write' })
   }
-  const directory = path.join(dataRoot, 'connectors', id)
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  signal.throwIfAborted()
-  if (repository.read(id).generation !== current.generation) throw new Error('Connector settings changed before launch')
-  const authorize = () => {
-    signal.throwIfAborted()
-    const latest = repository.read(id), grants = permissions.read(id)
-    if (latest.generation !== current.generation || latest.desiredState !== 'connected' || !grants.ready || grants.revision !== artifact.revision) throw new Error('Observer authorization changed')
-    const allowed = permissions.require(id, current.generation)
-    if (granted.some(original => !allowed.some(item => item.capability === original.capability && item.resource === original.resource && item.access === original.access))) throw new Error('Observer mount permission was revoked')
-  }
-  authorize()
-  const process = await launchConnectorProcess({ executable: artifact.executable, sha256: artifact.sha256, args: artifact.args,
-    dataDirectory: directory, readMounts: [{ source, target: '/inputs/log' }], writeMounts, signal })
-  const runtime = new ConnectorWorkerRuntime(id, current.generation, process.input, process.output, repository, events, () => process.stop(), authorize)
-  try {
-    await runtime.initialize({ protocolVersion: 1, connectorInstanceId: id, connectorKey: current.connectorKey, packageVersion: descriptor.manifest.version,
-      settings: workerSettings, grantedPermissions: workerGrants, dataDirectory: '/data' }, current.settings)
-  } catch (error) { await runtime.close(); throw error }
-  return { runtime, generation: current.generation, revision: snapshot.revision, exited: process.exited }
 }

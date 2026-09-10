@@ -10,27 +10,13 @@ function convertSetting(db: DatabaseSync, key: string, value: unknown, time: num
     return { state: 'applied', target: 'realm_meta.origin', error: null }
   }
   if (key === 'voice.gsv.tts' || key === 'voice.gsv.stt') {
-    const kind = key === 'voice.gsv.tts' ? 'tts' : 'stt'
-    const parsed = (kind === 'tts' ? gsvTtsConfigSchema : gsvSttConfigSchema).safeParse(value)
-    if (!parsed.success) return { state: 'review_required', target: `voice_configuration.${kind}`, error: 'Historical voice settings do not satisfy the current configuration contract' }
-    db.prepare('INSERT INTO voice_configuration VALUES(?,?,?)').run(kind, JSON.stringify(parsed.data), time)
-    return { state: 'applied', target: `voice_configuration.${kind}`, error: null }
+    return convertVoiceSetting(db, key, value, time)
   }
   if (key === 'permission.mode' || key === 'legacy.permission.mode') {
-    const parsed = permissionModeSchema.safeParse(value)
-    if (!parsed.success) return { state: 'review_required', target: 'permission.mode', error: 'Unsupported historical permission mode' }
-    if (key === 'permission.mode' && parsed.data === 'restricted') {
-      db.prepare('INSERT INTO runtime_settings VALUES(?,?,?)').run(key, JSON.stringify(parsed.data), time)
-      return { state: 'applied', target: key, error: null }
-    }
-    return { state: 'confirmation_required', target: 'permission.mode', error: null }
+    return convertPermissionSetting(db, key, value, time)
   }
   if (key === 'command.execution') {
-    const parsed = commandExecutionConfigSchema.safeParse(value)
-    if (!parsed.success) return { state: 'review_required', target: key, error: 'Unsupported historical command execution settings' }
-    if (parsed.data.mode !== 'sandbox' || parsed.data.networkAccess || parsed.data.writableRoots.length) return { state: 'confirmation_required', target: key, error: null }
-    db.prepare('INSERT INTO runtime_settings VALUES(?,?,?)').run(key, JSON.stringify(parsed.data), time)
-    return { state: 'applied', target: key, error: null }
+    return convertCommandSetting(db, key, value, time)
   }
   if (key.startsWith('self_awake.session.')) {
     if (origin !== 'mon' || typeof value !== 'string' || !db.prepare('SELECT 1 FROM sessions WHERE id=?').get(value)) throw new Error('Historical self-awake session setting has invalid ownership or target')
@@ -59,4 +45,30 @@ export async function convertLegacyAppConfig(db: DatabaseSync, source: LegacySna
     db.prepare("UPDATE legacy_conversion_tables SET state='converted' WHERE name='app_config'").run()
     db.exec('COMMIT')
   } catch (error) { db.exec('ROLLBACK'); throw error }
+}
+
+function convertVoiceSetting(db: DatabaseSync, key: string, value: unknown, time: number): Outcome {
+  const kind = key === 'voice.gsv.tts' ? 'tts' : 'stt'
+  const parsed = (kind === 'tts' ? gsvTtsConfigSchema : gsvSttConfigSchema).safeParse(value)
+  if (!parsed.success) return { state: 'review_required', target: `voice_configuration.${kind}`, error: 'Historical voice settings do not satisfy the current configuration contract' }
+  db.prepare('INSERT INTO voice_configuration VALUES(?,?,?)').run(kind, JSON.stringify(parsed.data), time)
+  return { state: 'applied', target: `voice_configuration.${kind}`, error: null }
+}
+
+function convertCommandSetting(db: DatabaseSync, key: string, value: unknown, time: number): Outcome {
+  const parsed = commandExecutionConfigSchema.safeParse(value)
+  if (!parsed.success) return { state: 'review_required', target: key, error: 'Unsupported historical command execution settings' }
+  if (parsed.data.mode !== 'sandbox' || parsed.data.networkAccess || parsed.data.writableRoots.length) return { state: 'confirmation_required', target: key, error: null }
+  db.prepare('INSERT INTO runtime_settings VALUES(?,?,?)').run(key, JSON.stringify(parsed.data), time)
+  return { state: 'applied', target: key, error: null }
+}
+
+function convertPermissionSetting(db: DatabaseSync, key: string, value: unknown, time: number): Outcome {
+  const parsed = permissionModeSchema.safeParse(value)
+  if (!parsed.success) return { state: 'review_required', target: 'permission.mode', error: 'Unsupported historical permission mode' }
+  if (key === 'permission.mode' && parsed.data === 'restricted') {
+    db.prepare('INSERT INTO runtime_settings VALUES(?,?,?)').run(key, JSON.stringify(parsed.data), time)
+    return { state: 'applied', target: key, error: null }
+  }
+  return { state: 'confirmation_required', target: 'permission.mode', error: null }
 }

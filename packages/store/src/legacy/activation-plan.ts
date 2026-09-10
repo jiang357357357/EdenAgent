@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { lstat, realpath, open, unlink } from 'node:fs/promises'
 import path from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync, type SQLOutputValue } from 'node:sqlite'
 import { LegacySnapshotReader } from './snapshot-reader.ts'
 import { legacyRecoverySummary } from './recovery-summary.ts'
 import { databaseSchemaVersion } from '../migrations.ts'
@@ -51,12 +51,7 @@ export async function buildActivationPlan(snapshot: string, target: string, orig
     const blockers: string[] = []
     if (existingRuntime !== null) blockers.push('A runtime database already exists; never overwrite it during activation')
     if (tables.length !== source.manifest.tables.length) blockers.push('Snapshot and staged table sets differ')
-    for (const table of source.manifest.tables) {
-      await source.scan(table.name, () => {})
-      const staged = tables.find(row => row.name === table.name)
-      if (!staged || staged.sha256 !== table.sha256 || Number(staged.rows) !== table.rows) blockers.push(`Snapshot evidence differs: ${table.name}`)
-      if (staged?.state !== 'converted') blockers.push(`Table conversion pending: ${table.name}`)
-    }
+    await checkStagedTables(source, tables, blockers)
     const recovery = legacyRecoverySummary(db)
     for (const domain of recovery.items) if (domain.count) blockers.push(`Recovery pending: ${domain.key} (${domain.count})`)
     if (recovery.workspaceSelection !== 'not_imported' && recovery.workspaceSelection !== 'reselected') blockers.push(`Workspace selection requires review: ${recovery.workspaceSelection}`)
@@ -70,24 +65,41 @@ export async function buildActivationPlan(snapshot: string, target: string, orig
     if (integrity.length !== 1 || integrity[0] !== 'ok') blockers.push('SQLite integrity requires repair')
     const schemaVersion = Number(db.prepare('PRAGMA user_version').get()?.user_version)
     if (schemaVersion !== databaseSchemaVersion) blockers.push('Staging schema differs from this host; resume schema preparation before activation')
-    for (const blob of db.prepare('SELECT id,sha256,byte_length FROM blobs ORDER BY id').iterate()) {
-      const hash = String(blob.sha256)
-      if (!/^[a-f0-9]{64}$/.test(hash)) { blockers.push(`Invalid Blob digest: ${String(blob.id)}`); continue }
-      try {
-        const root = path.join(target, 'blobs'), prefix = path.join(root, hash.slice(0, 2))
-        if ((await lstat(root)).isSymbolicLink() || (await lstat(prefix)).isSymbolicLink()) throw new Error('Unsafe Blob directory')
-        const filename = path.join(prefix, hash), info = await lstat(filename)
-        if (info.size !== Number(blob.byte_length) || await digestFile(filename) !== hash) throw new Error('Blob content differs from metadata')
-      } catch (error) { blockers.push(`Blob unavailable or invalid: ${String(blob.id)} (${error instanceof Error ? error.message : String(error)})`) }
-    }
+    await checkActivationBlobs(db, blockers, target)
     db.exec('COMMIT')
-    const evidence = { origin, target, schemaVersion, tables, databaseSha256: await digestFile(filename),
-      walSha256: await digestFile(`${filename}-wal`, true), recovery, blockers }
-    return { format: 'eden.activation-plan.v1', fingerprint: createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),
+    const evidence = {
+      origin, target, schemaVersion, tables, databaseSha256: await digestFile(filename),
+      walSha256: await digestFile(`${filename}-wal`, true), recovery, blockers
+    }
+    return {
+      format: 'eden.activation-plan.v1', fingerprint: createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),
       ...evidence, sourceDatabase: filename, runtimeDatabase: path.join(target, 'eden-agent.db'),
       state: 'review_required',
-      note: 'Offline data preflight only. Even zero blockers do not prove business compatibility or authorize activation. Preserve the staging root and its assets; explicit activation and rollback are separate operations.' }
+      note: 'Offline data preflight only. Even zero blockers do not prove business compatibility or authorize activation. Preserve the staging root and its assets; explicit activation and rollback are separate operations.'
+    }
   } finally { db.close() }
+}
+
+async function checkActivationBlobs(db: DatabaseSync, blockers: string[], target: string) {
+  for (const blob of db.prepare('SELECT id,sha256,byte_length FROM blobs ORDER BY id').iterate()) {
+    const hash = String(blob.sha256)
+    if (!/^[a-f0-9]{64}$/.test(hash)) { blockers.push(`Invalid Blob digest: ${String(blob.id)}`); continue }
+    try {
+      const root = path.join(target, 'blobs'), prefix = path.join(root, hash.slice(0, 2))
+      if ((await lstat(root)).isSymbolicLink() || (await lstat(prefix)).isSymbolicLink()) throw new Error('Unsafe Blob directory')
+      const filename = path.join(prefix, hash), info = await lstat(filename)
+      if (info.size !== Number(blob.byte_length) || await digestFile(filename) !== hash) throw new Error('Blob content differs from metadata')
+    } catch (error) { blockers.push(`Blob unavailable or invalid: ${String(blob.id)} (${error instanceof Error ? error.message : String(error)})`) }
+  }
+}
+
+async function checkStagedTables(source: LegacySnapshotReader, tables: Record<string, SQLOutputValue>[], blockers: string[]) {
+  for (const table of source.manifest.tables) {
+    await source.scan(table.name, () => { })
+    const staged = tables.find(row => row.name === table.name)
+    if (!staged || staged.sha256 !== table.sha256 || Number(staged.rows) !== table.rows) blockers.push(`Snapshot evidence differs: ${table.name}`)
+    if (staged?.state !== 'converted') blockers.push(`Table conversion pending: ${table.name}`)
+  }
 }
 
 export function readActivationPlan(snapshot: string, destination: string, origin: 'mon' | 'local') {

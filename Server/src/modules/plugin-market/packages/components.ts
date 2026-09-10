@@ -1,9 +1,13 @@
 import { z } from 'zod'
 import { createSkillSnapshot } from '../../skills/index.ts'
-import type { InstalledPackageRepository } from './installed-repository.ts'
-type Package = ReturnType<InstalledPackageRepository['verified']>
-const cardSchema = z.object({ schemaVersion: z.literal(1), cards: z.array(z.object({ id: z.string().min(1).max(128),
-  location: z.enum(['plugin_detail', 'settings']), title: z.string().max(256), body: z.string().max(16000), tone: z.enum(['info', 'success', 'warning']).default('info') }).strict()).max(64).default([]) }).strict()
+import type { VerifiedPackage } from './verified-package.ts'
+type Package = VerifiedPackage
+const cardSchema = z.object({
+  schemaVersion: z.literal(1), cards: z.array(z.object({
+    id: z.string().min(1).max(128),
+    location: z.enum(['plugin_detail', 'settings']), title: z.string().max(256), body: z.string().max(16000), tone: z.enum(['info', 'success', 'warning']).default('info')
+  }).strict()).max(64).default([])
+}).strict()
 export function packageUiCards(value: Package, enabled: (id: string, fallback: boolean) => boolean) {
   return value.manifest.components.ui.filter(component => enabled(component.id, component.enabledByDefault)).flatMap(component => {
     const bytes = value.files.get(component.entry)

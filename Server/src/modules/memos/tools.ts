@@ -26,7 +26,7 @@ export function memoTools(repository: MemoRepository, permissions: PermissionSer
       if (name === 'get_next_memo_wake') {
         const value = schemas.get_next_memo_wake.parse(input)
         const memo = repository.next(value.after)
-        return toJson({ nextWakeAt: memo?.snoozedUntil ?? memo?.remindAt ?? memo?.dueAt ?? null, memo })
+        return toJson({ nextWakeAt: memoWakeAt(memo), memo })
       }
       const previous = 'id' in input ? repository.read(input.id) : undefined
       const dispatch = name === 'dispatch_due_memos' ? schemas.dispatch_due_memos.parse(input) : undefined
@@ -37,10 +37,7 @@ export function memoTools(repository: MemoRepository, permissions: PermissionSer
         context.signal.throwIfAborted()
       }
       if (dispatch) {
-        if (dispatch.markDispatched) repository.markTriggered(due)
-        const next = repository.next(dispatch.before)
-        return toJson({ memos: due, dispatchedCount: dispatch.markDispatched ? due.length : 0,
-          markDispatched: dispatch.markDispatched, nextWakeAt: next?.snoozedUntil ?? next?.remindAt ?? next?.dueAt ?? null, nextMemo: next })
+        return dispatchDueMemos(repository, dispatch, due)
       }
       return toJson(mutate(repository, name, input, previous, sessionId, `${sessionId}:${turnId}:${context.callId}`))
     },
@@ -61,3 +58,14 @@ function mutate(repository: MemoRepository, name: MemoToolName, input: unknown, 
   if (name === 'update_memo') return repository.update(previous.id, schemas.update_memo.parse(input).patch, previous.updatedAt)
   return repository.update(previous.id, { status: name === 'complete_memo' ? 'done' : 'archived' }, previous.updatedAt)
 }
+
+function dispatchDueMemos(repository: MemoRepository, dispatch: z.output<typeof schemas.dispatch_due_memos>, due: MemoInfo[]) {
+  if (dispatch.markDispatched) repository.markTriggered(due)
+  const next = repository.next(dispatch.before)
+  return toJson({
+    memos: due, dispatchedCount: dispatch.markDispatched ? due.length : 0,
+    markDispatched: dispatch.markDispatched, nextWakeAt: next?.snoozedUntil ?? next?.remindAt ?? next?.dueAt ?? null, nextMemo: next
+  })
+}
+
+function memoWakeAt(memo: MemoInfo | null | undefined) { return memo?.snoozedUntil ?? memo?.remindAt ?? memo?.dueAt ?? null }

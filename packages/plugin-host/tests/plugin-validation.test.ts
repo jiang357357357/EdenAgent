@@ -12,16 +12,17 @@ test('source validation rejects type errors, private dependencies, compiler refe
   const database = new EdenDatabase(':memory:', 'local')
   const plugins = new PluginService(database)
   try {
+    let revision: string | undefined
     for (const [source, error] of [
       ['export default function() { const wrong: number = "text"; return wrong }', /not assignable/],
       ['import secret from "/private/secret"; export default () => secret', /only explicit node/],
       ['/// <reference path="/private/secret" />\nexport default () => 1', /reference directives/],
       ['export default 1', /must be callable/],
     ] as const) {
-      plugins.drafts.save(manifest, source)
+      revision = plugins.drafts.save(manifest, source, revision).draftRevision
       await assert.rejects(plugins.validate('validation'), error)
     }
-    plugins.drafts.save(manifest, 'export default () => 1')
+    plugins.drafts.save(manifest, 'export default () => 1', revision)
     const abort = new AbortController()
     abort.abort()
     await assert.rejects(plugins.validate('validation', abort.signal), /abort/i)

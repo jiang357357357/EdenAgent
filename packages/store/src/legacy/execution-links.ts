@@ -17,17 +17,21 @@ export function linkLegacyExecutions(db: DatabaseSync): void {
       }
       db.prepare('UPDATE self_awake_runs SET input_id=?,turn_id=? WHERE id=?').run(row.job_input!, row.input_turn!, row.id!)
     }
-    const reminders = db.prepare("SELECT source_id,row_json FROM legacy_conversion_records WHERE domain='desktop_reminders'").iterate()
-    for (const item of reminders) {
-      const original = legacyRow(JSON.parse(String(item.row_json)))
-      if (original.run_id === null) continue
-      if (typeof original.run_id !== 'string') throw new Error('Invalid legacy desktop run ID')
-      const run = db.prepare('SELECT session_id,turn_id FROM self_awake_runs WHERE id=?').get(original.run_id)
-      const reminder = db.prepare('SELECT session_id,turn_id FROM desktop_reminders WHERE id=?').get(item.source_id!)
-      if (!run || !reminder || run.session_id !== reminder.session_id ||
-        (reminder.turn_id !== null && reminder.turn_id !== run.turn_id)) throw new Error('Legacy desktop execution linkage mismatch')
-      if (run.turn_id !== null) db.prepare('UPDATE desktop_reminders SET turn_id=? WHERE id=?').run(run.turn_id!, item.source_id!)
-    }
+    linkReminderRuns(db)
     db.exec('COMMIT')
   } catch (error) { db.exec('ROLLBACK'); throw error }
+}
+
+function linkReminderRuns(db: DatabaseSync) {
+  const reminders = db.prepare("SELECT source_id,row_json FROM legacy_conversion_records WHERE domain='desktop_reminders'").iterate()
+  for (const item of reminders) {
+    const original = legacyRow(JSON.parse(String(item.row_json)))
+    if (original.run_id === null) continue
+    if (typeof original.run_id !== 'string') throw new Error('Invalid legacy desktop run ID')
+    const run = db.prepare('SELECT session_id,turn_id FROM self_awake_runs WHERE id=?').get(original.run_id)
+    const reminder = db.prepare('SELECT session_id,turn_id FROM desktop_reminders WHERE id=?').get(item.source_id!)
+    if (!run || !reminder || run.session_id !== reminder.session_id ||
+      (reminder.turn_id !== null && reminder.turn_id !== run.turn_id)) throw new Error('Legacy desktop execution linkage mismatch')
+    if (run.turn_id !== null) db.prepare('UPDATE desktop_reminders SET turn_id=? WHERE id=?').run(run.turn_id!, item.source_id!)
+  }
 }

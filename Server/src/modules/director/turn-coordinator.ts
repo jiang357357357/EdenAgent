@@ -72,7 +72,7 @@ export class CompanionTurnCoordinator {
         if (!participant || !model) throw new Error('Director selected an unbound actor')
         this.runs.startBeat(plan.planID, beatIndex)
         await this.actors.execute({ input, plan, beatIndex, participant, model,
-          tools: request.tools(beat.assistantID), conversation, signal, images })
+          tools: request.tools(beat.assistantID), refreshTools: () => request.tools(beat.assistantID), conversation, signal, images })
         signal.throwIfAborted()
         progress = this.runs.completeBeat(plan.planID, beatIndex)
         const latest = conversationWindow(this.sessions.events.messages(input.sessionId, undefined, 100).items.map(event => event.payload))

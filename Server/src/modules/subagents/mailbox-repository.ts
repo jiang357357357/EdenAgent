@@ -31,7 +31,7 @@ export class SubagentMailbox {
         details: messageDetails(row.details_json) }))
     })
   }
-  send(agentId: string, senderSessionId: string, message: string, key = randomUUID()) {
+  send(agentId: string, senderSessionId: string, message: string, key: string = randomUUID()) {
     if (!message.trim() || message.length > 16000) throw new Error('Subagent message must contain 1–16000 characters')
     return this.database.transaction(() => {
       const old = this.database.connection.prepare('SELECT id,message,sender_session_id FROM subagent_messages WHERE agent_id=? AND operation_key=?').get(agentId, key)

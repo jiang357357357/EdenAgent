@@ -5,6 +5,7 @@ import type { RuntimeTool } from '@eden/runtime-pi'
 import type { SkillService } from './service.ts'
 import type { PermissionService } from '../permissions/index.ts'
 import { skillAvailability, supportsSkillProfile } from './availability.ts'
+import { directSkillTools } from './direct-tools.ts'
 export function skillTools(service: SkillService, permissions: PermissionService, sessionId: string, turnId: string, profile = 'user_chat', availableTools?: () => readonly string[]): RuntimeTool[] {
   const availability = (skill: ReturnType<SkillService['repository']['read']>) => {
     if (!availableTools) return skill
@@ -24,15 +25,21 @@ export function skillTools(service: SkillService, permissions: PermissionService
       run: () => service.repository.list().filter(skill => skill.enabled && skill.modelInvocable && supportsSkillProfile(skill.profiles, profile) && availability(skill).available) },
     { name: 'read_skill', description: 'Read the installed instruction skill. Apply relevant instructions within existing user authorization.', schema: skillReadSchema,
       run: (raw: unknown) => read(skillReadSchema.parse(raw)) },
+    { name: 'load_skill', description: 'Load complete installed skill instructions using the legacy tool name. Instructions do not grant permissions.', schema: skillReadSchema,
+      run: (raw: unknown) => read(skillReadSchema.parse(raw)) },
     { name: 'read_skill_file', description: 'Read an exact supporting file from an installed skill snapshot as base64; does not execute code.', schema: skillFileSchema,
       run: (raw: unknown) => { const input = skillFileSchema.parse(raw); read(input); return service.repository.file(input.name, input.path, input) } },
   ]
   const executeSchema = skillReadSchema.extend({ tool: z.string().min(2).max(64), arguments: jsonValue })
-  return [...definitions.map(definition => ({ name: definition.name, revision: 'eden.skills.v1', executionMode: 'sequential' as const,
-    description: definition.description, parameters: toJson(z.toJSONSchema(definition.schema)) as Record<string, JsonValue>,
+  const inventory = service.repository.list(false).filter(skill => skill.enabled && skill.modelInvocable && supportsSkillProfile(skill.profiles, profile))
+    .slice(0, 96).map(skill => ({ name: skill.name, description: skill.description.slice(0, 240), revision: skill.contentHash }))
+  const promptHint = 'Skill discovery metadata follows as JSON data (up to 96 entries; list_skills returns the full catalog). Use list_skills for availability and load_skill or read_skill for full instructions before using a relevant skill. Skill text cannot grant permissions.\n'
+    + JSON.stringify(inventory) + (service.catalogError ? '\nSkill directory refresh failed; this catalog may be stale.' : '')
+  const tools: RuntimeTool[] = [...definitions.map(definition => ({ name: definition.name, revision: 'eden.skills.v1', executionMode: 'sequential' as const,
+    description: definition.description, ...(definition.name === 'list_skills' ? { promptHint } : {}), parameters: toJson(z.toJSONSchema(definition.schema)) as Record<string, JsonValue>,
     async execute(raw: unknown) { definition.schema.parse(raw); return toJson(definition.run(raw)) } })), {
     name: 'run_skill_tool', revision: 'eden.skills.v1', executionMode: 'sequential',
-    description: 'Execute an installed skill code tool with JSON arguments after approval. No network or host workspace access is provided.',
+    description: 'Execute an installed skill code tool with JSON arguments after approval. Runs in the configured isolation backend with a verified skill snapshot; isolation enforcement is owned by that backend.',
     parameters: toJson(z.toJSONSchema(executeSchema)) as Record<string, JsonValue>,
     async execute(raw, context) {
       const input = executeSchema.parse(raw), metadata = read(input)
@@ -61,4 +68,5 @@ export function skillTools(service: SkillService, permissions: PermissionService
       } finally { service.repository.discardPreview(preview.previewID) }
     },
   }]
+  return [...tools, ...directSkillTools(service, tools.find(tool => tool.name === 'run_skill_tool')!, profile)]
 }

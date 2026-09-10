@@ -14,12 +14,7 @@ export async function nativeMounts(dataRoot: string, settings: Record<string, un
     const granted = grants.some(item => item.capability === permission.capability && item.resource === resource && item.access === permission.access)
     if (!granted) { if (key) delete workerSettings[key]; continue }
     if (!key || typeof resource !== 'string' || !['filesystem.read', 'filesystem.write'].includes(permission.capability)) throw new Error('Native plugin requires a dedicated adapter for non-filesystem permissions')
-    const source = await realpath(resource), info = await lstat(source), write = permission.capability === 'filesystem.write'
-    if (!path.isAbsolute(resource) || (await lstat(resource)).isSymbolicLink() || (!info.isFile() && !info.isDirectory()) || (write && !info.isDirectory())) throw new Error('Native plugin mount has an invalid path or type')
-    const protectedRoots = [privateRoot, path.resolve(dataRoot, '..', '..'), path.resolve('Data'), '/proc', '/dev', '/sys', '/etc']
-    if (write) protectedRoots.push('/usr', '/bin', '/sbin', '/lib', '/lib64')
-    if (source === path.parse(source).root || protectedRoots.some(root => source === root || source.startsWith(root + path.sep) || root.startsWith(source + path.sep))) throw new Error('Native plugin mount overlaps private or protected host data')
-    if ((write && permission.access !== 'write') || (!write && permission.access !== 'read')) throw new Error('Native plugin mount access does not match its capability')
+    const { write, source } = await resolveNativeMount(resource, permission, privateRoot, dataRoot)
     if (workerGrants.length >= 16) throw new Error('Native plugin exceeds mount count limit')
     const target = `${write ? '/outputs' : '/inputs'}/resource_${workerGrants.length}`
     const mounts = write ? writeMounts : readMounts
@@ -28,4 +23,14 @@ export async function nativeMounts(dataRoot: string, settings: Record<string, un
     workerGrants.push({ capability: permission.capability, resource: target, access: permission.access })
   }
   return { workerSettings, readMounts, writeMounts, workerGrants }
+}
+
+async function resolveNativeMount(resource: string, permission: { capability: string; resource: string; access: string; required: boolean; description: string }, privateRoot: string, dataRoot: string) {
+  const source = await realpath(resource), info = await lstat(source), write = permission.capability === 'filesystem.write'
+  if (!path.isAbsolute(resource) || (await lstat(resource)).isSymbolicLink() || (!info.isFile() && !info.isDirectory()) || (write && !info.isDirectory())) throw new Error('Native plugin mount has an invalid path or type')
+  const protectedRoots = [privateRoot, path.resolve(dataRoot, '..', '..'), path.resolve('Data'), '/proc', '/dev', '/sys', '/etc']
+  if (write) protectedRoots.push('/usr', '/bin', '/sbin', '/lib', '/lib64')
+  if (source === path.parse(source).root || protectedRoots.some(root => source === root || source.startsWith(root + path.sep) || root.startsWith(source + path.sep))) throw new Error('Native plugin mount overlaps private or protected host data')
+  if ((write && permission.access !== 'write') || (!write && permission.access !== 'read')) throw new Error('Native plugin mount access does not match its capability')
+  return { write, source }
 }

@@ -11,11 +11,7 @@ function run(db: DatabaseSync, row: LegacyRow): void {
   const status = legacyText(row, 'status')
   if (!['pending', 'running', 'completed', 'failed'].includes(status)) throw new Error('Invalid legacy self-awake run status')
   if (legacyText(row, 'schema_version') !== 'self-awake.v1') throw new Error('Unsupported legacy self-awake schema')
-  const job = db.prepare('SELECT state,session_id,kind FROM jobs WHERE id=?').get(jobId)
-  if (!job || job.session_id !== sessionId || job.kind !== 'self_awake') throw new Error('Legacy self-awake run job ownership mismatch')
-  const resumePreparing = status === 'pending' && job.state === 'queued'
-  const interrupted = status === 'running' || (status === 'pending' && !resumePreparing)
-  const state = interrupted ? 'interrupted' : resumePreparing ? 'preparing' : status
+  const { interrupted, state, resumePreparing } = legacyRunState(db, jobId, sessionId, status)
   const attempts = legacyTime(row.attempts)
   if (attempts < 0) throw new Error('Invalid legacy self-awake attempt count')
   const error = interrupted ? 'Legacy run did not finish; automatic replay is disabled' : row.last_error === null ? null : legacyText(row, 'last_error')
@@ -29,13 +25,22 @@ function run(db: DatabaseSync, row: LegacyRow): void {
     .run(interrupted ? 'unknown' : status, error, jobId)
 }
 
+function legacyRunState(db: DatabaseSync, jobId: string, sessionId: string, status: string) {
+  const job = db.prepare('SELECT state,session_id,kind FROM jobs WHERE id=?').get(jobId)
+  if (!job || job.session_id !== sessionId || job.kind !== 'self_awake') throw new Error('Legacy self-awake run job ownership mismatch')
+  const resumePreparing = status === 'pending' && job.state === 'queued'
+  const interrupted = status === 'running' || (status === 'pending' && !resumePreparing)
+  const state = interrupted ? 'interrupted' : resumePreparing ? 'preparing' : status
+  return { interrupted, state, resumePreparing }
+}
+
 function diary(db: DatabaseSync, row: LegacyRow): void {
   const id = legacyUuid(row, 'id'), runId = legacyUuid(row, 'run_id'), sessionId = legacyUuid(row, 'session_id')
   const owner = db.prepare('SELECT session_id FROM self_awake_runs WHERE id=?').get(runId)
   if (!owner || owner.session_id !== sessionId) throw new Error('Legacy diary does not belong to its run session')
   db.prepare(`INSERT INTO self_awake_diaries(id,run_id,session_id,assistant_id,character_id,title,content,mood,metadata_json,created_at)
     VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id, runId, sessionId, legacyText(row, 'assistant_id'), legacyText(row, 'character_id'),
-      legacyText(row, 'title'), legacyText(row, 'content'), legacyText(row, 'mood'), legacyJson(row, 'metadata_json'), legacyTime(row.created_at))
+    legacyText(row, 'title'), legacyText(row, 'content'), legacyText(row, 'mood'), legacyJson(row, 'metadata_json'), legacyTime(row.created_at))
 }
 
 export async function convertSelfAwakeHistory(db: DatabaseSync, source: LegacySnapshotReader): Promise<string[]> {

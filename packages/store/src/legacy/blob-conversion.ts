@@ -16,12 +16,8 @@ async function sourceFile(root: string, storagePath: string) {
   return open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
 }
 async function copyBlob(row: LegacyRow, root: string, target: string, maxBytes: number) {
-  const id = row.id, hash = row.sha256, mime = row.mime
-  if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
-    || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash) || typeof mime !== 'string' || !/^[\x20-\x7e]{1,255}$/.test(mime)
-    || typeof row.storage_path !== 'string' || typeof row.byte_length !== 'bigint' || row.byte_length < 0n || row.byte_length > BigInt(maxBytes)
-    || typeof row.created_at !== 'bigint' || row.created_at < 0n || !Number.isSafeInteger(Number(row.created_at))) throw new Error('Invalid or oversized legacy Blob metadata')
-  const source = await sourceFile(root, row.storage_path)
+  const { hash, id, mime, storagePath, bytes, createdAt } = blobMetadata(row, maxBytes)
+  const source = await sourceFile(root, storagePath)
   try {
     const initial = await source.stat()
     if (!initial.isFile() || initial.size !== Number(row.byte_length)) throw new Error('Legacy Blob size mismatch')
@@ -49,8 +45,17 @@ async function copyBlob(row: LegacyRow, root: string, target: string, maxBytes: 
       }
     } finally { await output.close() }
   } finally { await source.close() }
-  return { id, hash, mime, bytes: row.byte_length, createdAt: row.created_at }
+  return { id, hash, mime, bytes, createdAt }
 }
+function blobMetadata(row: LegacyRow, maxBytes: number) {
+  const id = row.id, hash = row.sha256, mime = row.mime
+  if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash) || typeof mime !== 'string' || !/^[\x20-\x7e]{1,255}$/.test(mime)
+    || typeof row.storage_path !== 'string' || typeof row.byte_length !== 'bigint' || row.byte_length < 0n || row.byte_length > BigInt(maxBytes)
+    || typeof row.created_at !== 'bigint' || row.created_at < 0n || !Number.isSafeInteger(Number(row.created_at))) throw new Error('Invalid or oversized legacy Blob metadata')
+  return { hash, id, mime, storagePath: row.storage_path, bytes: row.byte_length, createdAt: row.created_at }
+}
+
 export async function convertLegacyBlobs(db: DatabaseSync, snapshot: LegacySnapshotReader, sourceRoot: string, targetRoot: string, maxBytes = 32 * 1024 * 1024) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 1024 * 1024 * 1024) throw new Error('Invalid migration Blob size limit')
   const root = await realpath(sourceRoot), target = path.resolve(targetRoot)

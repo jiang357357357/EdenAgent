@@ -2,14 +2,14 @@ import { commandExecutionConfigSchema, commandExecutionSetSchema, type CommandEx
 import { probeSandbox, runWorkspaceCommand, hostCommandInfo, runHostCommand } from '@eden/execution'
 import type { configuredExternalCommandSandbox } from '@eden/execution'
 import type { EdenDatabase } from '@eden/store'
-import { workspaceRoot } from '../workspace/workspace-path.ts'
+import { workspaceRoot } from '@eden/execution'
 
 export class CommandService {
   private active = 0
   private generation = 0
   private probe?: ReturnType<typeof probeSandbox>
   constructor(private readonly database: EdenDatabase, private readonly protectedRoots: readonly string[],
-    private readonly external?: ReturnType<typeof configuredExternalCommandSandbox>) {}
+    private readonly external?: ReturnType<typeof configuredExternalCommandSandbox>) { }
 
   snapshot() {
     const row = this.database.connection.prepare("SELECT value_json FROM runtime_settings WHERE key='command.execution'").get()
@@ -22,9 +22,11 @@ export class CommandService {
     const sandbox = await (this.probe ??= this.external ? this.external.probe() : probeSandbox())
     const { config } = this.snapshot()
     const host = hostCommandInfo()
-    return { ...config, available: config.mode === 'host' ? host.available : sandbox.available,
+    return {
+      ...config, available: config.mode === 'host' ? host.available : sandbox.available,
       hostAvailable: host.available, hostShell: host.shell, sandboxAvailable: sandbox.available, sandboxBackend: sandbox.backend, shell: config.mode === 'host' || process.platform === 'win32' ? host.shell : this.external ? '/bin/bash' : '/bin/sh',
-      detail: config.mode === 'host' ? 'Current OS account permissions; filesystem and network are unrestricted. 30-second and 1 MiB output limits apply.' : sandbox.detail }
+      detail: config.mode === 'host' ? 'Current OS account permissions; filesystem and network are unrestricted. 30-second and 1 MiB output limits apply.' : sandbox.detail
+    }
   }
 
   async set(raw: unknown) {
@@ -33,8 +35,10 @@ export class CommandService {
     if (input.mode === 'host' && !input.confirmHostExecution) throw new Error('Explicit host execution confirmation is required')
     if (input.mode === 'host' && !hostCommandInfo().available) throw new Error('Host command execution is unavailable on this platform')
     if (this.external && input.mode === 'sandbox' && (input.networkAccess || input.writableRoots.length)) throw new Error('External sandbox access is configured by its administrator; host network and writable-root overrides are unavailable')
-    const config: CommandExecutionConfig = { mode: input.mode, networkAccess: input.mode === 'host' ? true : input.networkAccess,
-      writableRoots: input.mode === 'host' ? [] : [...new Set(input.writableRoots.map(root => workspaceRoot(root, this.protectedRoots)))] }
+    const config: CommandExecutionConfig = {
+      mode: input.mode, networkAccess: input.mode === 'host' ? true : input.networkAccess,
+      writableRoots: input.mode === 'host' ? [] : [...new Set(input.writableRoots.map(root => workspaceRoot(root, this.protectedRoots)))]
+    }
     this.database.transaction(() => {
       const previous = this.snapshot().config
       const now = Date.now()

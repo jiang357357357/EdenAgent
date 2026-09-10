@@ -46,7 +46,7 @@ export class DesktopReminderRepository {
       if (current.state === 'closed' || current.state === state) return { reminder: current }
       if (current.turnId === null || ['unknown', 'failed'].includes(current.state)) throw new Error('Historical reminder cannot be transitioned through live display acknowledgements')
       const now = Date.now()
-      this.sessions.database.connection.prepare('UPDATE desktop_reminders SET state=?,displayed_at=CASE WHEN ?='displayed' THEN COALESCE(displayed_at,?) ELSE displayed_at END,closed_at=? WHERE id=?')
+      this.sessions.database.connection.prepare("UPDATE desktop_reminders SET state=?,displayed_at=CASE WHEN ?='displayed' THEN COALESCE(displayed_at,?) ELSE displayed_at END,closed_at=? WHERE id=?")
         .run(state, state, now, state === 'closed' ? now : null, id)
       const reminder = this.read(id)
       return { reminder, event: this.sessions.events.insert(current.sessionId, current.turnId, `desktop.reminder.${state}`, toJson(reminder)) }

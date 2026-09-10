@@ -22,7 +22,7 @@ const allowed = new Set([
   'agent.recovery.mailbox.followup.abandon',
   'agent.roles', 'agent.roles.edit', 'agent.roles.save', 'agent.roles.remove', 'agent.roles.import.preview', 'agent.roles.import.apply',
   'permission.list', 'permission.mode.get', 'permission.mode.set', 'permission.grant.revoke',
-  'skill.list', 'skill.read', 'skill.inspect', 'skill.install_preview', 'skill.install', 'skill.enable', 'skill.uninstall', 'skill.file',
+  'skill.catalog_status', 'skill.list', 'skill.read', 'skill.inspect', 'skill.install_preview', 'skill.install', 'skill.enable', 'skill.uninstall', 'skill.file',
   'plugin.recovery.list', 'plugin.recovery.permissions', 'plugin.recovery.inspect', 'plugin.preview.discard',
   'plugin.list', 'plugin.read', 'plugin.version.list', 'plugin.version.read', 'plugin.install_preview', 'plugin.permissions.set',
   'plugin.market.source.list', 'plugin.market.key.list', 'plugin.market.key.add', 'plugin.market.key.revoke',

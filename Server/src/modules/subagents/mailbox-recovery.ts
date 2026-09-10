@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 import type { EdenDatabase } from '@eden/store'
+import type { SQLOutputValue, DatabaseSync } from 'node:sqlite'
 const digest = (row: object) => createHash('sha256').update(JSON.stringify(row)).digest('hex')
 
 export class SubagentMailboxRecovery {
-  constructor(private readonly database: EdenDatabase) {}
+  constructor(private readonly database: EdenDatabase) { }
   followupSource(sessionId: string, id: string, fingerprint: string) {
     const db = this.database.connection
     const row = db.prepare('SELECT * FROM legacy_subagent_mailbox WHERE id=? AND session_id=?').get(id, sessionId)
@@ -54,10 +55,14 @@ export class SubagentMailboxRecovery {
     const rows = this.database.connection.prepare(`SELECT * FROM legacy_subagent_mailbox WHERE session_id=? AND id>?
       AND state IN ('context_required','review_required','followup_prepared') ORDER BY id LIMIT 51`).all(sessionId, after)
     const visible = rows.slice(0, 50)
-    return { items: visible.map(row => ({ id: String(row.id), senderPath: String(row.sender_path), targetPath: String(row.target_path),
-      kind: String(row.kind), state: String(row.state), triggerTurn: Boolean(row.trigger_turn), content: String(row.content).slice(0, 16000), truncated: String(row.content).length > 16000,
-      fingerprint: digest(row), canDeliver: ['message', 'completion'].includes(String(row.kind)) && Boolean(this.mapped(String(row.id), sessionId) || this.rootSender(row, sessionId)) })),
-      nextCursor: rows.length > 50 ? String(visible.at(-1)!.id) : null }
+    return {
+      items: visible.map(row => ({
+        id: String(row.id), senderPath: String(row.sender_path), targetPath: String(row.target_path),
+        kind: String(row.kind), state: String(row.state), triggerTurn: Boolean(row.trigger_turn), content: String(row.content).slice(0, 16000), truncated: String(row.content).length > 16000,
+        fingerprint: digest(row), canDeliver: ['message', 'completion'].includes(String(row.kind)) && Boolean(this.mapped(String(row.id), sessionId) || this.rootSender(row, sessionId))
+      })),
+      nextCursor: rows.length > 50 ? String(visible.at(-1)!.id) : null
+    }
   }
   resolve(sessionId: string, id: string, fingerprint: string, decision: 'deliver_message' | 'archive' | 'prepare_followup', note: string) {
     const state = decision === 'deliver_message' ? 'available' as const : decision === 'prepare_followup' ? 'followup_prepared' as const : 'archived' as const
@@ -70,30 +75,42 @@ export class SubagentMailboxRecovery {
         if (old.fingerprint !== fingerprint || old.decision !== decision || old.note !== note) throw new Error('Mailbox item already reviewed with different evidence')
         return
       }
-      if (!['context_required','review_required'].includes(String(row.state)) || digest(row) !== fingerprint) throw new Error('Mailbox item changed; review it again')
+      if (!['context_required', 'review_required'].includes(String(row.state)) || digest(row) !== fingerprint) throw new Error('Mailbox item changed; review it again')
       const mapped = this.mapped(id, sessionId)
       const rootSender = this.rootSender(row, sessionId)
-      if (decision === 'prepare_followup') {
-        if (row.kind !== 'followup' || row.sender_path !== '/root' || row.consumed_at !== null || !String(row.content).trim() || String(row.content).length > 64000 ||
-          !db.prepare('SELECT 1 FROM subagent_threads WHERE root_session_id=? AND agent_path=?').get(sessionId, row.target_path!)) throw new Error('Historical follow-up requires an unconsumed root request and known recipient')
-      }
-      if (mapped && (['queued','running'].includes(String(mapped.task_state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=(SELECT child_session_id FROM subagent_threads WHERE id=?) AND state='running' LIMIT 1").get(mapped.agent_id!))) throw new Error('Stop the recipient before reviewing its historical inbox')
-      if (decision === 'deliver_message') {
-        if (rootSender) {
-          if (db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state IN ('queued','running') LIMIT 1").get(sessionId)) throw new Error('Stop the root session before releasing historical messages')
-          if (Number(db.prepare('SELECT COUNT(*) AS n FROM subagent_root_messages WHERE session_id=? AND read_at IS NULL').get(sessionId)?.n) >= 128) throw new Error('Root mailbox has 128 unread messages')
-          db.prepare('INSERT INTO subagent_root_messages(id,session_id,sender_session_id,message,operation_key,created_at) VALUES(?,?,?,?,?,?)')
-            .run(id, sessionId, rootSender.child_session_id!, row.content!, `legacy-mailbox:${id}`, row.created_at!)
-        } else {
-        if (!mapped || !['message', 'completion'].includes(String(row.kind)) || mapped.message !== row.content || mapped.read_at != null) throw new Error('Only an unread, unambiguously mapped message or completion notice can become available')
-        if (row.kind === 'completion' && !db.prepare('SELECT 1 FROM subagent_threads WHERE root_session_id=? AND agent_path=? AND parent_id=?').get(sessionId, row.sender_path!, mapped.agent_id!)) throw new Error('Historical completion notice does not target its direct parent')
-        const count = Number(db.prepare('SELECT COUNT(*) AS n FROM subagent_messages WHERE agent_id=? AND read_at IS NULL').get(mapped.agent_id!)?.n)
-        if (count > 128) throw new Error('Archive or process excess historical messages before releasing this inbox')
-        }
-      } else if (mapped) db.prepare('UPDATE subagent_messages SET read_at=COALESCE(read_at,?) WHERE id=?').run(Date.now(), id)
+      assertPreparedFollowup(decision, row, db, sessionId)
+      if (mapped && (['queued', 'running'].includes(String(mapped.task_state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=(SELECT child_session_id FROM subagent_threads WHERE id=?) AND state='running' LIMIT 1").get(mapped.agent_id!))) throw new Error('Stop the recipient before reviewing its historical inbox')
+      applyMailboxDelivery(rootSender, db, row, mapped, decision, sessionId, id)
       db.prepare('INSERT INTO subagent_mailbox_restorations VALUES(?,?,?,?,?)').run(id, fingerprint, decision, note, Date.now())
       db.prepare('UPDATE legacy_subagent_mailbox SET state=? WHERE id=?').run(state, id)
     })
     return { id, state }
+
   }
+}
+
+function assertPreparedFollowup(decision: string, row: Record<string, import('node:sqlite').SQLOutputValue>, db: import('node:sqlite').DatabaseSync, sessionId: string) {
+  if (decision === 'prepare_followup') {
+    if (row.kind !== 'followup' || row.sender_path !== '/root' || row.consumed_at !== null || !String(row.content).trim() || String(row.content).length > 64000 ||
+      !db.prepare('SELECT 1 FROM subagent_threads WHERE root_session_id=? AND agent_path=?').get(sessionId, row.target_path!)) throw new Error('Historical follow-up requires an unconsumed root request and known recipient')
+  }
+
+}
+
+function applyMailboxDelivery(rootSender: Record<string, SQLOutputValue> | undefined, db: DatabaseSync, row: Record<string, SQLOutputValue>, mapped: Record<string, SQLOutputValue> | undefined, decision: string, sessionId: string, id: string) {
+
+  if (decision === 'deliver_message') {
+    if (rootSender) {
+      if (db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state IN ('queued','running') LIMIT 1").get(sessionId)) throw new Error('Stop the root session before releasing historical messages')
+      if (Number(db.prepare('SELECT COUNT(*) AS n FROM subagent_root_messages WHERE session_id=? AND read_at IS NULL').get(sessionId)?.n) >= 128) throw new Error('Root mailbox has 128 unread messages')
+      db.prepare('INSERT INTO subagent_root_messages(id,session_id,sender_session_id,message,operation_key,created_at) VALUES(?,?,?,?,?,?)')
+        .run(id, sessionId, rootSender.child_session_id!, row.content!, `legacy-mailbox:${id}`, row.created_at!)
+    } else {
+      if (!mapped || !['message', 'completion'].includes(String(row.kind)) || mapped.message !== row.content || mapped.read_at != null) throw new Error('Only an unread, unambiguously mapped message or completion notice can become available')
+      if (row.kind === 'completion' && !db.prepare('SELECT 1 FROM subagent_threads WHERE root_session_id=? AND agent_path=? AND parent_id=?').get(sessionId, row.sender_path!, mapped.agent_id!)) throw new Error('Historical completion notice does not target its direct parent')
+      const count = Number(db.prepare('SELECT COUNT(*) AS n FROM subagent_messages WHERE agent_id=? AND read_at IS NULL').get(mapped.agent_id!)?.n)
+      if (count > 128) throw new Error('Archive or process excess historical messages before releasing this inbox')
+    }
+  } else if (mapped) db.prepare('UPDATE subagent_messages SET read_at=COALESCE(read_at,?) WHERE id=?').run(Date.now(), id)
+
 }

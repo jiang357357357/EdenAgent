@@ -1,3 +1,5 @@
+import { DatabaseSync } from 'node:sqlite'
+import { migrations } from '@eden/store/testing'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -76,11 +78,21 @@ test('disk reopen and version-18 upgrade keep uncertain old bindings unavailable
   const session = sessions.create('Upgrade source', [{ assistantId: 1 }])
   new ModelService('mon', undefined, new ModelBindingRepository(db)).bind(session.id, binding)
   new MonOperationRepository(sessions).begin(session.id, '/api/assistants/1/', {})
-  db.connection.exec('ALTER TABLE model_bindings DROP COLUMN operation_cursor')
-  db.connection.exec('DROP TABLE mon_connections')
-  db.connection.exec('DELETE FROM schema_migrations WHERE version>=19')
-  db.connection.exec('PRAGMA user_version=18')
-  db.close(); db = new EdenDatabase(filename, 'mon')
+  const tables = ['sessions', 'model_bindings', 'mon_operations']
+  const saved = new Map(tables.map(table => [table, db.connection.prepare(`SELECT * FROM ${table}`).all()]))
+  db.close(); await rm(filename)
+  const legacy = new DatabaseSync(filename)
+  for (let index = 0; index < 18; index++) {
+    legacy.exec(migrations[index]!)
+    legacy.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(index + 1, Date.now())
+  }
+  legacy.exec("INSERT INTO realm_meta VALUES ('origin','mon'); PRAGMA user_version=18")
+  for (const table of tables) {
+    const columns = legacy.prepare(`PRAGMA table_info(${table})`).all().map(row => String(row.name))
+    for (const row of saved.get(table)!) legacy.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`)
+      .run(...columns.map(column => row[column]!))
+  }
+  legacy.close(); db = new EdenDatabase(filename, 'mon')
   let models = new ModelService('mon', undefined, new ModelBindingRepository(db))
   assert.equal(models.resolve(session.id), undefined)
   new MonOperationRepository(new SessionRepository(db, 'mon'))

@@ -50,14 +50,18 @@ export class SelfAwakeActions {
       signal.throwIfAborted()
       const session = this.sessions.read(action.sessionId)
       if (session.status !== 'active' || session.participants.length > 1 || JSON.stringify(session.participants[0] ?? {}) !== JSON.stringify(action.author)) throw new Error('Self-awake author changed before recording the decision')
-      return { status: 'requested', action: decision.action, scope: 'local_runtime',
-        note: 'Decision marker only. Actual checks or synchronization require corresponding approved tools and their execution receipts.' }
+      return {
+        status: 'requested', action: decision.action, scope: 'local_runtime',
+        note: 'Decision marker only. Actual checks or synchronization require corresponding approved tools and their execution receipts.'
+      }
     }
     if (['chat_user', 'remind_user', 'ask_user'].includes(decision.action) && !decision.should_interrupt_user) return { status: 'not_requested' }
     if (['chat_user', 'remind_user', 'ask_user'].includes(decision.action)) {
       return executeContactAction(action, decision.action_payload, this.sessions, this.permissions, this.contact, async () => {
-        if (decision.action === 'ask_user') return toJson({ answers: await this.questions.ask(action.sessionId, action.turnId,
-          { questions: [{ header: '自醒确认', question: payload.message }] }, signal) })
+        if (decision.action === 'ask_user') return toJson({
+          answers: await this.questions.ask(action.sessionId, action.turnId,
+            { questions: [{ header: '自醒确认', question: payload.message }] }, signal)
+        })
         const reminder = desktopReminderCreateSchema.parse({ title: payload.title ?? '角色消息', message: payload.message })
         return toJson({ reminder: this.reminders.create(action.sessionId, action.turnId, reminder, `self-awake:${action.id}:contact`) })
       }, signal)
@@ -69,12 +73,23 @@ export class SelfAwakeActions {
     const session = this.sessions.read(action.sessionId)
     if (session.status !== 'active' || JSON.stringify(session.participants[0] ?? {}) !== JSON.stringify(action.author)) throw new Error('Self-awake author changed during approval')
     if (decision.action === 'create_task') {
-      const due = payload.due_at
-      const dueAt = typeof due === 'string' && !/^\d+$/.test(due) ? Date.parse(due) : due ?? null
-      return toJson({ memo: this.memos.create(memoCreateSchema.parse({ title: payload.title, content: payload.content ?? payload.message ?? '', kind: 'todo',
-        dueAt, relatedSessionId: action.sessionId, metadata: { runId: action.id } }), `self-awake:${action.id}:create_task`) })
+      return this.createTask(action, payload)
     }
     throw new Error('Unsupported self-awake action')
+
+  }
+
+  private createTask(action: Action, payload: Record<string, JsonValue>) {
+
+    const due = payload.due_at
+    const dueAt = typeof due === 'string' && !/^\d+$/.test(due) ? Date.parse(due) : due ?? null
+    return toJson({
+      memo: this.memos.create(memoCreateSchema.parse({
+        title: payload.title, content: payload.content ?? payload.message ?? '', kind: 'todo',
+        dueAt, relatedSessionId: action.sessionId, metadata: { runId: action.id }
+      }), `self-awake:${action.id}:create_task`)
+    })
+
   }
 }
 function object(value: JsonValue): Record<string, JsonValue> { return value && typeof value === 'object' && !Array.isArray(value) ? value : {} }

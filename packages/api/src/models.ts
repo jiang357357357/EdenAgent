@@ -13,7 +13,7 @@ export const configuredModelSchema = z.object({
   cost: z.object({ input: z.number().nonnegative().finite(), output: z.number().nonnegative().finite(),
     cacheRead: z.number().nonnegative().finite(), cacheWrite: z.number().nonnegative().finite() }).strict().optional(),
 }).strict().refine(value => value.maxTokens <= value.contextWindow, 'Model output budget exceeds its context window')
-  .transform(({ apiKey, ...config }) => ({ ...config, ...(apiKey ? { apiKey } : {}) }))
+  .transform(({ apiKey, reasoning, cost, ...config }) => ({ ...config, ...(apiKey ? { apiKey } : {}), ...(reasoning === undefined ? {} : { reasoning }), ...(cost === undefined ? {} : { cost }) }))
 export const modelReadSchema = z.object({ sessionId: z.string().uuid().nullish() }).strict()
 export const modelCatalogSchema = modelReadSchema.extend({ coreBaseUrl: modelEndpointSchema, coreToken: z.string().trim().min(1).max(8192) })
 export const modelSelectionTargetSchema = z.discriminatedUnion('kind', [

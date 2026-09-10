@@ -3,7 +3,10 @@
   "version": "2.0.0-dev.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./testing/schema-history.ts"
+  },
   "dependencies": {
     "@eden/api": "*",
     "@eden/runtime-pi": "*"

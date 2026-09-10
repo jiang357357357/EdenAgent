@@ -6,7 +6,8 @@ import path from 'node:path'
 import { z } from 'zod'
 import { buildActivationPlan, withActivationLock } from './activation-plan.ts'
 
-const confirmationSchema = z.object({ format: z.literal('eden.activation-confirmation.v1'),
+const confirmationSchema = z.object({
+  format: z.literal('eden.activation-confirmation.v1'),
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/), note: z.string().trim().min(1).max(4000),
   compatibilityEvidence: z.string().trim().min(1).max(16000), confirmActivation: z.literal(true),
 }).strict()
@@ -36,9 +37,7 @@ export async function activateLegacyImport(snapshot: string, destination: string
   const confirmationHash = createHash('sha256').update(JSON.stringify(consent)).digest('hex')
   return withActivationLock(destination, async target => {
     const runtime = path.join(target, 'eden-agent.db')
-    let exists = false
-    try { const info = await lstat(runtime); if (!info.isFile() || info.isSymbolicLink()) throw new Error('Unsafe runtime database'); exists = true }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+    let exists = await runtimeDatabaseExists(runtime)
     if (exists) {
       const existing = new DatabaseSync(runtime, { readOnly: true })
       try {
@@ -55,8 +54,10 @@ export async function activateLegacyImport(snapshot: string, destination: string
     if (plan.fingerprint !== consent.fingerprint) throw new Error('Activation evidence changed; generate and review a new plan')
     if (plan.blockers.length) throw new Error(`Activation is blocked: ${plan.blockers.join('; ')}`)
     const activationId = randomUUID(), temporary = path.join(target, `.activation-${activationId}.db`)
-    const receipt = { activationId, confirmationHash, fingerprint: consent.fingerprint, note: consent.note,
-      compatibilityEvidence: consent.compatibilityEvidence, origin, target, createdAt: Date.now(), ...(publicationGroup ? { publicationGroup } : {}) }
+    const receipt = {
+      activationId, confirmationHash, fingerprint: consent.fingerprint, note: consent.note,
+      compatibilityEvidence: consent.compatibilityEvidence, origin, target, createdAt: Date.now(), ...(publicationGroup ? { publicationGroup } : {})
+    }
     try {
       const source = new DatabaseSync(plan.sourceDatabase, { readOnly: true })
       try { source.prepare('VACUUM INTO ?').run(temporary) } finally { source.close() }
@@ -72,8 +73,17 @@ export async function activateLegacyImport(snapshot: string, destination: string
       try { await file.sync() } finally { await file.close() }
       await link(temporary, runtime)
       await syncActivationDirectory(target)
-      return { state: 'complete', origin, target, activationId, alreadyActivated: false,
-        note: 'Runtime database activated. Launch explicitly with this data root; no service or external action was started.' }
+      return {
+        state: 'complete', origin, target, activationId, alreadyActivated: false,
+        note: 'Runtime database activated. Launch explicitly with this data root; no service or external action was started.'
+      }
     } finally { await unlink(temporary).catch(error => { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }) }
   })
+}
+
+async function runtimeDatabaseExists(runtime: string) {
+  let exists = false
+  try { const info = await lstat(runtime); if (!info.isFile() || info.isSymbolicLink()) throw new Error('Unsafe runtime database'); exists = true }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+  return exists
 }

@@ -13,13 +13,14 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
   let requests = 0
   let controller = new AbortController()
   let active: Promise<JsonValue> | undefined
+  let currentTools = options.tools
   let revisions = new Map(options.tools.map(tool => [tool.name, tool.revision]))
   const healthy = () => {
     storage.assertHealthy()
     if (fatal) throw new Error('Runtime persistence failed; restore before continuing', { cause: fatal })
   }
   const fail = (error: unknown): never => { fatal = error; throw error }
-  const tools = (items: RuntimeTool[]) => items.map(tool => adaptTool(tool, options.callbacks, healthy, fail, options.toolCallPrefix))
+  const tools = (items: RuntimeTool[]) => items.map(tool => adaptTool<Record<string, never>>(tool, options.callbacks, healthy, fail, options.toolCallPrefix))
   const provider = createRuntimeModels(options.model, {
     signal: () => controller.signal,
     failed(error) { fatal = error; controller.abort() },
@@ -37,8 +38,19 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
       } catch (error) { fatal = error; throw error }
     },
   })
-  const harness = new AgentHarness({
-    session: storage.session(), ...provider, systemPrompt: options.systemPrompt,
+  const harness: AgentHarness<Record<string, never>> = new AgentHarness<Record<string, never>>({
+    session: storage.session(), ...provider,
+    toolContext: async () => {
+      healthy()
+      if (options.refreshTools) {
+        const items = await options.refreshTools()
+        await harness.setTools(tools(items), items.map(tool => tool.name))
+        currentTools = items
+        revisions = new Map(items.map(tool => [tool.name, tool.revision]))
+      }
+      return {}
+    },
+    systemPrompt: () => [options.systemPrompt, ...currentTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'),
     tools: tools(options.tools), thinkingLevel: options.model.reasoning ?? 'off', streamOptions: { maxRetries: 0 },
     retry: { enabled: false, maxRetries: 0, baseDelayMs: 0 },
   })
@@ -66,7 +78,8 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
     async compact(instructions) { return run(() => harness.compact(instructions)) },
     snapshot: () => storage.snapshot(),
     async replaceTools(items) {
-      healthy(); await active; await harness.waitForIdle(); await harness.setTools(tools(items))
+      healthy(); await active; await harness.waitForIdle(); await harness.setTools(tools(items), items.map(tool => tool.name))
+      currentTools = items
       revisions = new Map(items.map(tool => [tool.name, tool.revision]))
     },
   }

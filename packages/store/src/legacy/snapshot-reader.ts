@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { legacyManifest, legacyRow } from './snapshot-format.ts'
-import type { LegacyManifest, LegacyRow } from './snapshot-format.ts'
+import type { LegacyManifest, LegacyRow, LegacyTable } from './snapshot-format.ts'
 
 async function assertComplete(root: string) {
   try { await lstat(path.join(root, 'INCOMPLETE')) }
@@ -18,7 +18,7 @@ async function regularFile(root: string, filename: string) {
   return handle
 }
 export class LegacySnapshotReader {
-  private constructor(readonly root: string, readonly manifest: LegacyManifest) {}
+  private constructor(readonly root: string, readonly manifest: LegacyManifest) { }
   static async open(directory: string, origin: 'mon' | 'local') {
     const root = await realpath(directory)
     await assertComplete(root)
@@ -55,14 +55,7 @@ export class LegacySnapshotReader {
         if (position > table.bytes) throw new Error(`Legacy table grew during reading: ${name}`)
         const chunk = buffer.subarray(0, bytesRead); hash.update(chunk)
         remainder = Buffer.concat([remainder, chunk])
-        let newline: number
-        while ((newline = remainder.indexOf(10)) !== -1) {
-          if (newline > 32 * 1024 * 1024) throw new Error('Legacy row is too large')
-          const line = new TextDecoder('utf-8', { fatal: true }).decode(remainder.subarray(0, newline))
-          remainder = remainder.subarray(newline + 1)
-          if (++rows > table.rows) throw new Error(`Legacy table row count mismatch: ${name}`)
-          await consume(legacyRow(JSON.parse(line)), rows - 1)
-        }
+          ; ({ remainder, rows } = await consumeSnapshotRows(remainder, rows, table, name, consume))
         if (remainder.length > 32 * 1024 * 1024) throw new Error('Legacy row is too large')
       }
       const final = await handle.stat()
@@ -71,4 +64,16 @@ export class LegacySnapshotReader {
       await assertComplete(this.root)
     } finally { await handle.close() }
   }
+}
+
+async function consumeSnapshotRows(remainder: Buffer<ArrayBuffer>, rows: number, table: LegacyTable, name: string, consume: (row: LegacyRow, index: number) => void | Promise<void>) {
+  let newline: number
+  while ((newline = remainder.indexOf(10)) !== -1) {
+    if (newline > 32 * 1024 * 1024) throw new Error('Legacy row is too large')
+    const line = new TextDecoder('utf-8', { fatal: true }).decode(remainder.subarray(0, newline))
+    remainder = remainder.subarray(newline + 1)
+    if (++rows > table.rows) throw new Error(`Legacy table row count mismatch: ${name}`)
+    await consume(legacyRow(JSON.parse(line)), rows - 1)
+  }
+  return { remainder, rows }
 }

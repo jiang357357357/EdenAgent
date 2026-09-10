@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
 import type { EdenDatabase } from '@eden/store'
 import { readBaselineLedger } from './baseline-ledger.ts'
+import type { SQLOutputValue, DatabaseSync } from 'node:sqlite'
 
 /** Historical totals exclude the separately preserved TS request ledger. */
 export class SubagentBaselineRecovery {
-  constructor(private readonly database: EdenDatabase) {}
+  constructor(private readonly database: EdenDatabase) { }
   private source(agentId: string) {
     const db = this.database.connection
     const row = db.prepare('SELECT * FROM subagent_threads WHERE id=?').get(agentId)
@@ -17,7 +18,7 @@ export class SubagentBaselineRecovery {
       SELECT t.id,t.child_session_id FROM subagent_threads t JOIN tree p ON t.parent_id=p.id)
       SELECT t.* FROM subagent_threads t JOIN tree x ON x.id=t.id ORDER BY t.id`).all(agentId)
     for (const item of subtree) {
-      if (['queued','running'].includes(String(item.state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state='running' LIMIT 1").get(item.child_session_id!)) throw new Error('Stop all descendants before reviewing the historical total')
+      if (['queued', 'running'].includes(String(item.state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state='running' LIMIT 1").get(item.child_session_id!)) throw new Error('Stop all descendants before reviewing the historical total')
       if (item.id !== agentId && (item.usage_unknown || item.cost_unknown)) throw new Error('Review descendant historical totals first')
     }
     const ledger = readBaselineLedger(this.database, agentId)
@@ -28,8 +29,10 @@ export class SubagentBaselineRecovery {
   }
   preview(agentId: string) {
     const { row, fingerprint, ledger, historicalTokens, historicalCost } = this.source(agentId)
-    return { agentId, fingerprint, tokens: historicalTokens, costMicrousd: historicalCost, recordedTokens: ledger.tokens, recordedCostMicrousd: ledger.costMicrousd,
-      tokensUnknown: Boolean(row.legacy_usage_unknown), costUnknown: Boolean(row.legacy_cost_unknown) }
+    return {
+      agentId, fingerprint, tokens: historicalTokens, costMicrousd: historicalCost, recordedTokens: ledger.tokens, recordedCostMicrousd: ledger.costMicrousd,
+      tokensUnknown: Boolean(row.legacy_usage_unknown), costUnknown: Boolean(row.legacy_cost_unknown)
+    }
   }
   apply(agentId: string, fingerprint: string, tokens: number, costMicrousd: number, note: string) {
     this.database.transaction(() => {
@@ -45,28 +48,35 @@ export class SubagentBaselineRecovery {
       if (!row.legacy_usage_unknown && tokens !== current.historicalTokens || !row.legacy_cost_unknown && costMicrousd !== current.historicalCost) throw new Error('Known historical amounts must remain unchanged')
       const totalTokens = tokens + current.ledger.tokens, totalCost = costMicrousd + current.ledger.costMicrousd
       if (!Number.isSafeInteger(totalTokens) || !Number.isSafeInteger(totalCost)) throw new Error('Confirmed usage exceeds exact accounting range')
-      const tokensChanged = tokens !== current.historicalTokens, costChanged = costMicrousd !== current.historicalCost
-      let parentId = row.parent_id
-      const seen = new Set([agentId])
-      while (parentId != null) {
-        const id = String(parentId)
-        if (seen.has(id) || seen.size >= 4) throw new Error('Invalid historical accounting ancestry')
-        seen.add(id)
-        const parent = db.prepare('SELECT parent_id,state,child_session_id FROM subagent_threads WHERE id=?').get(id)
-        if (!parent || ['queued','running'].includes(String(parent.state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state IN ('queued','running') LIMIT 1").get(parent.child_session_id!)) throw new Error('Stop the parent task before reviewing descendant usage')
-        if (tokensChanged || costChanged) {
-          // Historical ancestor totals may already include the child. Never add twice or silently clear uncertainty.
-          if (db.prepare('SELECT 1 FROM subagent_baseline_restorations WHERE agent_id=?').get(id)) throw new Error('Ancestor total was already confirmed; review ordering is inconsistent')
-          db.prepare(`UPDATE subagent_threads SET legacy_usage_unknown=MAX(legacy_usage_unknown,?),usage_unknown=MAX(usage_unknown,?),
-            legacy_cost_unknown=MAX(legacy_cost_unknown,?),cost_unknown=MAX(cost_unknown,?),updated_at=? WHERE id=?`)
-            .run(Number(tokensChanged), Number(tokensChanged), Number(costChanged), Number(costChanged), Date.now(), id)
-        }
-        parentId = parent.parent_id
-      }
+      invalidateAncestorBaselines(current, row, db, agentId, tokens, costMicrousd)
       db.prepare('INSERT INTO subagent_baseline_restorations VALUES(?,?,?,?,?,?,?)')
         .run(agentId, fingerprint, JSON.stringify({ tokens: row.tokens_used, costMicrousd: row.cost_microusd_used, historicalTokens: current.historicalTokens, historicalCostMicrousd: current.historicalCost, ledger: current.ledger }), tokens, costMicrousd, note, Date.now())
       db.prepare(`UPDATE subagent_threads SET tokens_used=?,cost_microusd_used=?,legacy_usage_unknown=0,legacy_cost_unknown=0,
         usage_unknown=0,cost_unknown=0,updated_at=? WHERE id=?`).run(totalTokens, totalCost, Date.now(), agentId)
     })
+
   }
+}
+
+function invalidateAncestorBaselines(current: { historicalTokens: number; historicalCost: number }, row: Record<string, SQLOutputValue>, db: DatabaseSync, agentId: string, tokens: number, costMicrousd: number) {
+
+  const tokensChanged = tokens !== current.historicalTokens, costChanged = costMicrousd !== current.historicalCost
+  let parentId = row.parent_id
+  const seen = new Set([agentId])
+  while (parentId != null) {
+    const id = String(parentId)
+    if (seen.has(id) || seen.size >= 4) throw new Error('Invalid historical accounting ancestry')
+    seen.add(id)
+    const parent = db.prepare('SELECT parent_id,state,child_session_id FROM subagent_threads WHERE id=?').get(id)
+    if (!parent || ['queued', 'running'].includes(String(parent.state)) || db.prepare("SELECT 1 FROM inputs WHERE session_id=? AND state IN ('queued','running') LIMIT 1").get(parent.child_session_id!)) throw new Error('Stop the parent task before reviewing descendant usage')
+    if (tokensChanged || costChanged) {
+      // Historical ancestor totals may already include the child. Never add twice or silently clear uncertainty.
+      if (db.prepare('SELECT 1 FROM subagent_baseline_restorations WHERE agent_id=?').get(id)) throw new Error('Ancestor total was already confirmed; review ordering is inconsistent')
+      db.prepare(`UPDATE subagent_threads SET legacy_usage_unknown=MAX(legacy_usage_unknown,?),usage_unknown=MAX(usage_unknown,?),
+            legacy_cost_unknown=MAX(legacy_cost_unknown,?),cost_unknown=MAX(cost_unknown,?),updated_at=? WHERE id=?`)
+        .run(Number(tokensChanged), Number(tokensChanged), Number(costChanged), Number(costChanged), Date.now(), id)
+    }
+    parentId = parent.parent_id
+  }
+
 }

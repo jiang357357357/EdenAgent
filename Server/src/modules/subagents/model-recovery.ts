@@ -7,7 +7,7 @@ import { SessionRepository } from '../sessions/index.ts'
 import { assertSubagentWorkspace } from './workspace-owner.ts'
 
 export class SubagentModelRecovery {
-  constructor(private readonly database: EdenDatabase, private readonly models: ModelService) {}
+  constructor(private readonly database: EdenDatabase, private readonly models: ModelService) { }
   sources(agentId: string) {
     const db = this.database.connection
     const thread = db.prepare('SELECT parent_session_id,parent_actor_id FROM subagent_threads WHERE id=?').get(agentId)
@@ -38,9 +38,11 @@ export class SubagentModelRecovery {
     const snapshot = this.models.childSnapshot(parentSessionId, { model: definition.model, reasoning: definition.reasoning, ...(actorId === null ? {} : { actorId }) })
     const fingerprint = createHash('sha256').update(JSON.stringify({ agentId, parentSessionId, actorId, workspaceRoot: thread.workspace_root, snapshot, definition })).digest('hex')
     const model = snapshot.origin === 'local' ? snapshot.model : snapshot.binding.main.model
-    const plan: SubagentModelRecoveryPlan = { agentId, parentSessionId, actorId, origin: snapshot.origin, fingerprint,
+    const plan: SubagentModelRecoveryPlan = {
+      agentId, parentSessionId, actorId, origin: snapshot.origin, fingerprint,
       provider: model.provider, modelId: model.id, baseUrl: model.baseUrl, reasoning: model.reasoning ?? 'off',
-      contextWindow: model.contextWindow, maxTokens: model.maxTokens }
+      contextWindow: model.contextWindow, maxTokens: model.maxTokens
+    }
     return { snapshot, plan }
   }
   preview(agentId: string, actorId?: string | number) { return this.candidate(agentId, actorId).plan }

@@ -9,6 +9,7 @@ export const sessionSummarySchema = z.object({
   id: z.string().uuid(), title: z.string(), titleSource: z.string(),
   status: z.enum(['active', 'closed']), runtimeOrigin: runtimeOriginSchema,
   participants: z.array(jsonValue), environment: jsonValue,
+  contextTokens: z.number().int().nonnegative().nullish(), tokenBreakdown: jsonValue.optional(),
   createdAt: z.number().int(), updatedAt: z.number().int(),
 })
 export type SessionSummary = z.infer<typeof sessionSummarySchema>

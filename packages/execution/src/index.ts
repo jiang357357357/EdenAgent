@@ -12,4 +12,5 @@ export { launchMcpProcess } from './mcp-process.ts'
 
 export { hostCommandInfo, runHostCommand } from './host-command.ts'
 
-export { configuredExternalCommandSandbox } from './external-command.ts'
+export { ExternalCommandSandbox, configuredExternalCommandSandbox } from './external-command.ts'
+export { containsPath, workspaceRoot, workspaceFile } from './workspace-path.ts'

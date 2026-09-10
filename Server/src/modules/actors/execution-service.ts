@@ -12,6 +12,7 @@ import type { MemoryRecall } from '../memories/index.ts'
 export interface ActorExecutionRequest {
   input: SessionInput; plan: DirectorPlan; beatIndex: number; participant: Record<string, JsonValue>
   model: RuntimeModel; tools: RuntimeTool[]; conversation: JsonValue[]; signal: AbortSignal
+  refreshTools?(): RuntimeTool[]
   images?: readonly RuntimeImage[]
 }
 
@@ -42,7 +43,7 @@ export class ActorExecutionService {
     const callbacks = runtimeCallbacks(this.sessions, input, { actor, privateNonAssistantMessages: true,
       checkpoint: async snapshot => this.checkpoints.save(input.sessionId, assistantId, input.turnId, snapshot) })
     const checkpoint = this.checkpoints.read(input.sessionId, assistantId)
-    const runtime = createRuntime({ sessionId: input.sessionId, model: request.model, tools: request.tools,
+    const runtime = createRuntime({ sessionId: input.sessionId, model: request.model, tools: request.tools, ...(request.refreshTools ? { refreshTools: request.refreshTools } : {}),
       systemPrompt: actorSystemPrompt(request.participant, input.metadata) + (this.memoryRecall?.prompt(input.sessionId, input.turnId, input.text, assistantId) ?? ''),
       toolCallPrefix: `${plan.planID}:${beatIndex}:`, ...(checkpoint ? { checkpoint } : {}),
       callbacks: { ...callbacks, event: async (kind, payload) => callbacks.event(kind, actorMessage(payload, request.participant, plan, beatIndex)) },

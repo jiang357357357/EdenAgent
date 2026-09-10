@@ -9,7 +9,7 @@ export const EDEN_AGENT_TOKEN_PROTOCOL_PREFIX = tokenProtocolPrefix
 export type RpcMethodMap = SchemaRpcMethodMap
 export type RpcNotificationMap = SchemaRpcNotificationMap
 
-export { uploadBlob } from '../lib/blob-upload'
+export { uploadBlob } from '../lib/blob-upload.ts'
 export type { BlobInfo } from '@eden/api'
 
-export { EdenAgentRpcClient } from '../lib/rpc-client'
+export { EdenAgentRpcClient } from '../lib/rpc-client.ts'

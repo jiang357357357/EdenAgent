@@ -1,13 +1,13 @@
 import { McpClient, McpStdioChannel } from '@eden/integrations'
-import { launchMcpProcess } from '@eden/execution'
+import { launchMcpProcess, type ExternalCommandSandbox } from '@eden/execution'
 import type { InstalledPackageRepository } from '../plugin-market/index.ts'
 type Plan = ReturnType<InstalledPackageRepository['runtimePlan']>
 type Component = Plan['runtimes'][number]
 
-export async function connectMcpStdio(component: Component, files: Plan['files'], authorize: () => void, signal: AbortSignal) {
+export async function connectMcpStdio(component: Component, files: Plan['files'], authorize: () => void, signal: AbortSignal, external?: ExternalCommandSandbox) {
   if (component.kind !== 'mcp_stdio') throw new Error('Expected MCP stdio component')
   authorize(); signal.throwIfAborted()
-  const process = await launchMcpProcess(files, component.descriptor, signal)
+  const process = await launchMcpProcess(files, component.descriptor, signal, external)
   let catalogChanged = false
   const channel = new McpStdioChannel(process.input, process.output, process.terminate, method => {
     if (['notifications/tools/list_changed', 'notifications/resources/list_changed'].includes(method)) catalogChanged = true

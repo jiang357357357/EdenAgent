@@ -1,0 +1,155 @@
+{
+  "stage": "architecture_gate_repair",
+  "date": "2026-09-10",
+  "platform": "Linux",
+  "node": "22.23.1",
+  "newTests": 14,
+  "totalTests": 682,
+  "suites": [
+    {
+      "suite": "server",
+      "command": "npm run test:server",
+      "exitCode": 0,
+      "tests": 252,
+      "pass": 252,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "web",
+      "command": "npm --prefix frontend/web test",
+      "exitCode": 0,
+      "tests": 233,
+      "pass": 233,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "desktop",
+      "command": "npm --prefix frontend/desktop test",
+      "exitCode": 0,
+      "tests": 172,
+      "pass": 172,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "project",
+      "command": "npm run test:project",
+      "exitCode": 0,
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "architecture-rules",
+      "command": "npm run test:architecture",
+      "exitCode": 0,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "server-artifact",
+      "command": "npm run test:server-artifact",
+      "exitCode": 0,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run typecheck:server",
+      "exitCode": 0,
+      "note": "Repeated after adding package and budget boundary tests"
+    },
+    {
+      "command": "npm run test:server-artifact",
+      "exitCode": 0,
+      "note": "Includes Server and migration artifact build plus real dual-host test"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "git -C frontend diff --check",
+      "exitCode": 0
+    }
+  ],
+  "architectureGate": {
+    "command": "npm run check:architecture",
+    "exitCode": 0,
+    "sourceFiles": 613,
+    "originalErrors": 71,
+    "errors": 0,
+    "resolved": {
+      "complexity": 60,
+      "dependencyCycles": 6,
+      "privateModuleImports": 4,
+      "privatePackageImports": 1
+    },
+    "policyChanged": false,
+    "maximumComplexity": 15,
+    "maximumLines": 500,
+    "exceptions": {},
+    "warnings": [
+      "WARNING Server/src/bootstrap/container.ts: line 38: long function (85 lines)",
+      "WARNING Server/src/bootstrap/services.ts: line 33: long function (81 lines)",
+      "WARNING Server/src/modules/sessions/session-service.ts: file has 301 lines",
+      "WARNING Server/src/modules/sessions/turn/runtime-callbacks.ts: line 30: long function (64 lines)",
+      "WARNING Server/src/modules/skills/tools.ts: line 9: long function (64 lines)",
+      "WARNING Server/src/modules/voice/realtime-connection.ts: line 6: long function (70 lines)",
+      "WARNING Server/src/transport/rpc/plugin.routes.ts: line 12: long function (62 lines)",
+      "WARNING packages/api/src/legacy-wire.ts: file has 409 lines",
+      "WARNING packages/runtime-pi/src/harness-runtime.ts: line 10: long function (77 lines)",
+      "WARNING packages/store/src/legacy/conversion-runner.ts: line 36: long function (75 lines)",
+      "WARNING packages/store/src/migrations.ts: file has 426 lines"
+    ]
+  },
+  "initialFailure": {
+    "suite": "server",
+    "tests": 247,
+    "pass": 246,
+    "fail": 1,
+    "test": "agent authors, tests, activates, and invokes its plugin through durable user approvals",
+    "observed": "Activation revision was undefined",
+    "rootCause": "Unconfirmed; occurred while multiple suites and builds ran concurrently",
+    "isolatedRerun": {
+      "command": "node --import tsx --test Server/tests/agent-plugin.test.ts",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0
+    },
+    "finalFullSuite": {
+      "tests": 252,
+      "pass": 252,
+      "fail": 0
+    },
+    "timeoutsOrAssertionsRelaxed": false
+  },
+  "limitations": [
+    "Real Mon Core and paid providers not exercised",
+    "Windows/macOS and Electron GUI not exercised",
+    "11 nonblocking size warnings remain",
+    "Initial plugin activation failure did not recur; root cause remains unconfirmed"
+  ],
+  "git": {
+    "committed": false,
+    "pushed": false
+  }
+}

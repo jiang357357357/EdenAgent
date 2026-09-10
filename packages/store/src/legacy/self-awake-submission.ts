@@ -14,19 +14,28 @@ export function convertSelfAwakeSubmission(db: DatabaseSync, row: LegacyRow): vo
     typeof event !== 'string' || !event || event.length > 256 || !Object.hasOwn(value, 'trigger')) {
     throw new Error('Legacy external self-awake submission lacks a compatible identity or request')
   }
+  assertSubmissionOwner(db, sessionId, user)
+  const requestKey = submissionRequestKey(row, user)
+  // Property order matches the parsed current bridge schema. Context is the complete original trigger,
+  // not the bounded prompt trigger constructed for runtime execution.
+  const input = { user_id: user, schema_version: 'self-awake.v1', idempotency_key: requestKey, event_id: event, context: value.trigger }
+  const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
+  db.prepare('INSERT INTO self_awake_submissions(user_id,request_key,request_hash,job_id) VALUES(?,?,?,?)').run(user, requestKey, hash, jobId)
+}
+
+function submissionRequestKey(row: LegacyRow, user: string) {
+  const key = legacyText(row, 'idempotency_key'), prefix = `self-awake:${user}:`
+  if (!key.startsWith(prefix)) throw new Error('Legacy self-awake submission key does not match its user')
+  const requestKey = key.slice(prefix.length)
+  if (!requestKey || requestKey.length > 256) throw new Error('Legacy self-awake submission key exceeds bridge limits')
+  return requestKey
+}
+
+function assertSubmissionOwner(db: DatabaseSync, sessionId: string, user: string) {
   const session = db.prepare('SELECT origin FROM sessions WHERE id=?').get(sessionId)
   const record = db.prepare("SELECT payload_json FROM events WHERE session_id=? AND kind IN ('session.created','session.metadata.updated') ORDER BY seq DESC LIMIT 1").get(sessionId)
   const metadata = record ? JSON.parse(String(record.payload_json)) : null
   if (session?.origin !== 'mon' || metadata?.environment?.sessionPurpose !== 'self_awake' || metadata?.environment?.selfAwakeUserId !== user) {
     throw new Error('Legacy external self-awake user does not own the converted background session')
   }
-  const key = legacyText(row, 'idempotency_key'), prefix = `self-awake:${user}:`
-  if (!key.startsWith(prefix)) throw new Error('Legacy self-awake submission key does not match its user')
-  const requestKey = key.slice(prefix.length)
-  if (!requestKey || requestKey.length > 256) throw new Error('Legacy self-awake submission key exceeds bridge limits')
-  // Property order matches the parsed current bridge schema. Context is the complete original trigger,
-  // not the bounded prompt trigger constructed for runtime execution.
-  const input = { user_id: user, schema_version: 'self-awake.v1', idempotency_key: requestKey, event_id: event, context: value.trigger }
-  const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
-  db.prepare('INSERT INTO self_awake_submissions(user_id,request_key,request_hash,job_id) VALUES(?,?,?,?)').run(user, requestKey, hash, jobId)
 }

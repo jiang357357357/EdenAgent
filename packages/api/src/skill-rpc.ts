@@ -9,7 +9,7 @@ export const skillInfoSchema = z.object({
   modelInvocable: z.boolean(), tools: z.array(z.string()), profiles: z.array(z.string()), permissions: z.array(z.string()), defaultPrompt: z.string(),
   codeTools: z.array(codeTool).optional(), files: z.array(z.string()), contentHash: z.string().regex(/^[a-f0-9]{64}$/), totalBytes: z.number().int().nonnegative(),
   enabled: z.boolean(), available: z.boolean(), missingTools: z.array(z.string()), scope: z.string(), workspaceRoot: z.string(), sourceType: z.string(),
-  manifest: z.object({ source, workspaceRoot: z.string() }),
+  manifest: z.object({ source, discovered: z.boolean().optional(), workspaceRoot: z.string() }),
 })
 export const skillPreviewInfoSchema = skillInfoSchema.pick({ displayName: true, description: true, version: true, scope: true,
   workspaceRoot: true, tools: true, profiles: true, modelInvocable: true, contentHash: true, totalBytes: true }).extend({
@@ -17,6 +17,8 @@ export const skillPreviewInfoSchema = skillInfoSchema.pick({ displayName: true, 
 })
 export type SkillInfo = z.infer<typeof skillInfoSchema>
 export const skillRpcMethods = {
+  'skill.catalog_status': { params: z.object({}).strict(), result: z.object({ error: z.string().nullable(), refreshing: z.boolean(), codeToolsAvailable: z.boolean() }) },
+  'skill.refresh': { params: z.object({}).strict(), result: z.object({ refreshed: z.literal(true) }) },
   'skill.list': { params: z.object({}).strict(), result: z.array(skillInfoSchema) },
   'skill.read': { params: skillReadSchema, result: skillInfoSchema },
   'skill.inspect': { params: skillInspectSchema, result: skillPreviewInfoSchema },

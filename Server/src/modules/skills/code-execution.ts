@@ -1,12 +1,12 @@
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { runSkillCommand } from '@eden/execution'
+import { runSkillCommand, type ExternalCommandSandbox } from '@eden/execution'
 import { assertToolInput } from '@eden/plugin-sdk'
 import { toJson } from '@eden/api'
 import type { SkillSnapshot } from './snapshot.ts'
 import type { SkillCodeTool } from './code-manifest.ts'
-export async function executeSkillCode(snapshot: SkillSnapshot, tool: SkillCodeTool, raw: unknown, signal: AbortSignal) {
+export async function executeSkillCode(snapshot: SkillSnapshot, tool: SkillCodeTool, raw: unknown, signal: AbortSignal, external?: ExternalCommandSandbox) {
   const input = toJson(raw)
   assertToolInput(tool.parameters, input)
   const directory = await mkdtemp(path.join(os.tmpdir(), 'eden-skill-execution-'))
@@ -18,7 +18,7 @@ export async function executeSkillCode(snapshot: SkillSnapshot, tool: SkillCodeT
       await mkdir(path.dirname(target), { recursive: true, mode: 0o700 })
       await writeFile(target, Buffer.from(bytes, 'base64'), { flag: 'wx', mode: 0o700 })
     }
-    const result = await runSkillCommand(directory, tool.command, input, tool.timeoutSeconds, signal)
+    const result = await runSkillCommand(directory, tool.command, input, tool.timeoutSeconds, signal, external)
     if (result.exitCode !== 0) throw new Error(`Skill command failed (${result.exitCode}): ${result.stderr.slice(0, 2000)}`)
     let output: unknown
     try { output = JSON.parse(result.stdout) } catch { output = result.stdout }

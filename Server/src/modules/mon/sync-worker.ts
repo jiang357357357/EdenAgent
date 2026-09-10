@@ -42,22 +42,30 @@ export class MonSyncWorker {
         if (!events.length) continue
         const client = new MonClient(connection.coreBaseUrl, connection.coreToken)
         const remoteId = await this.projection.ensure(client, sessionId, destination, this.abort.signal)
-        for (const event of events) {
-          if (event.kind === 'agent.message_end') {
-            const body = messageProjection(this.sessions, event)
-            if (body) await this.delivery.deliver(client, sessionId, key, event.id, remoteId, 'message', body, this.abort.signal)
-          }
-          const director = directorProjection(event)
-          if (director) await this.delivery.deliver(client, sessionId, key, event.id, remoteId, 'director', director, this.abort.signal)
-          db.prepare('UPDATE mon_sync_progress SET after_seq=?,attempts=0,retry_at=0,error=NULL WHERE session_id=? AND destination_key=?')
-            .run(event.seq, sessionId, key)
-        }
+        await this.deliverEvents(events, client, sessionId, key, remoteId)
       } catch {
         const attempts = Math.min(20, Number(progress.attempts) + 1)
         db.prepare('UPDATE mon_sync_progress SET attempts=?,retry_at=?,error=? WHERE session_id=? AND destination_key=?')
           .run(attempts, Date.now() + Math.min(300000, 2000 * 2 ** attempts), 'Mon projection delivery was not confirmed', sessionId, key)
       }
     }
+
   }
   async close() { if (this.timer) clearInterval(this.timer); this.abort.abort(); await this.task }
+
+  private async deliverEvents(events: ReturnType<SessionRepository['events']['list']>, client: MonClient, sessionId: string, key: string, remoteId: string) {
+    const db = this.sessions.database.connection
+
+    for (const event of events) {
+      if (event.kind === 'agent.message_end') {
+        const body = messageProjection(this.sessions, event)
+        if (body) await this.delivery.deliver(client, sessionId, key, event.id, remoteId, 'message', body, this.abort.signal)
+      }
+      const director = directorProjection(event)
+      if (director) await this.delivery.deliver(client, sessionId, key, event.id, remoteId, 'director', director, this.abort.signal)
+      db.prepare('UPDATE mon_sync_progress SET after_seq=?,attempts=0,retry_at=0,error=NULL WHERE session_id=? AND destination_key=?')
+        .run(event.seq, sessionId, key)
+    }
+
+  }
 }

@@ -6,6 +6,8 @@ import type { JsonValue } from '@eden/api'
 import type { SkillService } from '../../modules/skills/index.ts'
 export function skillRoutes(service: SkillService): Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> {
   const handlers: Record<string, (params: JsonValue) => JsonValue | Promise<JsonValue>> = {
+    'skill.catalog_status': raw => { z.object({}).strict().parse(raw); return service.status() },
+    'skill.refresh': async raw => { z.object({}).strict().parse(raw); await service.refresh(); return { refreshed: true } },
     'skill.list': raw => { z.object({}).strict().parse(raw); return toJson(service.repository.list()) },
     'skill.read': raw => { const input = skillReadSchema.parse(raw); return toJson(service.repository.read(input.name, true, input)) },
     'skill.inspect': async raw => toJson(await service.inspect(raw)),

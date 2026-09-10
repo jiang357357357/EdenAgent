@@ -17,6 +17,23 @@ export class ExternalCommandSandbox {
     if (createHash('sha256').update(readFileSync(this.executable)).digest('hex') !== this.sha256) throw new Error('External sandbox executable changed; administrator confirmation is required')
     return this.executable
   }
+  program(root: string, cwd: string, command: readonly string[], launcher: 'program' | 'mcp' = 'program') {
+    const executable = this.checkedExecutable(), workspace = realpathSync(root), working = realpathSync(cwd)
+    const relative = path.relative(workspace, working)
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('External sandbox working directory escapes snapshot')
+    if (!command.length || !command[0] || command.some(value => value.includes('\0'))) throw new Error('Invalid sandbox program arguments')
+    const program = command[0] === 'node' || command[0] === 'nodejs' ? process.execPath : command[0]
+    return { executable, args: ['--workspace', workspace, '--cwd', working, '--launcher', launcher, '--', program, ...command.slice(1)], cwd: working }
+  }
+  async probeProgram() {
+    let root
+    try {
+      root = await mkdtemp(path.join(os.tmpdir(), 'eden-external-program-'))
+      const result = await runProcess({ ...this.program(root, root, ['node', '-e', 'process.exit(0)']), input: '', timeoutMs: 5000, maxOutputBytes: 1024 })
+      return { available: result.exitCode === 0 }
+    } catch { return { available: false } }
+    finally { if (root) await rm(root, { recursive: true, force: true }) }
+  }
   async probe() {
     let root
     try {

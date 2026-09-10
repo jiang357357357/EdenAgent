@@ -14,7 +14,7 @@ export function captureRoleSkills(names: string[], repository?: SkillRepository)
   return names.map(name => {
     const skill = repository!.read(name)
     if (!skill.enabled || !skill.modelInvocable || !skill.available || typeof skill.content !== 'string') throw new Error(`Role skill is unavailable: ${name}; missing tools: ${skill.missingTools.join(', ') || 'none'}`)
-    if (skill.profiles.length && !skill.profiles.includes('user_chat')) throw new Error(`Role skill does not support child conversation tasks: ${name}`)
+    if (!skill.profiles.includes('subagent')) throw new Error(`Role skill does not declare the subagent profile: ${name}`)
     total += Buffer.byteLength(skill.content)
     if (total > 256 * 1024) throw new Error('Role skill instructions exceed 256 KiB; narrow the skill selection')
     return { name, contentHash: skill.contentHash, workspaceRoot: skill.workspaceRoot, content: skill.content,

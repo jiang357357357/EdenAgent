@@ -7,7 +7,7 @@ import type { Readable, Writable } from 'node:stream'
 import { sandboxArguments, sandboxExecutable } from './sandbox-arguments.ts'
 export interface ConnectorProcessRequest {
   executable: string
-  packageSnapshot?: { files: ReadonlyMap<string, Buffer>; entrypoint: string }
+  packageSnapshot?: { files: ReadonlyMap<string, Buffer>; entrypoint: string } | undefined
   sha256: string
   args?: string[]
   dataDirectory: string
@@ -43,33 +43,9 @@ export async function launchConnectorProcess(request: ConnectorProcessRequest): 
   if (request.adminBridgeDirectory && request.httpsBridgeDirectory) throw new Error('Only one connector network bridge is allowed')
   if (request.httpsBridgeDirectory) args.push('--ro-bind', canonical(request.httpsBridgeDirectory, true), '/network')
   if (request.adminBridgeDirectory) args.push('--ro-bind', canonical(request.adminBridgeDirectory, true), '/network')
-  const environment: Record<string, string> = { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' }
-  if (request.identity) {
-    if (!request.identity.key || request.identity.key.length > 256 || !request.identity.credential || request.identity.credential.length > 16384
-      || /[\r\n\0]/.test(request.identity.key + request.identity.credential)) throw new Error('Invalid private connector identity')
-    environment.MON_CONNECTOR_IDENTITY_KEY = request.identity.key
-    environment.MON_CONNECTOR_IDENTITY_CREDENTIAL = request.identity.credential
-  }
-  if (request.adminBridgeDirectory) environment.MON_CONNECTOR_ADMIN_SOCKET = '/network/transport.sock'
-  if (request.httpsBridgeDirectory) environment.MON_CONNECTOR_HTTPS_SOCKET = '/network/transport.sock'
-  const targets = new Set<string>()
-  for (const mount of request.readMounts) {
-    if (!/^\/inputs\/[a-zA-Z0-9_-]{1,64}$/.test(mount.target) || targets.has(mount.target)) throw new Error('Invalid connector sandbox mount target')
-    targets.add(mount.target)
-    const source = realpathSync(mount.source), stat = lstatSync(source)
-    if (!path.isAbsolute(mount.source) || lstatSync(mount.source).isSymbolicLink() || (!stat.isDirectory() && !stat.isFile())) throw new Error('Invalid connector read mount')
-    args.push('--ro-bind', source, mount.target)
-  }
-  const writes = request.writeMounts ?? []
-  if (writes.length > 4) throw new Error('Too many connector write grants')
-  args.push('--dir', '/outputs')
-  for (const mount of writes) {
-    if (!/^\/outputs\/[a-zA-Z0-9_-]{1,64}$/.test(mount.target) || targets.has(mount.target)) throw new Error('Invalid connector write target')
-    targets.add(mount.target)
-    args.push('--bind', canonical(mount.source, true), mount.target)
-  }
-  const workerArgs = request.args ?? []
-  if (workerArgs.length > 32 || workerArgs.some(arg => typeof arg !== 'string' || arg.length > 4096 || arg.includes('\0'))) throw new Error('Invalid connector worker arguments')
+  const environment: Record<string, string> = connectorEnvironment(request)
+  connectorMountArguments(request, args)
+  const workerArgs = connectorWorkerArguments(request)
   const snapshot = request.packageSnapshot
     ? await snapshotWorkerPackage(request.packageSnapshot.files, request.packageSnapshot.entrypoint, request.sha256, request.signal)
     : { ...await snapshotWorker(executable!, request.sha256, request.signal), root: undefined, guestExecutable: '/worker/connector', cwd: '/data' }
@@ -101,4 +77,42 @@ export async function launchConnectorProcess(request: ConnectorProcessRequest): 
     request.signal.throwIfAborted()
   } catch (error) { kill(); await exited; throw error }
   return { input: child.stdin, output: child.stdout, exited, async stop() { kill(); await exited } }
+}
+
+function connectorWorkerArguments(request: ConnectorProcessRequest) {
+  const workerArgs = request.args ?? []
+  if (workerArgs.length > 32 || workerArgs.some(arg => typeof arg !== 'string' || arg.length > 4096 || arg.includes('\0'))) throw new Error('Invalid connector worker arguments')
+  return workerArgs
+}
+
+function connectorMountArguments(request: ConnectorProcessRequest, args: string[]) {
+  const targets = new Set<string>()
+  for (const mount of request.readMounts) {
+    if (!/^\/inputs\/[a-zA-Z0-9_-]{1,64}$/.test(mount.target) || targets.has(mount.target)) throw new Error('Invalid connector sandbox mount target')
+    targets.add(mount.target)
+    const source = realpathSync(mount.source), stat = lstatSync(source)
+    if (!path.isAbsolute(mount.source) || lstatSync(mount.source).isSymbolicLink() || (!stat.isDirectory() && !stat.isFile())) throw new Error('Invalid connector read mount')
+    args.push('--ro-bind', source, mount.target)
+  }
+  const writes = request.writeMounts ?? []
+  if (writes.length > 4) throw new Error('Too many connector write grants')
+  args.push('--dir', '/outputs')
+  for (const mount of writes) {
+    if (!/^\/outputs\/[a-zA-Z0-9_-]{1,64}$/.test(mount.target) || targets.has(mount.target)) throw new Error('Invalid connector write target')
+    targets.add(mount.target)
+    args.push('--bind', canonical(mount.source, true), mount.target)
+  }
+}
+
+function connectorEnvironment(request: ConnectorProcessRequest) {
+  const environment: Record<string, string> = { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' }
+  if (request.identity) {
+    if (!request.identity.key || request.identity.key.length > 256 || !request.identity.credential || request.identity.credential.length > 16384
+      || /[\r\n\0]/.test(request.identity.key + request.identity.credential)) throw new Error('Invalid private connector identity')
+    environment.MON_CONNECTOR_IDENTITY_KEY = request.identity.key
+    environment.MON_CONNECTOR_IDENTITY_CREDENTIAL = request.identity.credential
+  }
+  if (request.adminBridgeDirectory) environment.MON_CONNECTOR_ADMIN_SOCKET = '/network/transport.sock'
+  if (request.httpsBridgeDirectory) environment.MON_CONNECTOR_HTTPS_SOCKET = '/network/transport.sock'
+  return environment
 }

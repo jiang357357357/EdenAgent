@@ -31,9 +31,9 @@ export function subagentRecoveryStatus(database: EdenDatabase, agentId: string):
     historicalConfigurationHash: historical ? createHash('sha256').update(String(historical.config_json)).digest('hex') : null,
     checks: [
       check('inactive', !['queued', 'running'].includes(String(thread.state)), '任务须停止后才能恢复配置。'),
-      check('context', Boolean(checkpoint) && (!historical || context?.state === 'prepared'), '历史上下文须已转换或明确应用人工摘要。'),
+      check('context', contextRecovered(checkpoint, historical, context), '历史上下文须已转换或明确应用人工摘要。'),
       check('workspace', Boolean(root) && root === new WorkspaceRepository(database).read(), '须明确绑定并选择原任务工作区。'),
-      check('parent', thread.parent_id == null || Boolean(parent && parent.workspace_root === root && (parent.recovery_state == null || parent.recovery_state === 'ready')), '嵌套任务须先恢复父任务与工作区归属。'),
+      check('parent', parentRecovered(thread.parent_id, parent, root), '嵌套任务须先恢复父任务与工作区归属。'),
       check('policy', Boolean(policy && role), '须保存经过历史限制收窄的工具策略及角色技能快照。'),
       check('modelReview', !historical || Boolean(modelReview), '须明确确认恢复模型；待激活快照不代表已经绑定到运行会话。'),
       check('usage', !thread.usage_unknown && !thread.cost_unknown && !unresolvedRequests, '历史用量与未确认模型请求须先核对。'),
@@ -42,4 +42,10 @@ export function subagentRecoveryStatus(database: EdenDatabase, agentId: string):
       check('legacyReady', !historical || historical.state === 'ready', '各项准备不等于激活；旧任务须完成整体恢复记录。'),
     ],
   }
+}
+
+function parentRecovered(parentId: unknown, parent: Record<string, unknown> | undefined, root: string | null) { return parentId == null || Boolean(parent && parent.workspace_root === root && (parent.recovery_state == null || parent.recovery_state === 'ready')) }
+
+function contextRecovered(checkpoint: unknown, historical: unknown, context: Record<string, unknown> | undefined) {
+  return Boolean(checkpoint) && (!historical || context?.state === 'prepared')
 }

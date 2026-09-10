@@ -1,3 +1,4 @@
+import { CommandService } from '../src/modules/commands/command-service.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, existsSync } from 'node:fs'
@@ -20,7 +21,7 @@ test('workspace writes and commands wait for approval and execute within the sel
   const permissions = new PermissionService(database, sessions.events)
   const workspace = new WorkspaceService(database, [])
   workspace.switch(project)
-  const tools = workspaceTools(workspace, permissions, session.id, session.id)
+  const tools = workspaceTools(workspace, permissions, session.id, session.id, new CommandService(database, []))
   const controller = new AbortController()
   let call = 0
   const execute = (name: string, input: Record<string, unknown>) => tools.find(tool => tool.name === name)!.execute(input, { callId: String(++call), signal: controller.signal })

@@ -32,7 +32,7 @@ export class SessionService {
 
   constructor(readonly repository: SessionRepository, private readonly model: RuntimeModel | ((sessionId: string) => RuntimeModel | undefined) | undefined,
     private readonly tools: (sessionId: string, turnId: string) => RuntimeTool[] = () => [],
-    private readonly participantsChanged: (sessionId: string) => void = () => {},
+    private readonly participantsChanged: (sessionId: string) => void = () => { },
     private readonly extension?: SessionTurnExtension, private readonly boundary?: SessionBoundary,
     private readonly attachments?: AttachmentService, private readonly memoryRecall?: MemoryRecall) {
     this.inputs = new InputRepository(repository.database, repository.events)
@@ -198,7 +198,7 @@ export class SessionService {
     this.controllers.get(input.sessionId)?.signal.throwIfAborted()
     const runtime = createRuntime({
       sessionId: input.sessionId, systemPrompt: sessionPrompt(input.metadata ?? {}) + (this.memoryRecall?.prompt(input.sessionId, input.turnId, input.text) ?? ''),
-      model, tools: this.tools(input.sessionId, input.turnId), transientInput,
+      model, tools: this.tools(input.sessionId, input.turnId), refreshTools: () => this.tools(input.sessionId, input.turnId), transientInput,
       callbacks: runtimeCallbacks(this.repository, input, { privateUserInput: transientInput }),
       ...(checkpoint ? { checkpoint } : {}),
     })

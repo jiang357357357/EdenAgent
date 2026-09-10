@@ -1,11 +1,10 @@
 /** Only Core's own media origin may receive its authentication token. */
 export async function fetchMonAudio(base: URL, token: string, source: string, signal?: AbortSignal) {
-  const url = new URL(source, base)
-  if (url.origin !== base.origin || !url.pathname.startsWith('/media/') || url.username || url.password || url.hash || /%2f|%5c|%2e/i.test(url.pathname)) {
-    throw new Error('Mon audio URL escaped its configured media origin')
-  }
-  const response = await fetch(url, { redirect: 'error', headers: { Authorization: `Token ${token}` },
-    signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]) })
+  const url = monMediaUrl(source, base)
+  const response = await fetch(url, {
+    redirect: 'error', headers: { Authorization: `Token ${token}` },
+    signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])])
+  })
   const max = 32 * 1024 * 1024
   if (!response.ok || !response.body || Number(response.headers.get('content-length')) > max) {
     await response.body?.cancel(); throw new Error('Mon audio download failed or exceeded its size limit')
@@ -25,4 +24,12 @@ export async function fetchMonAudio(base: URL, token: string, source: string, si
     if (!size) throw new Error('Mon returned empty audio')
     return { bytes: Buffer.concat(chunks), mime }
   } finally { await reader.cancel().catch(() => undefined); reader.releaseLock() }
+}
+
+function monMediaUrl(source: string, base: URL) {
+  const url = new URL(source, base)
+  if (url.origin !== base.origin || !url.pathname.startsWith('/media/') || url.username || url.password || url.hash || /%2f|%5c|%2e/i.test(url.pathname)) {
+    throw new Error('Mon audio URL escaped its configured media origin')
+  }
+  return url
 }

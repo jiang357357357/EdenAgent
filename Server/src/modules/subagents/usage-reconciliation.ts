@@ -1,4 +1,5 @@
 import type { EdenDatabase } from '@eden/store'
+import type { SQLOutputValue, DatabaseSync } from 'node:sqlite'
 
 /** Fill missing receipt fields only. Known provider amounts cannot be silently revised. */
 export function reconcileSubagentReceipt(database: EdenDatabase, requestId: string, turnId: string, tokens: number, costMicrousd: number): void {
@@ -11,6 +12,10 @@ export function reconcileSubagentReceipt(database: EdenDatabase, requestId: stri
   const owners = db.prepare('SELECT agent_id FROM subagent_request_owners WHERE request_id=?').all(requestId)
   if (!owners.length || owners.length > 4) throw new Error('Request has invalid budget ownership')
   db.prepare('UPDATE subagent_usage_receipts SET tokens=?,cost_microusd=? WHERE turn_id=? AND message_id=?').run(tokens, costMicrousd, turnId, requestId)
+  reconcileBudgetOwners(owners, db, tokenDelta, costDelta)
+}
+
+function reconcileBudgetOwners(owners: Record<string, SQLOutputValue>[], db: DatabaseSync, tokenDelta: number, costDelta: number) {
   for (const owner of owners) {
     const row = db.prepare('SELECT * FROM subagent_threads WHERE id=?').get(owner.agent_id!)
     if (!row) throw new Error('Request budget owner is missing')

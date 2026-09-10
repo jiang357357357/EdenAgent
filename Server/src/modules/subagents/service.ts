@@ -11,7 +11,7 @@ import type { ModelService } from '../models/index.ts'
 import type { JobRepository } from '../jobs/index.ts'
 import { SubagentRepository } from './repository.ts'
 export class SubagentService {
-  constructor(readonly repository: SubagentRepository, private readonly sessions: SessionService, private readonly models: ModelService, private readonly jobs: JobRepository, readonly mailbox: SubagentMailbox, private readonly skills?: SkillRepository) {}
+  constructor(readonly repository: SubagentRepository, private readonly sessions: SessionService, private readonly models: ModelService, private readonly jobs: JobRepository, readonly mailbox: SubagentMailbox, private readonly skills?: SkillRepository) { }
   private readonly stopping = new Set<string>()
   async stopChildren(sessionId: string): Promise<void> {
     if (this.stopping.has(sessionId)) return
@@ -27,7 +27,7 @@ export class SubagentService {
   parentActive(sessionId: string) { try { this.assertParentActive(sessionId); return true } catch { return false } }
   private assertParentActive(sessionId: string) {
     let current: string | undefined = sessionId
-    for (let depth = 0; current && depth <= 5; depth++) {
+    for (let depth = 0;current && depth <= 5;depth++) {
       if (this.stopping.has(current) || this.sessions.repository.read(current).status !== 'active') throw new Error('Parent session is stopping or closed')
       const parent = this.repository.parent(current)
       current = parent ? String(this.repository.raw(parent.id).parent_session_id) : undefined
