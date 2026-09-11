@@ -40,7 +40,7 @@
     "prepare": "husky",
     "test": "npm run test:architecture && npm run test:server",
     "test:server-artifact": "npm run build:server && node --test Script/Project/server_artifact.test.mjs",
-    "test:project": "node --test Script/Project/connector_resources.test.mjs Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs Script/Project/openttd_launcher.test.mjs frontend/tests/process-runner.test.mjs",
+    "test:project": "node --test Script/Project/runtime_children.test.mjs Script/Project/connector_resources.test.mjs Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs Script/Project/openttd_launcher.test.mjs frontend/tests/process-runner.test.mjs",
     "test:all": "npm test && npm --prefix frontend/web test && npm --prefix frontend/desktop test && npm run test:project && npm run test:server-artifact"
   },
   "workspaces": [

@@ -34,7 +34,7 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
       try {
         const value = snapshot as Record<string, JsonValue>
         const definitions = value.tools as Record<string, JsonValue>[]
-        await options.callbacks.request(toJson({ ...value, tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
+        await options.callbacks.request(toJson({ ...value, promptHints: currentTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []), tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
       } catch (error) { fatal = error; throw error }
     },
   })

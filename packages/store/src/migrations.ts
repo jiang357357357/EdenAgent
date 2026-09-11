@@ -403,6 +403,10 @@ export const migrations: readonly string[] = [
    ALTER TABLE local_child_models ADD COLUMN independent INTEGER NOT NULL DEFAULT 0;`,
   `CREATE TABLE mon_child_models(session_id TEXT NOT NULL REFERENCES sessions(id),model_key TEXT NOT NULL,entity_id TEXT NOT NULL,
      binding_json TEXT NOT NULL,connection_hash TEXT NOT NULL,revision TEXT NOT NULL,updated_at INTEGER NOT NULL,PRIMARY KEY(session_id,model_key));`,
+  `CREATE INDEX events_session_kind_seq ON events(session_id,kind,seq);
+   CREATE INDEX events_session_turn_kind_seq ON events(session_id,turn_id,kind,seq);`,
+  `INSERT INTO realm_meta(key,value) VALUES ('event_payload_format','eden.message.delta.v1');`,
+  `CREATE TABLE request_contents(hash TEXT PRIMARY KEY,content_json TEXT NOT NULL);`,
 ]
 
 export const databaseSchemaVersion = migrations.length

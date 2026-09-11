@@ -23,17 +23,29 @@ export async function stopChild(child) {
   }
 }
 
-export async function waitForHealth(port, origin, child) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (child.exitCode !== null || child.signalCode !== null) throw new Error(`${origin} Server exited before health check`)
+export async function waitForHealth(port, origin, child, { timeoutMs = 60000, intervalMs = 100 } = {}) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(intervalMs) || intervalMs < 0) throw new Error('Invalid startup wait bounds')
+  const started = performance.now()
+  const endpoint = `http://127.0.0.1:${port}/healthz`
+  let detail = 'No response received'
+  let requestError = ''
+  while (performance.now() - started < timeoutMs) {
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error(`${origin} Server exited before health check (code=${child.exitCode}, signal=${child.signalCode})`)
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(500) })
+      const remaining = Math.max(1, Math.ceil(timeoutMs - (performance.now() - started)))
+      const response = await fetch(endpoint, { signal: AbortSignal.timeout(Math.min(500, remaining)) })
+      requestError = ''
+      detail = `HTTP ${response.status}`
       const health = await response.json()
       if (response.ok && health.runtimeOrigin === origin && health.serverVersion === '2.0.0-dev.0') return
-    } catch { /* A starting server may not yet accept a connection. */ }
-    await delay(100)
+      detail += `; origin=${health.runtimeOrigin}, version=${health.serverVersion}`
+    } catch (error) {
+      requestError = `; request failed: ${error.cause?.code ?? error.message}`.slice(0, 500)
+    }
+    const remaining = timeoutMs - (performance.now() - started)
+    if (remaining > 0) await delay(Math.min(intervalMs, remaining))
   }
-  throw new Error(`${origin} Server startup timed out`)
+  throw new Error(`${origin} Server startup timed out after ${Math.round(performance.now() - started)}ms (${endpoint}; ${detail}${requestError}). Check server.startup logs for the last initialization stage.`)
 }
 
 export async function waitForWeb(port, child) {
