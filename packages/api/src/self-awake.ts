@@ -12,7 +12,7 @@ export const selfAwakeTimerSchema = z.object({
 export const selfAwakeDecisionSchema = z.object({
   mood: z.string().max(1000), current_desire: z.string().max(4000), observations: z.array(z.string().max(4000)).max(5),
   should_interrupt_user: z.boolean(), action: z.enum(['chat_user', 'remind_user', 'create_task', 'ask_user', 'run_safe_check', 'sync_context', 'write_diary']),
-  action_payload: jsonValue, next_wake: z.object({ after_minutes: z.number().int().min(1).max(10080), reason: z.string().min(1).max(4000) }).strict(),
+  action_payload: jsonValue, next_wake: z.object({ after_minutes: z.number().int().min(1).max(10080), reason: z.string().min(1).max(4000) }).strict().nullable(),
   diary: z.object({ title: z.string().trim().min(1).max(1000), content: z.string().trim().min(1).max(32000) }).strict(),
 }).strict()
 export type SelfAwakeDecision = z.infer<typeof selfAwakeDecisionSchema>

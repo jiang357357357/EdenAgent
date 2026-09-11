@@ -407,6 +407,13 @@ export const migrations: readonly string[] = [
    CREATE INDEX events_session_turn_kind_seq ON events(session_id,turn_id,kind,seq);`,
   `INSERT INTO realm_meta(key,value) VALUES ('event_payload_format','eden.message.delta.v1');`,
   `CREATE TABLE request_contents(hash TEXT PRIMARY KEY,content_json TEXT NOT NULL);`,
+  `UPDATE jobs SET state='cancelled',error='Replaced by latest self-awake plan during queue upgrade'
+     WHERE kind='self_awake' AND state='queued' AND id NOT IN
+       (SELECT id FROM jobs WHERE kind='self_awake' AND state='queued' ORDER BY created_at DESC,rowid DESC LIMIT 1);
+   CREATE UNIQUE INDEX jobs_one_pending_self_awake ON jobs(kind) WHERE kind='self_awake' AND state='queued';
+   CREATE TABLE self_awake_timer_publications(job_id TEXT PRIMARY KEY REFERENCES jobs(id),published_at INTEGER NOT NULL);
+   CREATE TABLE self_awake_submission_aliases(user_id TEXT NOT NULL,request_key TEXT NOT NULL,request_hash TEXT NOT NULL,
+     job_id TEXT NOT NULL REFERENCES jobs(id),PRIMARY KEY(user_id,request_key));`,
 ]
 
 export const databaseSchemaVersion = migrations.length

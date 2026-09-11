@@ -1,5 +1,5 @@
 import { tableConverted } from './conversion-state.ts'
-import { convertSelfAwakeJob } from './self-awake-job.ts'
+import { convertSelfAwakeJob, retainLatestImportedWake } from './self-awake-job.ts'
 import { convertSelfAwakeSubmission } from './self-awake-submission.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import type { LegacySnapshotReader } from './snapshot-reader.ts'
@@ -33,6 +33,11 @@ function reminderMemo(job: ConvertedJob, db: DatabaseSync) {
   return memo
 }
 
+function pendingWake(db: DatabaseSync, kind: string, job: ConvertedJob, createdAt: number): ConvertedJob {
+  if (kind !== 'self_awake' || job.state !== 'queued' || retainLatestImportedWake(db, createdAt)) return job
+  return { ...job, state: 'cancelled', error: 'Superseded by a newer imported self-awake plan' }
+}
+
 function convertJob(db: DatabaseSync, row: LegacyRow): void {
   const id = legacyUuid(row, 'id'), kind = legacyText(row, 'kind'), state = legacyText(row, 'state')
   if (!['scheduled', 'claimed', 'completed', 'failed', 'cancelled'].includes(state)) throw new Error('Unsupported legacy job state')
@@ -53,6 +58,7 @@ function convertJob(db: DatabaseSync, row: LegacyRow): void {
   }
   if (state === 'scheduled' && !['memo.reminder', 'self_awake'].includes(kind)) throw new Error(`Scheduled legacy job requires a domain converter: ${kind}`)
   if (kind === 'memo.reminder' && ['scheduled', 'claimed'].includes(state)) job = reminder(db, job)
+  job = pendingWake(db, kind, job, legacyTime(row.created_at))
   db.prepare(`INSERT INTO jobs(id,kind,session_id,due_at,payload_json,operation_key,causation_id,depth,state,attempts,error,created_at,updated_at)
     VALUES(?,?,?,?,?,?,?,0,?,?,?,?,?)`).run(id, kind, job.sessionId, job.dueAt, job.payload, job.key, job.causation,
     job.state, attempts, job.error, legacyTime(row.created_at), legacyTime(row.updated_at))
