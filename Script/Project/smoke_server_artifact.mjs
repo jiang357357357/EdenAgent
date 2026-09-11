@@ -10,7 +10,7 @@ const children = []
 async function launch(origin) {
   const child = spawn(process.execPath, ['dist/server/main.mjs'], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    env: { ...realmEnvironment(process.env, origin, origin.repeat(16), 0), EDEN_AGENT_V2_DATA_ROOT: path.join(directory, origin) },
+    env: { ...realmEnvironment(process.env, origin, origin.repeat(16), 0), EDEN_AGENT_DATA_ROOT: path.join(directory, origin) },
   })
   children.push(child)
   const port = await new Promise((resolve, reject) => {

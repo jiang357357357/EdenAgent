@@ -34,7 +34,7 @@ The host and connectors use Node/TypeScript. The separate Windows desktop pointe
 
 ## Realms and models
 
-The two hosts keep separate processes, capability tokens, databases, files and credentials. Events are committed before broadcast. Default new roots are `Data/realms/mon/v2` and `Data/realms/local/v2`; old production data is not automatically copied or migrated in place.
+The two hosts keep separate processes, capability tokens, databases, files and credentials. Events are committed before broadcast. Data roots are fixed at `Data/realms/mon` and `Data/realms/local`; legacy Agent data is ignored and never imported.
 
 Mon models come from verified Mon Core connections, including actor and director bindings. Local models use local configuration or `EDEN_AGENT_MODEL=provider/model`. Independent child-model profiles stay within their realm; updating a profile does not silently change existing task snapshots.
 

@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises"
 
 const baseUrl = process.env.EDEN_AGENT_BASE_URL || "http://127.0.0.1:40092"
-const tokenFile = process.env.EDEN_AGENT_TOKEN_FILE || "Data/server-capability.token"
+const dataRoot = process.env.EDEN_AGENT_DATA_ROOT || "Data/realms/mon"
+const tokenFile = process.env.EDEN_AGENT_MON_TOKEN_FILE || `${dataRoot}/capability.token`
 const connectorKey = process.argv[2]
 let completed = false
 

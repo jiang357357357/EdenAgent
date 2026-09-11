@@ -22,6 +22,15 @@ export function stopWindowsProcessTree(pid: number): Promise<void> {
     const child = spawn(tools.taskkill, ['/PID', String(pid), '/T', '/F'], { shell: false, windowsHide: true, stdio: 'ignore', env: tools.environment })
     const timer = setTimeout(() => { child.kill(); reject(new Error('Windows process-tree termination timed out')) }, 10000)
     child.once('error', error => { clearTimeout(timer); reject(error) })
-    child.once('close', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error('Windows process-tree termination was not confirmed')) })
+    child.once('close', code => {
+      clearTimeout(timer)
+      if (code === 0) { resolve(); return }
+      // taskkill returns 128 when the worker exits before its process snapshot.
+      if (code === 128) {
+        try { process.kill(pid, 0) }
+        catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') { resolve(); return } }
+      }
+      reject(new Error(`Windows process-tree termination was not confirmed (taskkill ${code})`))
+    })
   })
 }

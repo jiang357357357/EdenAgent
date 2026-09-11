@@ -3,13 +3,13 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { launchNode, realmEnvironment, stopChild, waitForHealth, waitForWeb } from './runtime_children.mjs'
-import realmRoots from '../../frontend/desktop/src/processes/realm-data-roots.cjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(import.meta.url)
-const { roots: dataRoots, selection } = realmRoots.resolveRealmSelection(process.env, {
-  mon: path.join(root, 'Data/realms/mon/v2'), local: path.join(root, 'Data/realms/local/v2'),
-})
+const dataRoots = {
+  mon: path.resolve(process.env.EDEN_AGENT_MON_DATA_ROOT ?? path.join(root, 'Data/realms/mon')),
+  local: path.resolve(process.env.EDEN_AGENT_LOCAL_DATA_ROOT ?? path.join(root, 'Data/realms/local')),
+}
 const children = []
 const tokens = { mon: randomBytes(32).toString('base64url'), local: randomBytes(32).toString('base64url') }
 const ports = { mon: Number(process.env.EDEN_AGENT_MON_PORT ?? 40092), local: Number(process.env.EDEN_AGENT_LOCAL_PORT ?? 40093) }
@@ -33,8 +33,7 @@ try {
   const checks = []
   for (const origin of ['mon', 'local']) {
     const child = start(['--import', 'tsx', 'Server/src/main.ts'], {
-      ...realmEnvironment(process.env, origin, tokens[origin], ports[origin]), EDEN_AGENT_V2_DATA_ROOT: dataRoots[origin],
-      ...(selection ? { EDEN_AGENT_RUNTIME_SELECTION: selection.filename, EDEN_AGENT_RUNTIME_SELECTION_REVISION: selection.revision } : {}),
+      ...realmEnvironment(process.env, origin, tokens[origin], ports[origin]), EDEN_AGENT_DATA_ROOT: dataRoots[origin],
     })
     checks.push(waitForHealth(ports[origin], origin, child))
   }

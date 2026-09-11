@@ -5,18 +5,20 @@ import { toJson, configuredModelSchema } from '@eden/api'
 import type { JsonValue } from '@eden/api'
 import * as completions from '@earendil-works/pi-ai/api/openai-completions'
 import type { RuntimeModel } from './contracts.ts'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { durableResponseStream } from './response-stream.ts'
 
 interface RequestControl { record(snapshot: JsonValue): Promise<void>; signal(): AbortSignal; response?(snapshot: JsonValue): Promise<void>; failed?(error: unknown): void }
 
-export function createRuntimeModels(config: RuntimeModel, control: RequestControl): { models: Models; model: Model<'openai-completions'> } {
+export function createRuntimeModels(config: RuntimeModel, control: RequestControl, sessionId: string = randomUUID()): { models: Models; model: Model<'openai-completions'> } {
   configuredModelSchema.parse(config)
   const model: Model<'openai-completions'> = {
     id: config.id, name: config.id, api: 'openai-completions', provider: config.provider,
     baseUrl: config.baseUrl, reasoning: config.reasoning !== undefined && config.reasoning !== 'off', input: ['text', 'image'],
     cost: config.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: config.contextWindow, maxTokens: config.maxTokens,
+    ...(['opencode-go', 'opencode_go'].includes(config.provider) ? { headers: { 'User-Agent': 'eden-agent/2.0.0-dev.0',
+      'x-opencode-session': createHash('sha256').update(sessionId).digest('hex') } } : {}),
   }
   const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } })
   const observe = (start: (scoped: RequestControl) => ReturnType<typeof completions.stream>) => {

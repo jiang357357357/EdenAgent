@@ -12,7 +12,7 @@ const artifact = fileURLToPath(new URL('../../dist/server/main.mjs', import.meta
 async function host(root, origin) {
   const token = (origin === 'local' ? 'l' : 'm').repeat(43)
   const child = fork(artifact, [], { cwd: root, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    env: { PATH: process.env.PATH, EDEN_AGENT_RUNTIME_ORIGIN: origin, EDEN_AGENT_V2_DATA_ROOT: path.join(root, origin),
+    env: { PATH: process.env.PATH, EDEN_AGENT_RUNTIME_ORIGIN: origin, EDEN_AGENT_DATA_ROOT: path.join(root, origin),
       EDEN_AGENT_CAPABILITY_TOKEN: token, EDEN_AGENT_PORT: '0' } })
   let stderr = '', stdout = ''
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-8000) })

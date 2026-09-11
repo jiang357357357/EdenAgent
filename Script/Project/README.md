@@ -12,10 +12,6 @@ Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独�
 
 `dev.mjs` 的等待逻辑见 `runtime_children.mjs`；独立桌面入口有自己的启动等待流程。不得把旧入口的超时或原地复制行为视为当前实现。旧数据只能通过明确快照、暂存导入与激活恢复，不自动覆盖或迁移真实 Data。
 
-- `import_legacy.mjs` / `export_legacy.mjs`：快照、暂存转换、恢复与激活预检。
-- `activate_legacy.mjs` / `activate_pair.mjs` / `rollback_pair.mjs`：单库/共同激活与回退门禁。
-- `select_runtime.mjs`：离线成对选择启动根目录及恢复上一版。
-- `migration_artifacts.mjs`：把以上命令打包为独立 ESM 文件，并为发行包附上命令索引、操作文档和 SHA-256 清单。角色 TOML 导出辅助脚本仍需 Python 3.11+。
 
 迁移实现说明见 `文档/技术/ts-migration/数据迁移操作.md`。当前阶段只编写业务与发行实现；未经用户明确要求，不运行测试、构建、迁移或冒烟检查，未运行不能宣称制品已验收。
 

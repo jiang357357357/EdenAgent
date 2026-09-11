@@ -8,11 +8,13 @@ export type RecordedReply = { text: string } | { tool: string; input: Record<str
 
 export async function recordedModel(replies: RecordedReply[]) {
   const requests: Record<string, unknown>[] = []
+  const headers: import('node:http').IncomingHttpHeaders[] = []
   const active = new Set<ServerResponse>()
   const server = createServer(async (request, response) => {
     let body = ''
     for await (const chunk of request) body += chunk.toString()
     requests.push(JSON.parse(body))
+    headers.push(request.headers)
     const reply = replies[requests.length - 1]
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     active.add(response)
@@ -35,7 +37,7 @@ export async function recordedModel(replies: RecordedReply[]) {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as AddressInfo).port
   return {
-    requests,
+    requests, headers,
     config: { provider: 'recorded', id: 'recorded', baseUrl: `http://127.0.0.1:${port}/v1`, contextWindow: 32000, maxTokens: 1024 },
     async close() {
       for (const response of active) response.destroy()

@@ -37,7 +37,7 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
         await options.callbacks.request(toJson({ ...value, promptHints: currentTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []), tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
       } catch (error) { fatal = error; throw error }
     },
-  })
+  }, options.sessionId)
   const harness: AgentHarness<Record<string, never>> = new AgentHarness<Record<string, never>>({
     session: storage.session(), ...provider,
     toolContext: async () => {

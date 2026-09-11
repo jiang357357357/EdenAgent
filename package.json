@@ -8,8 +8,6 @@
   "scripts": {
     "check:architecture": "node Script/Architecture/check.mjs",
     "test:architecture": "node --test Script/Architecture/rules.test.mjs",
-    "legacy:export": "node --import tsx Script/Project/export_legacy.mjs",
-    "legacy:import": "node --import tsx Script/Project/import_legacy.mjs",
     "inventory:runtime": "node Script/Project/inventory-runtime.mjs",
     "build:server": "node Script/Project/build_server.mjs",
     "start:server": "node dist/server/main.mjs",
@@ -49,13 +47,14 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@electron/packager": "20.0.1",
     "@types/node": "22.19.19",
     "esbuild": "0.28.1",
-    "tsx": "4.22.1",
-    "typescript": "5.9.3",
     "husky": "9.1.7",
     "oxlint": "1.60.0",
-    "prettier": "3.6.2"
+    "prettier": "3.6.2",
+    "tsx": "4.22.1",
+    "typescript": "5.9.3"
   },
   "repository": {
     "type": "git",

@@ -1,8 +1,1 @@
 export { EdenDatabase } from './database.ts'
-export { exportLegacySnapshot } from './legacy/snapshot.ts'
-export { LegacySnapshotReader } from './legacy/snapshot-reader.ts'
-export type { LegacyManifest, LegacyTable, LegacyRow, LegacyCell } from './legacy/snapshot-format.ts'
-export { stageLegacySessions } from './legacy/stage-sessions.ts'
-export { resumeLegacyConversion } from './legacy/resume-conversion.ts'
-export { readLegacyConversionStatus } from './legacy/conversion-status.ts'
-export { exportLegacyContextReview, applyLegacyContextSummary } from './legacy/context-review.ts'
