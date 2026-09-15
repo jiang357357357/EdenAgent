@@ -24,3 +24,4 @@ export type GsvSttConfig = z.infer<typeof gsvSttConfigSchema>
 
 export const gsvDiscoverySchema = z.object({ config: gsvTtsConfigSchema, stage: z.enum(['all', 'catalog', 'worlds', 'roles', 'emotions']).default('all') }).strict()
 export const gsvSttTestSchema = z.object({ config: gsvSttConfigSchema }).strict()
+export const gsvSttDiscoverySchema = z.object({ config: gsvSttConfigSchema }).strict()

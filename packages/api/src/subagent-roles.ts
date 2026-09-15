@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { skillNameSchema } from './skills.ts'
-const names = z.array(z.string().min(1).max(200)).max(256)
+const toolName = z.string().min(1).max(200)
+  .refine(value => !value.startsWith('eden_'), 'eden_ 前缀的工具名称已经停用，请使用当前工具名称')
+const names = z.array(toolName).max(256)
 export const subagentRoleDefinitionSchema = z.object({ name: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
   description: z.string().trim().min(1).max(1000), instructions: z.string().trim().min(1).max(32000),
   skills: z.array(skillNameSchema).max(32).refine(value => new Set(value).size === value.length, 'Role skills must be distinct').default([]),

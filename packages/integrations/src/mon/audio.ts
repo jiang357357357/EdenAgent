@@ -1,7 +1,8 @@
+import { monFetch } from './transport.ts'
 /** Only Core's own media origin may receive its authentication token. */
 export async function fetchMonAudio(base: URL, token: string, source: string, signal?: AbortSignal) {
   const url = monMediaUrl(source, base)
-  const response = await fetch(url, {
+  const response = await monFetch(url, {
     redirect: 'error', headers: { Authorization: `Token ${token}` },
     signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])])
   })

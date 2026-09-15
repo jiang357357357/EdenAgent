@@ -2,13 +2,13 @@ import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { launchNode, realmEnvironment, stopChild, waitForHealth, waitForWeb } from './runtime_children.mjs'
+import { launchNode, realmEnvironment, resolveDevelopmentRealmRoot, stopChild, takeOverTcpPort, waitForHealth, waitForWeb } from './runtime_children.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(import.meta.url)
 const dataRoots = {
-  mon: path.resolve(process.env.EDEN_AGENT_MON_DATA_ROOT ?? path.join(root, 'Data/realms/mon')),
-  local: path.resolve(process.env.EDEN_AGENT_LOCAL_DATA_ROOT ?? path.join(root, 'Data/realms/local')),
+  mon: resolveDevelopmentRealmRoot(root, 'mon', process.env.EDEN_AGENT_MON_DATA_ROOT),
+  local: resolveDevelopmentRealmRoot(root, 'local', process.env.EDEN_AGENT_LOCAL_DATA_ROOT),
 }
 const children = []
 const tokens = { mon: randomBytes(32).toString('base64url'), local: randomBytes(32).toString('base64url') }
@@ -30,6 +30,9 @@ function start(args, env) {
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { void shutdown(0) })
 try {
+  for (const [label, port] of [['伊甸园后端', ports.mon], ['尘世后端', ports.local], ['Web', webPort]]) {
+    takeOverTcpPort(port, label)
+  }
   const checks = []
   for (const origin of ['mon', 'local']) {
     const child = start(['--import', 'tsx', 'Server/src/main.ts'], {
@@ -54,7 +57,9 @@ try {
   await waitForWeb(webPort, web)
   if (!process.argv.includes('--web-only')) {
     const electron = require.resolve('electron/cli.js')
-    start([electron, 'frontend/desktop'], { ...clientEnv, EDEN_AGENT_WEB_URL: `http://127.0.0.1:${webPort}` })
+    const desktopEnv = { ...clientEnv, EDEN_AGENT_WEB_URL: `http://127.0.0.1:${webPort}` }
+    delete desktopEnv.ELECTRON_RUN_AS_NODE
+    start([electron, 'frontend/desktop'], desktopEnv)
   }
   process.stdout.write('TS runtime development started. Business migration remains in progress.\n')
 } catch (error) {

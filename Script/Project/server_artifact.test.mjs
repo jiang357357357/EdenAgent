@@ -80,6 +80,11 @@ test('built dual hosts isolate sessions and blobs and preserve local state after
   assert.equal((await fetch(`http://127.0.0.1:${mon.port}/blobs/${blob.id}`, { headers: { Authorization: `Bearer ${mon.token}` } })).status, 404)
   assert.equal((await fetch(`http://127.0.0.1:${local.port}/blobs/${blob.id}`, { headers: { Authorization: `Bearer ${mon.token}` } })).status, 401)
   assert.equal((await localClient.rpc('skill.catalog_status', {})).error, null)
+  for (const connection of [localClient, monClient]) {
+    const skills = await connection.rpc('skill.list', {})
+    assert.deepEqual(skills.map(skill => skill.name).sort(), ['eden-memory', 'eden-reminders', 'eden-self-awake', 'eden-workspace'])
+    assert.ok(skills.every(skill => skill.content === null))
+  }
   localClient.close(); await local.close()
   const restarted = await host(root, 'local'); servers.push(restarted)
   const restored = await client(restarted, 'local'); clients.push(restored)

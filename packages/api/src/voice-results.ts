@@ -1,10 +1,22 @@
 import { z } from 'zod'
 const time = z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const option = z.object({ id: z.string(), value: z.string(), label: z.string() })
+const sttLanguage = z.enum(['auto', 'zh', 'yue', 'en', 'ja', 'ko'])
 export const gsvDiscoveryResultSchema = z.object({ ok: z.literal(true), latencyMs: time, versions: z.array(option), worlds: z.array(option),
   roles: z.array(option), emotions: z.array(option), selectedRoleId: z.string() })
 export const gsvPreviewResultSchema = z.object({ ok: z.literal(true), audioBlobId: z.string().uuid(), mime: z.string(), durationMs: time.nullable(), latencyMs: time, roleId: z.string() })
 export const sttTestResultSchema = z.object({ ok: z.literal(true), latencyMs: time })
+export const gsvSttModelCapabilitySchema = z.object({
+  modelType: z.string(),
+  languages: z.array(sttLanguage),
+  sizes: z.array(z.string()),
+  precisions: z.array(z.enum(['float32', 'float16', 'int8'])),
+})
+export const gsvSttDiscoveryResultSchema = z.object({
+  ok: z.literal(true),
+  latencyMs: time,
+  models: z.array(gsvSttModelCapabilitySchema),
+})
 export const voiceSynthesizeResultSchema = z.object({ success: z.literal(true), audio_blob_id: z.string().uuid(), audio_url: z.null(), text: z.string(), cached: z.boolean(),
   cache_key: z.string(), audio_format: z.string(), duration_ms: time.nullable(), size_bytes: time, speech_segment_id: time,
   segment_group_id: z.string(), group_index: time, sequence: time })

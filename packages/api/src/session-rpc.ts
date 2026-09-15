@@ -24,6 +24,7 @@ export const sessionRpcMethods = {
   'session.create': { params: sessionCreateSchema, result: sessionSummarySchema },
   'session.list': { params: sessionListSchema, result: z.array(sessionSummarySchema) },
   'session.read': { params: sessionIdSchema, result: sessionSummarySchema },
+  'session.context': { params: sessionIdSchema, result: z.object({ requests: z.array(sessionEventSchema) }) },
   'session.rename': { params: sessionTitleSchema, result: sessionSummarySchema },
   'session.set_participants': { params: sessionParticipantsSchema, result: sessionSummarySchema },
   'event.list': { params: eventListSchema, result: eventPageSchema },

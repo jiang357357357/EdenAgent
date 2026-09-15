@@ -4,7 +4,8 @@ import type { AddressInfo } from 'node:net'
 import type { JsonValue, RuntimeCheckpoint } from '@eden/api'
 import type { RuntimeOptions } from '../src/index.ts'
 
-export type RecordedReply = { text: string } | { tool: string; input: Record<string, unknown> } | { wait: true }
+export type RecordedReply = { text: string; thinking?: string } | { tool: string; input: Record<string, unknown> } | { wait: true } |
+  { error: string; partial?: string } | { status: number; error: string }
 
 export async function recordedModel(replies: RecordedReply[]) {
   const requests: Record<string, unknown>[] = []
@@ -16,6 +17,11 @@ export async function recordedModel(replies: RecordedReply[]) {
     requests.push(JSON.parse(body))
     headers.push(request.headers)
     const reply = replies[requests.length - 1]
+    if (reply && 'status' in reply) {
+      response.writeHead(reply.status, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: { message: reply.error, type: reply.error } }))
+      return
+    }
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     active.add(response)
     response.on('close', () => active.delete(response))
@@ -25,14 +31,19 @@ export async function recordedModel(replies: RecordedReply[]) {
         created: 1, model: 'recorded', choices: [{ index: 0, delta, finish_reason }] })}\n\n`)
     }
     chunk({ role: 'assistant' })
-    if (reply && 'tool' in reply) {
+    if (reply && 'error' in reply) {
+      if (reply.partial) chunk({ content: reply.partial })
+      response.flushHeaders()
+      setTimeout(() => response.destroy(new Error(reply.error)), 10)
+    } else if (reply && 'tool' in reply) {
       chunk({ tool_calls: [{ index: 0, id: `call-${requests.length}`, type: 'function', function: { name: reply.tool, arguments: JSON.stringify(reply.input) } }] })
       chunk({}, 'tool_calls')
     } else {
+      if (reply && 'thinking' in reply && reply.thinking) chunk({ reasoning_content: reply.thinking })
       chunk({ content: reply && 'text' in reply ? reply.text : 'No more recorded replies' })
       chunk({}, 'stop')
     }
-    response.end('data: [DONE]\n\n')
+    if (!(reply && 'error' in reply)) response.end('data: [DONE]\n\n')
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as AddressInfo).port

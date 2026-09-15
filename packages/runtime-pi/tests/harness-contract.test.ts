@@ -75,3 +75,17 @@ test('rejects mismatched checkpoint ownership and malformed persisted entries', 
     assert.throws(() => createRuntime({ ...options, checkpoint: { ...checkpoint, entries: [{ type: 'message' }] } }))
   } finally { await model.close() }
 })
+
+test('context source metadata is audited without changing the provider prompt', async () => {
+  const model = await recordedModel([{ text: 'ok' }]), record = callbacks()
+  const sources = [{ kind: 'system', title: 'Rules', content: 'exact system' }]
+  try {
+    const runtime = createRuntime({ sessionId: 'sources', systemPrompt: 'exact system', contextSources: sources,
+      model: model.config, tools: [], callbacks: record.handlers })
+    await runtime.prompt('hello')
+    const audit = record.requests[0] as Record<string, unknown>
+    assert.deepEqual(audit.contextSources, sources)
+    assert.equal(JSON.stringify(model.requests[0]).includes('contextSources'), false)
+    assert.ok(JSON.stringify(model.requests[0]).includes('exact system'))
+  } finally { await model.close() }
+})

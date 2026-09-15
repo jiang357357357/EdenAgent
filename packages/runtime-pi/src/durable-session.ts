@@ -53,6 +53,11 @@ export class DurableSessionStorage extends InMemorySessionStorage {
     return next
   }
 
+  persistentContext(messages: AgentMessage[]): AgentMessage[] {
+    const transient = this.transientMessage
+    return transient ? messages.filter(message => JSON.stringify(message) !== JSON.stringify(transient)) : messages
+  }
+
   endTransientInput(): void { this.transientMessage = undefined }
 
   override async setLeafId(targetId: string | null): Promise<void> {

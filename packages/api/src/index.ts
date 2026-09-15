@@ -73,9 +73,9 @@ export { agentReadSchema, agentListSchema, agentMessageSchema, agentSpawnSchema 
 export { voiceServiceUrlSchema, gsvTtsConfigSchema, gsvSttConfigSchema, voiceRuntimeConfigSchema, gsvPreviewSchema } from './voice.ts'
 export type { GsvTtsConfig, GsvSttConfig } from './voice.ts'
 
-export { gsvDiscoverySchema, gsvSttTestSchema } from './voice.ts'
+export { gsvDiscoverySchema, gsvSttDiscoverySchema, gsvSttTestSchema } from './voice.ts'
 
-export { voiceSynthesizeSchema, voiceSegmentsSchema } from './voice-speech.ts'
+export { voiceSynthesizeSchema, voiceSegmentsSchema, voiceCancelSchema } from './voice-speech.ts'
 export type { VoiceSynthesizeInput } from './voice-speech.ts'
 
 export { screenRequestSchema, cameraRequestSchema, mediaListSchema, mediaResultSchema, mediaResolveSchema } from './media.ts'
@@ -113,7 +113,7 @@ export { connectorInfoSchema, connectorCapabilitySchema, connectorCatalogEntrySc
 export type { ConnectorInfo, ConnectorCapabilityInfo, ConnectorCatalogEntry } from './connectors.ts'
 export { mediaRequestInfoSchema } from './media.ts'
 export type { MediaRequestInfo } from './media.ts'
-export { gsvDiscoveryResultSchema, gsvPreviewResultSchema, sttTestResultSchema, voiceSynthesizeResultSchema, voiceSegmentInfoSchema } from './voice-results.ts'
+export { gsvDiscoveryResultSchema, gsvPreviewResultSchema, gsvSttDiscoveryResultSchema, gsvSttModelCapabilitySchema, sttTestResultSchema, voiceSynthesizeResultSchema, voiceSegmentInfoSchema } from './voice-results.ts'
 export type { VoiceSegmentInfo, VoiceSynthesizeResult } from './voice-results.ts'
 export { modelStatusSchema } from './model-status.ts'
 export type { ModelStatus } from './model-status.ts'
@@ -171,3 +171,4 @@ export { connectorManifestSchema } from './connector-manifest.ts'
 export type { ConnectorManifest } from './connector-manifest.ts'
 
 export { modelContextUsage } from './model-context-usage.ts'
+export { modelParticipant, modelCharacterProfile } from './model-participant.ts'

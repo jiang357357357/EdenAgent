@@ -10,7 +10,7 @@
 
 统一插件包由 `Server/src/modules/plugin-market` 管理安装、完整性、版本选择、包权限、组件启停和回滚。一个包可以包含技能、连接器、MCP、受控 UI、声明式 Hook。连接器模块只管理具体身份实例、资源授权、事件、操作历史和 worker 生命周期，不另建插件安装与版本机制。
 
-现有单文件工具插件继续使用 `packages/plugin-host` 的草稿、验证、测试、安装和激活流程。它与统一包共享插件身份冲突检查；本轮统一的是连接器组件与插件包，未把旧工具插件的数据表重写为另一套表。智能体写工具插件使用 `eden_plugin`，写含连接器的包使用工作区工具和 `eden_connector_plugin`。二者不允许自行授予权限。
+现有单文件工具插件继续使用 `packages/plugin-host` 的草稿、验证、测试、安装和激活流程。它与统一包共享插件身份冲突检查；本轮统一的是连接器组件与插件包，未把旧工具插件的数据表重写为另一套表。智能体写工具插件使用 `manage_plugins`，写含连接器的包使用工作区工具和 `manage_connector_plugins`。二者不允许自行授予权限。
 
 ## 连接器包格式
 
@@ -60,7 +60,7 @@ node Script/Project/package_connector.mjs --source /absolute/source /absolute/pa
 
 官方制品在 `dist/connectors/<id>`，需要在插件管理中预览、安装、批准包权限和启用，再创建连接器实例并批准具体资源。清单可在安装前浏览，但不能绕过插件安装直接执行。原官方实例名称保留为所属插件组件的兼容别名，旧授权不会自动迁移。
 
-智能体创作流程：获取 SDK 说明，编写源码与两份清单，构建，在临时夹具和隔离执行环境测试，预览确切制品，安装为禁用版本，经现有审批流程批准权限后启用。`eden_connector_plugin` 提供 describe/inspect/install/enable/disable/list，不提供自授权限入口。测试由现有工作区命令流程执行，不把“安装成功”或智能体自述测试通过当作测试报告。
+智能体创作流程：获取 SDK 说明，编写源码与两份清单，构建，在临时夹具和隔离执行环境测试，预览确切制品，安装为禁用版本，经现有审批流程批准权限后启用。`manage_connector_plugins` 提供 describe/inspect/install/enable/disable/list，不提供自授权限入口。测试由现有工作区命令流程执行，不把“安装成功”或智能体自述测试通过当作测试报告。
 
 ## 平台与验收范围
 

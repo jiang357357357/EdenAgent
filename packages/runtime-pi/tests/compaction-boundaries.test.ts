@@ -37,3 +37,30 @@ test('cancellation terminates a waiting compaction request and preserves prior h
     assert.ok(!(await runtime.snapshot()).entries.some(entry => typeof entry === 'object' && entry !== null && !Array.isArray(entry) && entry.type === 'compaction'))
   } finally { await model.close() }
 })
+
+test('manual compaction below 20k sends actual history and restores the summary on continuation', async () => {
+  const model = await recordedModel([{ text: 'Recorded response '.repeat(500) }, { text: 'Summary: retain project requirement MARKER_123' }, { text: 'Continued' }])
+  const record = callbacks()
+  try {
+    const runtime = createRuntime({ sessionId: 'compact-small', systemPrompt: '', model: model.config, tools: [], callbacks: record.handlers })
+    await runtime.prompt('Project requirement MARKER_123. ' + 'Context '.repeat(500))
+    await runtime.compact('Summarize')
+    assert.match(JSON.stringify(model.requests[1]), /MARKER_123/)
+    assert.match(JSON.stringify(model.requests[1]), /Recorded response/)
+    const checkpoint = await runtime.snapshot()
+    assert.ok(checkpoint.entries.some(entry => entry && typeof entry === 'object' && !Array.isArray(entry) && entry.type === 'compaction'))
+    const restored = createRuntime({ sessionId: 'compact-small', systemPrompt: '', model: model.config, tools: [], callbacks: record.handlers, checkpoint })
+    await restored.prompt('Continue')
+    assert.match(JSON.stringify(model.requests.at(-1)), /Summary: retain project requirement MARKER_123/)
+  } finally { await model.close() }
+})
+
+test('empty history never sends a summarization request', async () => {
+  const model = await recordedModel([{ text: 'Must not be requested' }])
+  try {
+    const runtime = createRuntime({ sessionId: 'compact-empty', systemPrompt: '', model: model.config, tools: [], callbacks: callbacks().handlers })
+    await assert.rejects(runtime.compact())
+    assert.equal(model.requests.length, 0)
+    assert.ok(!(await runtime.snapshot()).entries.some(entry => entry && typeof entry === 'object' && !Array.isArray(entry) && entry.type === 'compaction'))
+  } finally { await model.close() }
+})

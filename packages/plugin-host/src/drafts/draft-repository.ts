@@ -21,7 +21,7 @@ export class DraftRepository {
       if (old) {
         const previous = this.revision(pluginManifestSchema.parse(JSON.parse(String(old.manifest_json))), String(old.source))
         if (previous === draftRevision) return { manifest: parsed, source, draftRevision }
-        if (previous !== expectedDraftRevision) throw new Error('Plugin draft changed; read its current draftRevision before replacing it')
+        if (previous !== expectedDraftRevision) throw new Error('Plugin draft changed; read its current content before replacing it')
       } else if (expectedDraftRevision != null) throw new Error('Plugin draft was removed; reload before saving')
       db.prepare(`INSERT INTO plugin_drafts VALUES (?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET manifest_json=excluded.manifest_json,source=excluded.source,updated_at=excluded.updated_at`)

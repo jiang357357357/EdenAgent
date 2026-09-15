@@ -24,7 +24,7 @@ export const selfAwakeRpcMethods = {
   'self_awake.job.resubmit': { params: jobIdSchema.extend({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     note: z.string().trim().min(1).max(4000), confirmResubmit: z.literal(true) }), result: jobInfoSchema },
   'self_awake.list': { params: selfAwakeListSchema, result: z.object({
-    schedule: z.object({ status: z.literal('scheduled'), nextWakeAt: z.string(), reason: z.string() }).nullable(),
+    schedule: z.object({ status: z.enum(['scheduled', 'disabled', 'unscheduled', 'retrying']), nextWakeAt: z.string().nullable(), reason: z.string() }).nullable(),
     count: z.number().int(), page: z.number().int(), pageSize: z.number().int(), totalPages: z.number().int(), results: z.array(selfAwakeRunInfoSchema),
   }) },
   'self_awake.execution': { params: selfAwakeExecutionSchema, result: z.object({ path: z.string(), record: jsonValue }) },

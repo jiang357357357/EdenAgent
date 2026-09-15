@@ -414,6 +414,47 @@ export const migrations: readonly string[] = [
    CREATE TABLE self_awake_timer_publications(job_id TEXT PRIMARY KEY REFERENCES jobs(id),published_at INTEGER NOT NULL);
    CREATE TABLE self_awake_submission_aliases(user_id TEXT NOT NULL,request_key TEXT NOT NULL,request_hash TEXT NOT NULL,
      job_id TEXT NOT NULL REFERENCES jobs(id),PRIMARY KEY(user_id,request_key));`,
+  `CREATE TEMP TABLE retired_builtin_tool_names(old_name TEXT PRIMARY KEY,new_name TEXT NOT NULL);
+   INSERT INTO retired_builtin_tool_names VALUES
+     ('eden_read_file','read_file'),('eden_write_file','write_file'),('eden_exec','exec_command'),
+     ('eden_attachment','read_attachment'),('eden_question','request_user_input'),('eden_plugin','manage_plugins'),
+     ('eden_connector_plugin','manage_connector_plugins');
+   UPDATE subagent_policies SET policy_json=json_set(policy_json,
+     '$.allowedTools',CASE WHEN json_type(policy_json,'$.allowedTools')='array' THEN json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(policy_json,'$.allowedTools'))) ELSE json_extract(policy_json,'$.allowedTools') END,
+     '$.deniedTools',json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(policy_json,'$.deniedTools'))))
+     WHERE EXISTS(SELECT 1 FROM json_each(policy_json,'$.allowedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names))
+        OR EXISTS(SELECT 1 FROM json_each(policy_json,'$.deniedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names));
+   UPDATE subagent_roles SET definition_json=json_set(definition_json,
+     '$.allowedTools',CASE WHEN json_type(definition_json,'$.allowedTools')='array' THEN json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.allowedTools'))) ELSE json_extract(definition_json,'$.allowedTools') END,
+     '$.deniedTools',json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.deniedTools'))))
+     WHERE EXISTS(SELECT 1 FROM json_each(definition_json,'$.allowedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names))
+        OR EXISTS(SELECT 1 FROM json_each(definition_json,'$.deniedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names));
+   UPDATE subagent_project_roles SET definition_json=json_set(definition_json,
+     '$.allowedTools',CASE WHEN json_type(definition_json,'$.allowedTools')='array' THEN json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.allowedTools'))) ELSE json_extract(definition_json,'$.allowedTools') END,
+     '$.deniedTools',json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.deniedTools'))))
+     WHERE EXISTS(SELECT 1 FROM json_each(definition_json,'$.allowedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names))
+        OR EXISTS(SELECT 1 FROM json_each(definition_json,'$.deniedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names));
+   UPDATE subagent_role_snapshots SET definition_json=json_set(definition_json,
+     '$.allowedTools',CASE WHEN json_type(definition_json,'$.allowedTools')='array' THEN json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.allowedTools'))) ELSE json_extract(definition_json,'$.allowedTools') END,
+     '$.deniedTools',json((SELECT json_group_array(DISTINCT COALESCE((SELECT new_name FROM retired_builtin_tool_names WHERE old_name=value),value)) FROM json_each(definition_json,'$.deniedTools'))))
+     WHERE EXISTS(SELECT 1 FROM json_each(definition_json,'$.allowedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names))
+        OR EXISTS(SELECT 1 FROM json_each(definition_json,'$.deniedTools') WHERE value IN (SELECT old_name FROM retired_builtin_tool_names));
+   DROP TABLE retired_builtin_tool_names;`,
+  `CREATE TABLE session_capability_selections(session_id TEXT NOT NULL REFERENCES sessions(id),owner TEXT NOT NULL,
+     kind TEXT NOT NULL,key TEXT NOT NULL,selection_json TEXT NOT NULL,updated_at INTEGER NOT NULL,
+     PRIMARY KEY(session_id,owner,kind,key));`,
+  `INSERT INTO session_capability_selections(session_id,owner,kind,key,selection_json,updated_at)
+   SELECT s.session_id,s.owner,'tool',json_extract(t.value,'$.id'),
+     json_object('kind','tool','key',json_extract(t.value,'$.id'),'revision',json_extract(t.value,'$.revision'),
+       'workspaceRoot',json_extract(s.selection_json,'$.contextRoot'),'contextRoot',json_extract(s.selection_json,'$.contextRoot'),
+       'enabled',json('true'),'tools',json_array(json(t.value))),s.updated_at
+   FROM session_capability_selections s,json_each(s.selection_json,'$.tools') t
+   WHERE s.kind='skill' AND json_extract(s.selection_json,'$.enabled')=1
+   ORDER BY s.updated_at DESC
+   ON CONFLICT(session_id,owner,kind,key) DO UPDATE SET
+     selection_json=excluded.selection_json,updated_at=excluded.updated_at
+   WHERE json_extract(session_capability_selections.selection_json,'$.enabled')=0;`,
+  `CREATE TABLE ui_preferences(id INTEGER PRIMARY KEY CHECK(id=1), auto_scroll_enabled INTEGER NOT NULL CHECK(auto_scroll_enabled IN (0,1)));`,
 ]
 
 export const databaseSchemaVersion = migrations.length

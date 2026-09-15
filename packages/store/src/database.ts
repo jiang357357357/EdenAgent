@@ -28,7 +28,7 @@ export class EdenDatabase {
 
   private assertExistingDatabase(origin: 'mon' | 'local') {
     const tables = this.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()
-    if (tables.length && !tables.some(row => row.name === 'realm_meta')) throw new Error('Database does not belong to Eden Agent')
+    if (tables.length && !tables.some(row => row.name === 'realm_meta')) throw new Error('Database does not belong to Eden Agent; use explicit import for legacy data')
     if (tables.length) this.assertOrigin(origin)
   }
 

@@ -42,3 +42,14 @@ Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独�
 双世界可以分别设置 `EDEN_AGENT_MON_EXTERNAL_SANDBOX` / `EDEN_AGENT_MON_EXTERNAL_SANDBOX_SHA256` 与 `EDEN_AGENT_LOCAL_EXTERNAL_SANDBOX` / `EDEN_AGENT_LOCAL_EXTERNAL_SANDBOX_SHA256`。当前世界专属变量只要出现任意一项，就必须提供完整有效的一对；不借用公共配置的另一半，空字符串也视为配置错误。两项均未设置时才使用上面的公共配置；公共配置表示管理员明确允许两个世界使用同一隔离器程序，各次调用仍传入各自获批的工作区。
 
 开发双服务、桌面托管和独立 Server 最终都由宿主配置加载器选择当前世界的配置。前两者仅向子进程转发公共变量与该世界的专属变量，不转发另一个世界的隔离器配置。配置加载后显式注入命令、技能和 MCP 服务，各服务不再分别选择外部隔离器。开发入口同时传递模型计价、允许来源与 Blob 上限配置，避免独立启动与开发启动行为不同。本轮仅编写源码，未启动这些入口。
+## 固定端口接管
+
+开发启动采用“后启动者接管”规则：启动前释放伊甸园后端、尘世后端和 Web 声明的固定端口。若旧监听进程由 MonPM 监管，启动器会先停止对应 MonPM 应用，避免其自动重启后再次抢占端口。`npm run dev` 与 `cd frontend && npm run dev` 使用同一套双宿主启动流程。
+
+## Mon 部署路径与启动诊断
+
+每个伊甸园数据目录的 `mon-service.json` 显式绑定一套 Core 部署。`deploymentRoot` 可使用相对于该 JSON 所在目录的路径；`authFile` 和可选 `scheduleStateFile` 相对于部署根解析，绝对路径继续支持。不设置 `deploymentRoot` 时，相对文件路径直接相对于 JSON 所在目录解析。不要通过自动搜索另一套认证文件来绕过缺失配置。
+
+启动会检查配置格式、文件可读性以及 `MON_SERVICE_SHARED_SECRET` / `MON_SERVICE_USER_ID` 是否完整。显式环境认证必须完整提供，整体覆盖文件绑定，不混合账号或调度状态。认证内容不写入诊断消息。Core 连接错误显示底层错误码与目标 origin，不包含令牌、请求体或 URL 查询参数。
+
+若 Web 启动出现 `ENOSPC` 且 syscall 为 `watch`，可临时使用 `CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=1000 npm run dev` 绕过文件监听数量限制；这与认证路径缺失是两类问题，不需要复制认证文件或修改系统限制。

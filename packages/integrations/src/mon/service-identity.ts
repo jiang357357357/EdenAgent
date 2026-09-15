@@ -1,3 +1,4 @@
+import { monFetch } from './transport.ts'
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { modelEndpointSchema } from '@eden/api'
@@ -12,7 +13,7 @@ export async function acquireMonServiceToken(identity: MonServiceIdentity, signa
   const pathname = '/api/internal/service-token/'
   const body = Buffer.from(JSON.stringify({ audience: 'monagent', requested_scope: 'self_awake:user_context' }))
   const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomUUID()
-  const response = await fetch(`${base}${pathname}`, { method: 'POST', body, redirect: 'error',
+  const response = await monFetch(`${base}${pathname}`, { method: 'POST', body, redirect: 'error',
     signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]), headers: {
       'content-type': 'application/json', 'x-mon-service-id': 'monagent', 'x-mon-service-scope': 'core:service_token',
       'x-mon-service-timestamp': timestamp, 'x-mon-service-nonce': nonce,

@@ -61,7 +61,7 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
       clearTimeout(timer)
       request.signal?.removeEventListener('abort', abort)
       await termination
-      if (failure) reject(failure)
+      if (failure) reject(Object.assign(failure, { toolOutcome: child.pid ? 'unknown' : 'failed' }))
       else resolve({ stdout: stdout + decoders.stdout.end(), stderr: stderr + decoders.stderr.end(), exitCode: code ?? -1 })
     })
     child.stdin.end(request.input)

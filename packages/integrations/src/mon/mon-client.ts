@@ -1,3 +1,4 @@
+import { monFetch } from './transport.ts'
 import { fetchMonAudio } from './audio.ts'
 import { jsonValue, modelEndpointSchema } from '@eden/api'
 import type { JsonValue } from '@eden/api'
@@ -82,7 +83,7 @@ export class MonClient {
   }
 
   private async request(method: string, endpoint: string, body?: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
-    const response = await fetch(this.endpointUrl(endpoint), {
+    const response = await monFetch(this.endpointUrl(endpoint), {
       method, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]),
       headers: { Authorization: `Token ${this.token}`, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),

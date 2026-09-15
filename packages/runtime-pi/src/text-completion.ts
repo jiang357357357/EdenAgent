@@ -35,6 +35,8 @@ export async function completeText(request: TextCompletionRequest): Promise<stri
   if (recordingFailed) throw new Error('Model request persistence failed', { cause: recordingError })
   request.signal.throwIfAborted()
   if (response.stopReason !== 'stop') throw new TextCompletionError('Model did not complete a text response')
-  if (response.content.some(block => block.type !== 'text')) throw new TextCompletionError('Model returned non-text content')
-  return response.content.filter(block => block.type === 'text').map(block => block.text).join('\n')
+  if (response.content.some(block => block.type !== 'text' && block.type !== 'thinking')) throw new TextCompletionError('Model returned non-text content')
+  const text = response.content.filter(block => block.type === 'text').map(block => block.text).join('\n')
+  if (!text.trim()) throw new TextCompletionError('Model returned no text content')
+  return text
 }

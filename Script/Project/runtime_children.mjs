@@ -1,6 +1,33 @@
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import commandEnvironment from '../../frontend/desktop/src/processes/realm-command-environment.cjs'
+import portTakeover from '../../frontend/desktop/src/processes/port-takeover.cjs'
+
+export const { takeOverTcpPort } = portTakeover
+
+function isCurrentRealmDatabase(filename) {
+  if (!existsSync(filename)) return false
+  const database = new DatabaseSync(filename, { readOnly: true })
+  try {
+    return Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='realm_meta'").get())
+  } finally {
+    database.close()
+  }
+}
+
+export function resolveDevelopmentRealmRoot(root, origin, configured) {
+  if (configured?.trim()) return path.resolve(configured)
+  const current = path.join(root, 'Data', 'realms', origin)
+  const currentDatabase = path.join(current, 'eden-agent.db')
+  const retainedV2 = path.join(current, 'v2')
+  if (existsSync(currentDatabase) && !isCurrentRealmDatabase(currentDatabase) && isCurrentRealmDatabase(path.join(retainedV2, 'eden-agent.db'))) {
+    return retainedV2
+  }
+  return current
+}
 
 export function launchNode(root, args, env) {
   return spawn(process.execPath, args, { cwd: root, env, stdio: 'inherit', detached: process.platform !== 'win32' })
