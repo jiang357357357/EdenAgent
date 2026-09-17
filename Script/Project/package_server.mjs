@@ -4,7 +4,6 @@ import { createHash, randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serverDependencyPlan } from './server_dependency_plan.mjs'
-import { copyConnectorResources } from './connector_resources.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const output = path.resolve(process.argv[2] ?? path.join(root, 'dist', `runtime-${process.platform}-${process.arch}`))
@@ -20,7 +19,7 @@ if (!license) throw new Error('The Node distribution LICENSE must be present alo
 const staging = `${output}.staging-${randomUUID()}`
 await mkdir(staging, { recursive: true })
 try {
-  const connectors = await copyConnectorResources(root, staging)
+  const connectors = [] // Connectors are installed independently, never bundled from local build output.
   await mkdir(path.join(staging, 'server'))
   await cp(entry, path.join(staging, 'server/main.mjs'))
   await cp(`${entry}.map`, path.join(staging, 'server/main.mjs.map'))

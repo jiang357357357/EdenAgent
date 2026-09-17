@@ -3,6 +3,8 @@ import { jsonValue } from './json.ts'
 import { jobIdSchema, jobInfoSchema } from './jobs.ts'
 import { selfAwakeListSchema, selfAwakeExecutionSchema } from './self-awake.ts'
 export const selfAwakeRunInfoSchema = z.object({
+  scheduledWake: z.object({ id: z.uuid(), dueAt: z.number().int(), createdAt: z.number().int(),
+    state: jobInfoSchema.shape.state, reason: z.string() }).nullable().optional(),
   outcomeReview: z.object({ decision: z.string(), note: z.string(), reviewedAt: z.number() }).nullable().optional(),
   id: z.string().uuid(), jobId: z.string().uuid(), sessionId: z.string().uuid(), schemaVersion: z.literal('self-awake.v1'), eventId: z.string(),
   status: z.string(), request: jsonValue, decision: jsonValue, authorSnapshot: jsonValue, attempts: z.number().int(), lastError: z.string().nullable(),

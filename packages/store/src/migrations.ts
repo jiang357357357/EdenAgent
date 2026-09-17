@@ -455,6 +455,11 @@ export const migrations: readonly string[] = [
      selection_json=excluded.selection_json,updated_at=excluded.updated_at
    WHERE json_extract(session_capability_selections.selection_json,'$.enabled')=0;`,
   `CREATE TABLE ui_preferences(id INTEGER PRIMARY KEY CHECK(id=1), auto_scroll_enabled INTEGER NOT NULL CHECK(auto_scroll_enabled IN (0,1)));`,
+  `CREATE TABLE session_owners(session_id TEXT PRIMARY KEY REFERENCES sessions(id),account_key TEXT NOT NULL);
+   CREATE INDEX session_owners_account ON session_owners(account_key,session_id);
+   CREATE TABLE blob_owners(blob_id TEXT NOT NULL REFERENCES blobs(id),account_key TEXT NOT NULL,PRIMARY KEY(blob_id,account_key));
+   CREATE TABLE account_records(kind TEXT NOT NULL,record_id INTEGER NOT NULL,account_key TEXT NOT NULL,PRIMARY KEY(kind,record_id));
+   CREATE TABLE account_ui_preferences(account_key TEXT PRIMARY KEY,auto_scroll_enabled INTEGER NOT NULL CHECK(auto_scroll_enabled IN (0,1)));`,
 ]
 
 export const databaseSchemaVersion = migrations.length

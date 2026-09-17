@@ -172,3 +172,7 @@ export type { ConnectorManifest } from './connector-manifest.ts'
 
 export { modelContextUsage } from './model-context-usage.ts'
 export { modelParticipant, modelCharacterProfile } from './model-participant.ts'
+
+export { accentThemeSchema, type AccentTheme } from "./ui-preferences.ts"
+
+export { baseThemeSchema, type BaseTheme } from "./ui-preferences.ts"

@@ -4,11 +4,9 @@
 - `dev_desktop.mjs`：仅启动 Web 与桌面壳。
 - `monconfig.mjs`：读取项目 `.monconfig`。
 - `monconfig.test.mjs`：配置读取测试。
-- `openttd_launcher.mjs`：OpenTTD 实例配置、端口、注册表和身份匹配清理辅助程序；管理密码只从标准输入读取。Linux 注册表同时固化 PID、`/proc` 启动时钟、实际可执行文件和启动目标，拒绝 PID 重用或目标变化。
-- `openttd_launcher.test.mjs`：跨平台验证配置隔离和临时端口；在 Linux 上真实启动伪 OpenTTD 进程，覆盖默认/显式加入后的退出清理、专用服保存退出、身份匹配、共享内容目录及旧运行目录单次迁移。
-- `package_connector.mjs`：自动发现官方目录，或通过 `--source <目录> <目标>` 构建任意 TS 连接器包；Node worker、清单和资产及校验清单写入 `dist/connectors/<id>`。
+- `package_connector.mjs`：通过 `--source <目录> <目标>` 构建任意 TS 连接器包；Node worker、清单和资产及校验清单写入 `dist/connectors/<id>`。
 
-Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独立迁移命令，`package_server.mjs` 组装 Node、运行依赖、连接器和迁移工具。宿主和连接器无需 Cargo；旧 Rust worker/helper 位于 `Archive/2026-09-10-rust-connectors`。
+Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独立迁移命令，`package_server.mjs` 组装 Node、运行依赖、连接器和迁移工具。宿主和连接器无需 Cargo；旧游戏连接器及其专属 Rust 归档已移除。
 
 `dev.mjs` 的等待逻辑见 `runtime_children.mjs`；独立桌面入口有自己的启动等待流程。不得把旧入口的超时或原地复制行为视为当前实现。旧数据只能通过明确快照、暂存导入与激活恢复，不自动覆盖或迁移真实 Data。
 

@@ -19,9 +19,4 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run typecheck:server
       - run: npm run check:architecture
-      - run: npm run build:connectors
-      - uses: actions/upload-artifact@v4
-        with:
-          name: eden-agent-connector-plugins
-          path: dist/connectors/
-          if-no-files-found: error
+      - run: node --import tsx --test Server/tests/integration/connectors/authoring.test.ts Server/tests/connector-component.test.ts Server/tests/connector-capability-input.test.ts packages/plugin-sdk/tests/connector-wire.test.ts

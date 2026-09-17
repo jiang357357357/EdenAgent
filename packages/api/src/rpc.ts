@@ -14,6 +14,7 @@ export const rpcRequestSchema = z.object({
 export const initializeSchema = z.object({
   protocolVersion: z.literal(protocolVersion), runtimeOrigin: runtimeOriginSchema,
   clientName: z.string(), clientVersion: z.string(), capabilities: z.array(z.string()),
+  coreToken: z.string().min(1).max(8192).optional(),
 }).strict()
 export const sessionIdSchema = z.object({ sessionId: z.string().uuid() }).strict()
 export const sessionTitleSchema = sessionIdSchema.extend({ title: z.string().min(1).max(500) })

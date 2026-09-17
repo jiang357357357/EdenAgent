@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createRuntime } from '../src/index.ts'
 import { adaptTool } from '../src/tool-adapter.ts'
 import type { RuntimeTool, ToolOutcome } from '../src/index.ts'
-import { callbacks } from './recorded-model.ts'
+import { callbacks, recordedModel } from './recorded-model.ts'
 
 test('business failure is committed once and reported as an error to pi', async () => {
   const audit = callbacks(), outcomes: (ToolOutcome | undefined)[] = []
@@ -39,4 +40,20 @@ test('image projection preserves original audit data and uncertain execution rem
   tool.execute = async () => { throw Object.assign(new Error('connection lost'), { toolOutcome: 'unknown' }) }
   await assert.rejects(adapted.execute('lost', {}, new AbortController().signal, undefined, undefined), /connection lost/)
   assert.deepEqual(outcomes, ['completed', 'unknown'])
+})
+
+test('a failed tool result returns to the model so the turn can still finish', async () => {
+  const model = await recordedModel([{ tool: 'restricted', input: {} }, { text: '仍然完成本轮日记' }])
+  const tool: RuntimeTool = {
+    name: 'restricted', revision: '1', description: '', parameters: { type: 'object', properties: {} },
+    async execute() { throw Object.assign(new Error('Permission unavailable in background run'), { toolOutcome: 'failed' }) },
+  }
+  try {
+    const runtime = createRuntime({ sessionId: 'failed-tool-continuation', systemPrompt: '', model: model.config,
+      tools: [tool], callbacks: callbacks().handlers })
+    const answer = await runtime.prompt('完成后台记录')
+    assert.match(JSON.stringify(answer), /仍然完成本轮日记/)
+    assert.equal(model.requests.length, 2)
+    assert.match(JSON.stringify(model.requests[1]?.messages), /Permission unavailable in background run/)
+  } finally { await model.close() }
 })

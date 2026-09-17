@@ -1,4 +1,3 @@
-import { packageOfficialConnectors } from './package_connector.mjs'
 import { build } from 'esbuild'
 
 await build({
@@ -9,5 +8,3 @@ await build({
   external: ['@earendil-works/*', 'ws', 'zod', 'typebox', 'esbuild'],
 })
 process.stdout.write('Built dist/server/main.mjs (pi and npm runtime dependencies remain external)\n')
-await packageOfficialConnectors()
-process.stdout.write('Built portable TypeScript connector packages\n')

@@ -4,9 +4,8 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 
-const agentRoot = fileURLToPath(new URL('../../', import.meta.url))
 
-/** Build any connector source directory. Official packages use exactly this entrypoint. */
+/** Build any user or agent authored connector source directory. */
 export async function packageConnector(source, destination) {
   const root = await realpath(source), metadata = path.join(root, 'package')
   const manifest = JSON.parse(await readFile(path.join(metadata, 'connector.json'), 'utf8'))
@@ -22,7 +21,8 @@ export async function packageConnector(source, destination) {
       return !['checksums.json', 'signature.json', 'workers', 'worker'].includes(path.relative(metadata, file).split(path.sep)[0])
     } })
     await build({ entryPoints: [path.join(root, 'src/main.ts')], outfile: path.join(staging, 'worker/main.mjs'), bundle: true,
-      platform: 'node', target: 'node22', format: 'esm', sourcemap: false, packages: 'bundle' })
+      platform: 'node', target: 'node22', format: 'esm', sourcemap: false, packages: 'bundle',
+      nodePaths: [fileURLToPath(new URL('../../node_modules', import.meta.url))] })
     const checksums = {}
     for (const file of await files(staging)) checksums[path.relative(staging, file).split(path.sep).join('/')] = createHash('sha256').update(await readFile(file)).digest('hex')
     await writeFile(path.join(staging, 'checksums.json'), JSON.stringify(checksums, null, 2) + '\n')
@@ -46,16 +46,7 @@ async function files(root) {
   }
   return result.sort()
 }
-export async function packageOfficialConnectors() {
-  const source = path.join(agentRoot, 'Server/connectors/official')
-  for (const entry of await readdir(source, { withFileTypes: true })) if (entry.isDirectory() && /^[a-z][a-z0-9.-]*$/.test(entry.name)) {
-    await packageConnector(path.join(source, entry.name), path.join(agentRoot, 'dist/connectors', entry.name))
-  }
-}
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const key = process.argv[2]
-  if (key === '--all') await packageOfficialConnectors()
-  else if (key === '--source' && process.argv[3] && process.argv[4]) console.log(await packageConnector(path.resolve(process.argv[3]), path.resolve(process.argv[4])))
-  else if (key && /^[a-z][a-z0-9.-]*$/.test(key)) console.log(await packageConnector(path.join(agentRoot, 'Server/connectors/official', key), path.join(agentRoot, 'dist/connectors', key)))
-  else throw new Error('Usage: package_connector.mjs --all | <id> | --source <directory> <destination>')
+  if (process.argv[2] === '--source' && process.argv[3] && process.argv[4]) console.log(await packageConnector(path.resolve(process.argv[3]), path.resolve(process.argv[4])))
+  else throw new Error('Usage: package_connector.mjs --source <directory> <destination>')
 }

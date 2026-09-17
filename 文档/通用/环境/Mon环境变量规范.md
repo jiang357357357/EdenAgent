@@ -130,7 +130,7 @@ Eden Agent 使用可插拔的搜索 Provider。默认 `auto` 会优先选择已�
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `EDEN_AGENT_SEARCH_PROVIDER` | `auto` | Provider 或逗号分隔的优先顺序；支持 `auto`、`brave`、`exa`、`tavily`、`searxng`、`bing`、`duckduckgo` |
+| `EDEN_AGENT_SEARCH_PROVIDER` | `auto` | Provider 或逗号分隔的优先顺序；支持 `auto`、`brave`、`exa`、`tavily`、`searxng`、`sogou`、`bing`、`duckduckgo` |
 | `EDEN_AGENT_SEARCH_TIMEOUT_MS` | `10000` | 单个搜索入口超时，范围 `1000`～`60000` 毫秒 |
 | `EDEN_AGENT_SEARCH_CACHE_TTL_SECONDS` | `120` | 进程内搜索缓存时间；设为 `0` 可关闭，最大 `3600` 秒 |
 | `BRAVE_SEARCH_API_KEY` | 空 | Brave Search API 密钥；也兼容 `BRAVE_API_KEY` |
@@ -160,7 +160,7 @@ BRAVE_API_KEY=your-brave-key
 
 `.monconfig` 中对应的键为 `PROVIDER`、`TIMEOUT_MS`、`CACHE_TTL_SECONDS`、`BRAVE_API_KEY`、`EXA_API_KEY`、`TAVILY_API_KEY`、`SEARXNG_URL`、`FETCH_TIMEOUT_MS` 和 `FETCH_MAX_BYTES`。同名进程环境变量的优先级更高。
 
-`web_fetch` 只允许公开的 HTTP/HTTPS 地址，会拦截本机、私网、链路本地和保留地址，并对每次重定向重新校验。旧版外部搜索进程变量已废弃；必应和 DuckDuckGo HTML 解析只作为无密钥降级路径保留。
+`web_fetch` 只允许公开的 HTTP/HTTPS 地址，会拦截本机、私网、链路本地和保留地址，并对每次重定向重新校验。旧版外部搜索进程变量已废弃；Brave、搜狗、必应和 DuckDuckGo HTML 解析只作为无密钥降级路径保留。
 
 ---
 
