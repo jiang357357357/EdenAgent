@@ -34,8 +34,8 @@ test('a terminated stream rewinds its failed branch and retries the same logical
   } finally { await fixture.close() }
 })
 
-test('a failed provider request is not replayed after any tool starts', async () => {
-  const fixture = await recordedModel([{ tool: 'effect', input: {} }, { error: 'terminated' }, { text: '不得请求' }])
+test('only the failed model request is retried after a tool, without replaying the tool', async () => {
+  const fixture = await recordedModel([{ tool: 'effect', input: {} }, { error: 'terminated' }, { text: '恢复完成' }])
   const record = callbacks()
   let executions = 0
   try {
@@ -43,9 +43,11 @@ test('a failed provider request is not replayed after any tool starts', async ()
       tools: [{ name: 'effect', revision: '1', description: 'effect', parameters: { type: 'object' }, async execute() { executions++; return null } }],
       callbacks: record.handlers, modelRetry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 } })
     const result = await runtime.prompt('执行') as Record<string, unknown>
-    assert.equal(result.stopReason, 'error')
+    assert.equal(result.stopReason, 'stop')
     assert.equal(executions, 1)
-    assert.equal(fixture.requests.length, 2)
+    assert.equal(fixture.requests.length, 3)
+    assert.deepEqual(fixture.requests[1], fixture.requests[2])
+    assert.match(JSON.stringify(record.events.filter(event => event.kind === 'model_transport')), /UND_ERR_SOCKET|ECONNRESET/)
     assert.equal(record.events.filter(event => event.kind === 'retry_scheduled').length, 0)
   } finally { await fixture.close() }
 })
@@ -70,7 +72,7 @@ test('transient provider status failures are retried', async () => {
     const result = await runtime.prompt('执行') as Record<string, unknown>
     assert.equal(result.stopReason, 'stop')
     assert.equal(fixture.requests.length, 2)
-    assert.equal(record.events.filter(event => event.kind === 'retry_scheduled').length, 1)
+    assert.equal(record.events.filter(event => event.kind === 'model_request_retry').length, 1)
   } finally { await fixture.close() }
 })
 
@@ -82,13 +84,29 @@ test('aborting during retry backoff prevents another provider request', async ()
     ...record.handlers,
     async event(kind: string, payload: Parameters<typeof record.handlers.event>[1]) {
       await record.handlers.event(kind, payload)
-      if (kind === 'retry_scheduled') setTimeout(() => void runtime.abort(), 0)
+      if (kind === 'model_request_retry') setTimeout(() => void runtime.abort(), 0)
     },
   }
   try {
     runtime = createRuntime({ sessionId: 'retry-abort', systemPrompt: '', model: fixture.config, tools: [], callbacks: handlers,
       modelRetry: { maxRetries: 2, baseDelayMs: 10_000, maxDelayMs: 10_000 } })
-    await assert.rejects(runtime.prompt('执行'), /abort/i)
+    const result = await runtime.prompt('执行') as Record<string, unknown>
+    assert.equal(result.stopReason, 'aborted')
     assert.equal(fixture.requests.length, 1)
+  } finally { await fixture.close() }
+})
+
+
+test('request retry exhaustion stops at three attempts without a second turn-level budget', async () => {
+  const fixture = await recordedModel(Array.from({ length: 4 }, () => ({ status: 503, error: 'service unavailable' })))
+  try {
+    const record = callbacks()
+    const runtime = createRuntime({ sessionId: 'retry-exhausted', systemPrompt: '', model: fixture.config, tools: [], callbacks: record.handlers,
+      modelRetry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 } })
+    const result = await runtime.prompt('执行') as Record<string, unknown>
+    assert.equal(result.stopReason, 'error')
+    assert.equal(fixture.requests.length, 3)
+    assert.equal(record.events.filter(event => event.kind === 'retry_scheduled').length, 0)
+    assert.match(JSON.stringify(record.events.filter(event => event.kind === 'model_transport')), /"status":503/)
   } finally { await fixture.close() }
 })

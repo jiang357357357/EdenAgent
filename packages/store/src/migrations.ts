@@ -460,6 +460,29 @@ export const migrations: readonly string[] = [
    CREATE TABLE blob_owners(blob_id TEXT NOT NULL REFERENCES blobs(id),account_key TEXT NOT NULL,PRIMARY KEY(blob_id,account_key));
    CREATE TABLE account_records(kind TEXT NOT NULL,record_id INTEGER NOT NULL,account_key TEXT NOT NULL,PRIMARY KEY(kind,record_id));
    CREATE TABLE account_ui_preferences(account_key TEXT PRIMARY KEY,auto_scroll_enabled INTEGER NOT NULL CHECK(auto_scroll_enabled IN (0,1)));`,
+  `CREATE TABLE character_intentions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, account_key TEXT NOT NULL, character_id TEXT NOT NULL,
+     title TEXT NOT NULL, reason TEXT NOT NULL, next_step TEXT NOT NULL,
+     status TEXT NOT NULL CHECK(status IN ('active','waiting','paused','completed','abandoned')),
+     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+   CREATE INDEX character_intentions_owner ON character_intentions(account_key,character_id,status,updated_at);
+   CREATE TABLE character_intention_entries (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, intention_id INTEGER NOT NULL REFERENCES character_intentions(id),
+     status TEXT NOT NULL, note TEXT NOT NULL, artifact TEXT NOT NULL,
+     session_id TEXT NOT NULL REFERENCES sessions(id), turn_id TEXT NOT NULL, created_at INTEGER NOT NULL);
+   CREATE INDEX character_intention_entries_parent ON character_intention_entries(intention_id,id);`,
+  `ALTER TABLE character_intentions ADD COLUMN wait_for TEXT;
+   ALTER TABLE character_intentions ADD COLUMN waiting_since INTEGER;
+   ALTER TABLE character_intention_entries ADD COLUMN evidence_json TEXT;
+   UPDATE character_intentions SET wait_for=next_step,waiting_since=updated_at WHERE status='waiting';`,
+  `ALTER TABLE self_awake_runs ADD COLUMN diary_cleared INTEGER NOT NULL DEFAULT 0 CHECK(diary_cleared IN (0,1));
+   UPDATE self_awake_runs SET diary_cleared=1 WHERE state='completed' AND decision_json IS NULL
+     AND NOT EXISTS(SELECT 1 FROM self_awake_diaries d WHERE d.run_id=self_awake_runs.id)
+     AND EXISTS(SELECT 1 FROM events e WHERE e.session_id=self_awake_runs.session_id
+       AND e.turn_id=self_awake_runs.turn_id AND e.kind='agent.message_end'
+       AND json_extract(e.payload_json,'$.message.role')='assistant');`,
+  `DROP TABLE character_intention_entries;
+   DROP TABLE character_intentions;`,
 ]
 
 export const databaseSchemaVersion = migrations.length

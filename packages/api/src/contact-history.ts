@@ -1,3 +1,5 @@
 import { z } from 'zod'
-export const contactHistorySchema = z.object({ limit: z.number().int().min(1).max(100).default(10),
-  beforeId: z.union([z.number().int().positive().safe(), z.string().regex(/^\d{1,20}$/)]).optional() }).strict()
+export const contactHistorySchema = z.object({}).strict()
+
+export const ownerContactMessageSchema = z.object({ title: z.string().trim().min(1).max(256), message: z.string().trim().min(1).max(16000) }).strict()
+export const ownerQqMessageSchema = ownerContactMessageSchema.extend({ title: z.string().trim().max(256).default('') }).strict()

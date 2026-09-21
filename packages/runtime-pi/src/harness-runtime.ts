@@ -43,6 +43,11 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
   const tools = (items: RuntimeTool[]) => items.map(tool => adaptTool<Record<string, never>>(tool, callbacks, healthy, fail, options.toolCallPrefix))
   const provider = createRuntimeModels(options.model, {
     signal: () => controller.signal,
+    retry: retryPolicy,
+    async event(kind, payload) {
+      try { await callbacks.event(kind, payload) }
+      catch (error) { fatal = error; controller.abort(); throw error }
+    },
     failed(error) { fatal = error; controller.abort() },
     async response(snapshot) {
       try { await options.callbacks.response?.(snapshot) }

@@ -48,7 +48,7 @@ export type { JobSchedule, JobInfo } from './jobs.ts'
 export { memoNotificationSchema, memoNotificationListSchema, memoNotificationIdSchema, memoNotificationListResultSchema } from './memos.ts'
 export type { MemoNotification } from './memos.ts'
 
-export { selfAwakeListSchema, selfAwakeExecutionSchema, selfAwakeTimerSchema, selfAwakeDecisionSchema } from './self-awake.ts'
+export { selfAwakeListSchema, selfAwakeExecutionSchema, selfAwakeTimerSchema, selfAwakeToolTimerSchema, selfAwakeDiaryWriteSchema, selfAwakeDecisionSchema } from './self-awake.ts'
 export type { SelfAwakeDecision } from './self-awake.ts'
 
 export { desktopReminderCreateSchema, desktopReminderIdSchema, desktopReminderListSchema, desktopReminderSchema } from './notifications.ts'
@@ -82,7 +82,7 @@ export { screenRequestSchema, cameraRequestSchema, mediaListSchema, mediaResultS
 
 export { monSyncStatusSchema } from './mon-sync.ts'
 
-export { contactHistorySchema } from './contact-history.ts'
+export { contactHistorySchema, ownerContactMessageSchema, ownerQqMessageSchema } from './contact-history.ts'
 
 export { connectorCreateSchema, connectorUpdateSchema } from './connectors.ts'
 

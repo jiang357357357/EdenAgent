@@ -8,6 +8,6 @@ export const questionItemSchema = z.object({
 export const questionAskSchema = z.object({ questions: z.array(questionItemSchema).min(1).max(3) }).strict()
 export const questionListSchema = z.object({ sessionId: z.string().uuid().nullish() }).strict()
 export const questionIdSchema = z.object({ requestId: z.string().uuid() }).strict()
-export const questionResolveSchema = questionIdSchema.extend({ answers: z.array(z.array(z.string().trim().min(1).max(4000)).min(1).max(12)).min(1).max(3) })
+export const questionResolveSchema = questionIdSchema.extend({ answers: z.array(z.array(z.string().trim().min(1).max(4000)).max(13)).min(1).max(3), supplementary: z.array(z.string().trim().max(4000)).min(1).max(3).optional() })
 export type QuestionItem = z.infer<typeof questionItemSchema>
 export interface QuestionRequest { id: string; sessionId: string; turnId: string; state: string; questions: QuestionItem[]; createdAt: number }

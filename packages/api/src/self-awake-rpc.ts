@@ -7,7 +7,7 @@ export const selfAwakeRunInfoSchema = z.object({
     state: jobInfoSchema.shape.state, reason: z.string() }).nullable().optional(),
   outcomeReview: z.object({ decision: z.string(), note: z.string(), reviewedAt: z.number() }).nullable().optional(),
   id: z.string().uuid(), jobId: z.string().uuid(), sessionId: z.string().uuid(), schemaVersion: z.literal('self-awake.v1'), eventId: z.string(),
-  status: z.string(), request: jsonValue, decision: jsonValue, authorSnapshot: jsonValue, attempts: z.number().int(), lastError: z.string().nullable(),
+  status: z.string(), diaryCleared: z.boolean().optional(), request: jsonValue, decision: jsonValue, authorSnapshot: jsonValue, attempts: z.number().int(), lastError: z.string().nullable(),
   startedAt: z.number().int().nullable(), completedAt: z.number().int().nullable(), createdAt: z.number().int(), updatedAt: z.number().int(),
   diaries: z.array(z.object({ id: z.string().uuid(), runId: z.string().uuid(), sessionId: z.string().uuid(), assistantId: z.string(), characterId: z.string(),
     title: z.string(), content: z.string(), mood: z.string(), metadata: jsonValue, createdAt: z.number().int() })),
@@ -15,6 +15,8 @@ export const selfAwakeRunInfoSchema = z.object({
 export type SelfAwakeRunInfo = z.infer<typeof selfAwakeRunInfoSchema>
 const notificationReviewSchema = z.object({ fingerprint: z.string(), record: jsonValue, state: z.string() })
 export const selfAwakeRpcMethods = {
+  'self_awake.diaries.clear': { params: z.object({ confirmClear: z.literal(true) }).strict(), result: z.object({ deleted: z.number().int().nonnegative(), clearedAt: z.number().int() }) },
+  'self_awake.history.clear': { params: z.object({ confirmClear: z.literal(true) }).strict(), result: z.object({ deleted: z.number().int().nonnegative(), clearedAt: z.number().int() }) },
   'self_awake.run.review': { params: selfAwakeExecutionSchema, result: z.object({ fingerprint: z.string(), state: z.string() }) },
   'self_awake.run.resolve': { params: selfAwakeExecutionSchema.extend({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     decision: z.enum(['completed', 'failed']), note: z.string().trim().min(1).max(4000), confirmOutcome: z.literal(true) }), result: z.object({ fingerprint: z.string(), state: z.string() }) },

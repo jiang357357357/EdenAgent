@@ -2,13 +2,18 @@ import { z } from 'zod'
 import { jsonValue } from './json.ts'
 import { memoIntegerSchema } from './memos.ts'
 
-export const selfAwakeListSchema = z.object({ page: z.number().int().min(1).max(100000).default(1), pageSize: z.number().int().min(1).max(100).default(20), query: z.string().max(1000).nullish() }).strict()
+export const selfAwakeDiaryWriteSchema = z.object({ title: z.string().trim().min(1).max(200).default('日记'), content: z.string().max(32000).refine(value => value.trim().length > 0, '日记正文不能为空') }).strict()
+
+export const selfAwakeListSchema = z.object({ diariesOnly: z.boolean().optional(), page: z.number().int().min(1).max(100000).default(1), pageSize: z.number().int().min(1).max(100).default(20), query: z.string().max(1000).nullish() }).strict()
 export const selfAwakeExecutionSchema = z.object({ runId: z.uuid() }).strict()
 export const selfAwakeTimerSchema = z.object({
   afterMinutes: z.number().int().min(1).max(10080).optional(),
   at: z.union([memoIntegerSchema, z.string().refine(value => Number.isFinite(Date.parse(value)), 'Invalid date').transform(value => Date.parse(value))]).optional(),
   reason: z.string().trim().min(1).max(4000).default('Scheduled self-awake activation'),
 }).strict().refine(value => value.at !== undefined || value.afterMinutes !== undefined, 'at or afterMinutes is required')
+export const selfAwakeToolTimerSchema = selfAwakeTimerSchema.safeExtend({
+  at: z.string().datetime({ offset: true }).transform(value => Date.parse(value)).optional(),
+}).refine(value => (value.at !== undefined) !== (value.afterMinutes !== undefined), 'Choose at or afterMinutes')
 export const selfAwakeDecisionSchema = z.object({
   mood: z.string().max(1000), current_desire: z.string().max(4000), observations: z.array(z.string().max(4000)).max(5),
   should_interrupt_user: z.boolean(), action: z.enum(['chat_user', 'remind_user', 'create_task', 'ask_user', 'run_safe_check', 'sync_context', 'write_diary']),

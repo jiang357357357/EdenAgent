@@ -32,6 +32,7 @@ export interface RuntimeModel {
   contextWindow: number
   maxTokens: number
   reasoning?: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  sampling?: { temperature?: number | undefined; topP?: number | undefined; presencePenalty?: number | undefined; frequencyPenalty?: number | undefined } | undefined
   /** USD per million tokens; absence means cost is unknown, never free. */
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number }
 }
