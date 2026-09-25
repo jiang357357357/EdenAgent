@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { commandExecutionSetSchema, commandExecutionInfoSchema } from './command-execution.ts'
+import { terminalGetSchema, terminalSetSchema, terminalInfoSchema } from './terminal-environment.ts'
 import { permissionModeInfoSchema } from './permission-mode.ts'
 import { jsonValue } from './json.ts'
 import { permissionListSchema, permissionResolveSchema, permissionRequestIdSchema } from './plugins.ts'
@@ -29,6 +30,8 @@ const workspaceFileSchema = z.object({
 export const interactionRpcMethods = {
   'command.execution.get': { params: z.object({}).strict(), result: commandExecutionInfoSchema },
   'command.execution.set': { params: commandExecutionSetSchema, result: commandExecutionInfoSchema },
+  'command.terminal.get': { params: terminalGetSchema, result: terminalInfoSchema },
+  'command.terminal.set': { params: terminalSetSchema, result: terminalInfoSchema },
   'permission.mode.get': { params: z.object({}).strict(), result: permissionModeInfoSchema },
   'permission.mode.set': { params: permissionModeInfoSchema, result: permissionModeInfoSchema },
   'permission.list': { params: permissionListSchema, result: z.array(permissionRequestSchema) },

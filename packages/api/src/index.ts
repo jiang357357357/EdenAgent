@@ -127,6 +127,8 @@ export type { PermissionMode } from './permission-mode.ts'
 
 export { commandExecutionConfigSchema, commandExecutionSetSchema, commandExecutionInfoSchema } from './command-execution.ts'
 export type { CommandExecutionConfig, CommandExecutionInfo } from './command-execution.ts'
+export { terminalTargetSchema, terminalGetSchema, terminalSetSchema, terminalInfoSchema } from './terminal-environment.ts'
+export type { TerminalTarget, TerminalInfo } from './terminal-environment.ts'
 
 export { pluginTestReportSchema, pluginDraftContentSchema, pluginDraftSummarySchema, pluginVersionSummarySchema } from './plugin-development.ts'
 export type { PluginTestReport, PluginDraftContent, PluginDraftSummary, PluginVersionSummary } from './plugin-development.ts'
