@@ -25,7 +25,7 @@ export async function listWslDistributions(): Promise<string[]> {
 }
 
 /** WSL is an alternate local shell, not an Eden sandbox. */
-export async function runWslCommand(root: string, command: string, distribution: string, signal: AbortSignal) {
+export async function runWslCommand(root: string, command: string, distribution: string, signal: AbortSignal, timeoutMs = 30000) {
   if (process.platform !== 'win32') throw new Error('WSL terminal is available only on Windows')
   if (!(await listWslDistributions()).includes(distribution)) throw new Error(`WSL distribution is unavailable: ${distribution}`)
   // wslpath resolves the selected Windows workspace according to this distribution's mount configuration.
@@ -33,6 +33,6 @@ export async function runWslCommand(root: string, command: string, distribution:
   return runProcess({
     executable: wslExecutable(),
     args: ['--distribution', distribution, '--exec', '/bin/sh', '-c', script, 'eden-agent', root],
-    cwd: root, input: command, timeoutMs: 30000, maxOutputBytes: 1024 * 1024, signal,
+    cwd: root, input: command, timeoutMs, maxOutputBytes: 1024 * 1024, truncateOutput: true, signal,
   })
 }

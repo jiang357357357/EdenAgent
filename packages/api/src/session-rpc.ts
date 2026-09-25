@@ -2,12 +2,14 @@ import { z } from 'zod'
 import { inputRecoveryMethods } from './input-recovery.ts'
 import { jsonValue } from './json.ts'
 import { runtimeOriginSchema } from './runtime.ts'
+import { sessionPurposeSchema, sessionSourceChannelSchema } from './session-classification.ts'
 import { sessionCreateSchema, sessionListSchema, sessionIdSchema, sessionTitleSchema, sessionParticipantsSchema } from './rpc.ts'
 import { eventListSchema, messageListSchema } from './rpc.ts'
 
 export const sessionSummarySchema = z.object({
   id: z.string().uuid(), title: z.string(), titleSource: z.string(),
-  status: z.enum(['active', 'closed']), runtimeOrigin: runtimeOriginSchema,
+  status: z.enum(['active', 'closed']), executionStatus: z.enum(['idle', 'busy']), runtimeOrigin: runtimeOriginSchema,
+  purpose: sessionPurposeSchema.default('user_chat'), sourceChannel: sessionSourceChannelSchema.default('app'),
   participants: z.array(jsonValue), environment: jsonValue,
   contextTokens: z.number().int().nonnegative().nullish(), tokenBreakdown: jsonValue.optional(),
   createdAt: z.number().int(), updatedAt: z.number().int(),

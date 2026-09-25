@@ -1,9 +1,10 @@
 import path from "node:path"
 import { rm } from "node:fs/promises"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { spawnExecutable, spawnNpm } from "../../frontend/Script/Project/process_runner.mjs"
 import desktopRuntimeContract from "../../frontend/desktop/src/processes/desktop-runtime-contract.cjs"
+import portTakeover from "../../frontend/desktop/src/processes/port-takeover.cjs"
 import { loadMonConfig } from "./monconfig.mjs"
 
 const { createDesktopRuntimeEnvironment } = desktopRuntimeContract
@@ -11,7 +12,24 @@ const { createDesktopRuntimeEnvironment } = desktopRuntimeContract
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const config = loadMonConfig(root)
 const webPort = Number(process.env.EDEN_AGENT_WEB_PORT ?? config.number("server", "WEB_PORT", 40091))
+const monPort = Number(process.env.EDEN_AGENT_MON_PORT ?? config.number("server", "PORT", 40092))
 const quitFlag = config.path("desktop", "QUIT_FLAG", ".artifacts/desktop-quit.flag")
+
+function runningMonTokenFile() {
+  if (process.platform !== "linux") return undefined
+  for (const pid of portTakeover.listenerPids(monPort)) {
+    try {
+      const environment = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0")
+      const value = (key) => environment.find(item => item.startsWith(`${key}=`))?.slice(key.length + 1)
+      if (value("EDEN_AGENT_RUNTIME_ORIGIN") !== "mon") continue
+      const dataRoot = value("EDEN_AGENT_DATA_ROOT")
+      if (!dataRoot || !path.isAbsolute(dataRoot)) continue
+      const tokenFile = path.join(dataRoot, "capability.token")
+      if (existsSync(tokenFile)) return tokenFile
+    } catch { /* An external listener may not expose process details. */ }
+  }
+  return undefined
+}
 
 await rm(quitFlag, { force: true }).catch(() => {})
 
@@ -161,7 +179,11 @@ await new Promise((resolve, reject) => {
 }).catch(async error => { await cleanup(); throw error })
 
 const desktopEnvironment = createDesktopRuntimeEnvironment({
-  environment: { ...process.env, EDEN_AGENT_NODE_PATH: process.env.EDEN_AGENT_NODE_PATH || process.execPath },
+  environment: {
+    ...process.env,
+    EDEN_AGENT_NODE_PATH: process.env.EDEN_AGENT_NODE_PATH || process.execPath,
+    EDEN_AGENT_MON_TOKEN_FILE: process.env.EDEN_AGENT_MON_TOKEN_FILE || runningMonTokenFile(),
+  },
   agentRoot: root,
   parentPid: process.pid,
   quitFlag,

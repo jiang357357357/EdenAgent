@@ -121,6 +121,8 @@ export { monSyncResultSchema } from './mon-sync.ts'
 export type { MonSyncResult } from './mon-sync.ts'
 export { sessionSummarySchema, sessionEventSchema } from './session-rpc.ts'
 export type { SessionSummary, SessionEvent } from './session-rpc.ts'
+export { sessionPurposeSchema, sessionSourceChannelSchema } from './session-classification.ts'
+export type { SessionPurpose, SessionSourceChannel } from './session-classification.ts'
 
 export { permissionModeSchema, permissionModeInfoSchema } from './permission-mode.ts'
 export type { PermissionMode } from './permission-mode.ts'
@@ -178,3 +180,5 @@ export { modelParticipant, modelCharacterProfile } from './model-participant.ts'
 export { accentThemeSchema, type AccentTheme } from "./ui-preferences.ts"
 
 export { baseThemeSchema, type BaseTheme } from "./ui-preferences.ts"
+
+export { replyLengthSchema } from "./ui-preferences.ts"

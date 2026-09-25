@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { sessionEnvironmentSchema } from './environment.ts'
+import { sessionPurposeSchema, sessionSourceChannelSchema } from './session-classification.ts'
 import { jsonValue } from './json.ts'
 import { runtimeOriginSchema } from './runtime.ts'
 import { attachmentRefsSchema } from './attachments.ts'
@@ -28,7 +29,8 @@ export const sessionCreateSchema = z.object({
   title: z.string().max(500).default('New conversation'), participants: z.array(jsonValue).default([]),
   environment: sessionEnvironmentSchema.optional(),
 }).strict()
-export const sessionListSchema = z.object({ limit: z.number().int().min(1).max(1000).default(100), includeClosed: z.boolean().default(false), includeBackground: z.boolean().default(false) }).strict()
+export const sessionListSchema = z.object({ limit: z.number().int().min(1).max(1000).default(100), includeClosed: z.boolean().default(false),
+  includeBackground: z.boolean().default(false), purpose: sessionPurposeSchema.optional(), sourceChannel: sessionSourceChannelSchema.optional() }).strict()
 export const turnStartSchema = z.object({
   sessionId: z.string().uuid(), text: z.string().max(1_000_000), attachments: attachmentRefsSchema.default([]),
   environment: sessionEnvironmentSchema.optional(), idempotencyKey: z.string().min(1).max(200).optional(),

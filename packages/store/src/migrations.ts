@@ -529,6 +529,13 @@ export const migrations: readonly string[] = [
      OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=session_classification.session_id
        AND e.kind IN ('session.created','session.metadata.updated')
        AND json_extract(e.payload_json,'$.environment.sessionPurpose')='self_awake'));`,
+  `CREATE TABLE web_resources (
+     session_id TEXT NOT NULL REFERENCES sessions(id), ref_id TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK(kind IN ('search','page')), url TEXT NOT NULL,
+     title TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(session_id,ref_id)
+   );
+   CREATE INDEX web_resources_recent ON web_resources(session_id,created_at DESC,ref_id DESC);`,
 ]
 
 export const databaseSchemaVersion = migrations.length

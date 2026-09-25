@@ -1,7 +1,7 @@
 # Project development scripts
 
 - `dev.mjs`：分别启动伊甸园 TS Server（默认 `40092`）与尘世 TS Server（默认 `40093`），再启动 Web 与 Electron；两个服务使用独立令牌和数据目录。支持持久双世界目录选择；创建的子进程退出时停止本次开发进程组，不把端口上的其他服务当作本次已启动实例。
-- `dev_desktop.mjs`：仅启动 Web 与桌面壳。
+- `dev_desktop.mjs`：启动 Web 与桌面壳，Mon 后端沿用已运行的外部服务；桌面壳监管尘世本地运行时。Linux 上优先使用监听中 Mon Server 数据目录的能力令牌；其他环境可用 `EDEN_AGENT_MON_TOKEN_FILE` 显式指定。
 - `monconfig.mjs`：读取项目 `.monconfig`。
 - `monconfig.test.mjs`：配置读取测试。
 - `package_connector.mjs`：通过 `--source <目录> <目标>` 构建任意 TS 连接器包；Node worker、清单和资产及校验清单写入 `dist/connectors/<id>`。
@@ -42,7 +42,7 @@ Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独�
 开发双服务、桌面托管和独立 Server 最终都由宿主配置加载器选择当前世界的配置。前两者仅向子进程转发公共变量与该世界的专属变量，不转发另一个世界的隔离器配置。配置加载后显式注入命令、技能和 MCP 服务，各服务不再分别选择外部隔离器。开发入口同时传递模型计价、允许来源与 Blob 上限配置，避免独立启动与开发启动行为不同。本轮仅编写源码，未启动这些入口。
 ## 固定端口接管
 
-开发启动采用“后启动者接管”规则：启动前释放伊甸园后端、尘世后端和 Web 声明的固定端口。若旧监听进程由 MonPM 监管，启动器会先停止对应 MonPM 应用，避免其自动重启后再次抢占端口。`npm run dev` 与 `cd frontend && npm run dev` 使用同一套双宿主启动流程。
+根目录 `npm run dev` 采用“后启动者接管”规则：启动前释放伊甸园后端、尘世后端和 Web 声明的固定端口。若旧监听进程由 MonPM 监管，启动器会先停止对应 MonPM 应用，避免其自动重启后再次抢占端口。`cd frontend && npm run dev` 使用 `dev_desktop.mjs`，不接管伊甸园后端端口；只启动 Web 与 Electron，并由桌面壳按自身配置管理尘世本地运行时。
 
 ## Mon 部署路径与启动诊断
 

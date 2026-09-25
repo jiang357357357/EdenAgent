@@ -1,4 +1,7 @@
 import { z } from "zod"
+export const replyLengthSchema = z.enum(["short", "medium", "long"])
+const replyCharacter = z.object({ characterId: z.string().trim().min(1).max(100) }).strict()
+const replyLength = z.object({ length: replyLengthSchema }).strict()
 const preferences = z.object({ autoScrollEnabled: z.boolean() }).strict()
 const background = z
   .object({
@@ -21,6 +24,8 @@ const appearance = z
   })
   .strict()
 export const uiPreferenceRpcMethods = {
+  "ui.reply_length.get": { params: replyCharacter, result: replyLength },
+  "ui.reply_length.update": { params: replyCharacter.extend({ length: replyLengthSchema }), result: replyLength },
   "ui.appearance.get": { params: z.object({}).strict(), result: appearance },
   "ui.appearance.update": { params: appearance, result: appearance },
   "ui.background.get": { params: z.object({}).strict(), result: background },

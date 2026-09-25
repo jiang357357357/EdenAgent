@@ -3,7 +3,7 @@ import { hostProcessEnvironment } from './host-environment.ts'
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 
-export interface ProcessResult { stdout: string; stderr: string; exitCode: number }
+export interface ProcessResult { stdout: string; stderr: string; exitCode: number; outputTruncated?: boolean }
 export interface ProcessRequest {
   env?: NodeJS.ProcessEnv
   cwd?: string
@@ -12,6 +12,7 @@ export interface ProcessRequest {
   input: string
   timeoutMs: number
   maxOutputBytes: number
+  truncateOutput?: boolean
   signal?: AbortSignal
 }
 
@@ -27,6 +28,7 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
     let stderr = ''
     const decoders = { stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8') }
     let bytes = 0
+    let outputTruncated = false
     let failure: Error | undefined
     let termination: Promise<void> | undefined
     const stop = (reason: Error) => {
@@ -49,9 +51,12 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
     if (request.signal?.aborted) abort()
     const collect = (target: 'stdout' | 'stderr', chunk: Buffer) => {
       bytes += chunk.byteLength
-      if (bytes > request.maxOutputBytes) { stop(new Error('Process output limit exceeded')); return }
-      if (target === 'stdout') stdout += decoders.stdout.write(chunk)
-      else stderr += decoders.stderr.write(chunk)
+      if (bytes > request.maxOutputBytes && !request.truncateOutput) { stop(new Error('Process output limit exceeded')); return }
+      const remaining = Math.max(0, request.maxOutputBytes - (bytes - chunk.byteLength))
+      const visible = chunk.subarray(0, remaining)
+      if (visible.length < chunk.length) outputTruncated = true
+      if (target === 'stdout') stdout += decoders.stdout.write(visible)
+      else stderr += decoders.stderr.write(visible)
     }
     child.stdout.on('data', (chunk: Buffer) => collect('stdout', chunk))
     child.stderr.on('data', (chunk: Buffer) => collect('stderr', chunk))
@@ -62,7 +67,8 @@ export function runProcess(request: ProcessRequest): Promise<ProcessResult> {
       request.signal?.removeEventListener('abort', abort)
       await termination
       if (failure) reject(Object.assign(failure, { toolOutcome: child.pid ? 'unknown' : 'failed' }))
-      else resolve({ stdout: stdout + decoders.stdout.end(), stderr: stderr + decoders.stderr.end(), exitCode: code ?? -1 })
+      else resolve({ stdout: stdout + decoders.stdout.end(), stderr: stderr + decoders.stderr.end(), exitCode: code ?? -1,
+        ...(outputTruncated ? { outputTruncated: true } : {}) })
     })
     child.stdin.end(request.input)
   })
