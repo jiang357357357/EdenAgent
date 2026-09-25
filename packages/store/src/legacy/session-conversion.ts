@@ -27,6 +27,10 @@ export function convertLegacySession(db: DatabaseSync, row: LegacyRow, origin: '
   if (!Array.isArray(participants) || !environment || typeof environment !== 'object' || Array.isArray(environment)) throw new Error('Invalid legacy session metadata')
   const createdAt = timestamp(row.created_at), updatedAt = timestamp(row.updated_at)
   db.prepare('INSERT INTO sessions(id,title,origin,status,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(id, text(row, 'title'), origin, status, createdAt, updatedAt)
+  if (environment.sessionPurpose === 'self_awake' || environment.sessionPurpose === 'subagent') {
+    db.prepare('UPDATE session_classification SET purpose=?,source_channel=? WHERE session_id=?')
+      .run(environment.sessionPurpose, 'internal', id)
+  }
   db.prepare('INSERT INTO events(id,session_id,turn_id,seq,kind,payload_json,created_at) VALUES(?,?,NULL,1,?,?,?)')
     .run(metadataId(id), id, 'session.metadata.updated', JSON.stringify({ participants, environment, legacyTitleSource: typeof row.title_source === 'string' ? row.title_source : 'legacy' }), createdAt)
   db.prepare('INSERT INTO legacy_conversion_ids(domain,source_id,target_id) VALUES(?,?,?)').run('sessions', id, id)

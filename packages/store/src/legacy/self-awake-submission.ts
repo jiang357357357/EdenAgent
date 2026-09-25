@@ -21,6 +21,7 @@ export function convertSelfAwakeSubmission(db: DatabaseSync, row: LegacyRow): vo
   const input = { user_id: user, schema_version: 'self-awake.v1', idempotency_key: requestKey, event_id: event, context: value.trigger }
   const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
   db.prepare('INSERT INTO self_awake_submissions(user_id,request_key,request_hash,job_id) VALUES(?,?,?,?)').run(user, requestKey, hash, jobId)
+  db.prepare("UPDATE session_classification SET purpose='self_awake',source_channel='internal' WHERE session_id=?").run(sessionId)
 }
 
 function submissionRequestKey(row: LegacyRow, user: string) {

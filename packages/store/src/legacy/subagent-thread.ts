@@ -31,6 +31,7 @@ export function convertLegacyThread(db: DatabaseSync, row: LegacyRow): void {
   const config = object(configJson), usage = object(usageJson)
   const budget = config.budget === undefined ? {} : object(JSON.stringify(config.budget))
   db.prepare("INSERT INTO sessions(id,title,origin,status,created_at,updated_at) VALUES(?,?,?,'closed',?,?)").run(child, task, session.origin!, created, updated)
+  db.prepare("UPDATE session_classification SET purpose='subagent',source_channel='internal' WHERE session_id=?").run(child)
   db.prepare(`INSERT INTO events(id,session_id,turn_id,seq,kind,payload_json,created_at) VALUES(?,?,NULL,1,'session.metadata.updated',?,?)`)
     .run(derivedId(id, 'metadata'), child, JSON.stringify({ participants: [], environment: { sessionPurpose: 'subagent', parentSessionId: parentSession, legacyAgentId: id } }), created)
   db.prepare(`INSERT INTO subagent_threads(id,root_session_id,parent_session_id,child_session_id,parent_id,agent_path,task_name,role,depth,state,

@@ -483,6 +483,52 @@ export const migrations: readonly string[] = [
        AND json_extract(e.payload_json,'$.message.role')='assistant');`,
   `DROP TABLE character_intention_entries;
    DROP TABLE character_intentions;`,
+  `CREATE TABLE session_classification(
+     session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+     purpose TEXT NOT NULL CHECK(purpose IN ('user_chat','self_awake','subagent')),
+     source_channel TEXT NOT NULL CHECK(source_channel IN ('app','qq','internal')),
+     CHECK((purpose='user_chat' AND source_channel IN ('app','qq'))
+       OR (purpose IN ('self_awake','subagent') AND source_channel='internal'))
+   );
+   INSERT INTO session_classification(session_id,purpose,source_channel)
+   SELECT s.id,
+     CASE
+       WHEN EXISTS(SELECT 1 FROM subagent_threads t WHERE t.child_session_id=s.id)
+         OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=s.id AND e.kind='session.created'
+           AND json_extract(e.payload_json,'$.environment.sessionPurpose')='subagent') THEN 'subagent'
+       WHEN EXISTS(SELECT 1 FROM jobs j WHERE j.session_id=s.id AND j.kind='self_awake')
+         OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=s.id AND e.kind='session.created'
+           AND json_extract(e.payload_json,'$.environment.sessionPurpose')='self_awake') THEN 'self_awake'
+       ELSE 'user_chat' END,
+     CASE WHEN EXISTS(SELECT 1 FROM subagent_threads t WHERE t.child_session_id=s.id)
+         OR EXISTS(SELECT 1 FROM jobs j WHERE j.session_id=s.id AND j.kind='self_awake')
+         OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=s.id AND e.kind='session.created'
+           AND json_extract(e.payload_json,'$.environment.sessionPurpose') IN ('self_awake','subagent'))
+       THEN 'internal' ELSE 'app' END
+   FROM sessions s;
+   CREATE INDEX session_classification_filter ON session_classification(purpose,source_channel,session_id);
+   CREATE TRIGGER session_classification_insert AFTER INSERT ON sessions BEGIN
+     INSERT INTO session_classification(session_id,purpose,source_channel) VALUES(NEW.id,'user_chat','app');
+   END;`,
+  `CREATE TABLE qq_channel_conversations (
+     bot_qq TEXT NOT NULL, contact_qq TEXT NOT NULL,
+     session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id),
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY(bot_qq, contact_qq)
+   );`,
+  `UPDATE session_classification SET purpose='subagent',source_channel='internal'
+   WHERE purpose='user_chat' AND (
+     EXISTS(SELECT 1 FROM subagent_threads t WHERE t.child_session_id=session_classification.session_id)
+     OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=session_classification.session_id
+       AND e.kind IN ('session.created','session.metadata.updated')
+       AND json_extract(e.payload_json,'$.environment.sessionPurpose')='subagent'));
+   UPDATE session_classification SET purpose='self_awake',source_channel='internal'
+   WHERE purpose='user_chat' AND (
+     EXISTS(SELECT 1 FROM jobs j WHERE j.session_id=session_classification.session_id AND j.kind='self_awake')
+     OR EXISTS(SELECT 1 FROM self_awake_runs r WHERE r.session_id=session_classification.session_id)
+     OR EXISTS(SELECT 1 FROM events e WHERE e.session_id=session_classification.session_id
+       AND e.kind IN ('session.created','session.metadata.updated')
+       AND json_extract(e.payload_json,'$.environment.sessionPurpose')='self_awake'));`,
 ]
 
 export const databaseSchemaVersion = migrations.length
