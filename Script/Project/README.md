@@ -48,6 +48,6 @@ Server 使用 Node/TypeScript，`build_server.mjs` 构建主入口及六个独�
 
 每个伊甸园数据目录的 `mon-service.json` 显式绑定一套 Core 部署。`deploymentRoot` 可使用相对于该 JSON 所在目录的路径；`authFile` 和可选 `scheduleStateFile` 相对于部署根解析，绝对路径继续支持。不设置 `deploymentRoot` 时，相对文件路径直接相对于 JSON 所在目录解析。不要通过自动搜索另一套认证文件来绕过缺失配置。
 
-启动会检查配置格式、文件可读性以及 `MON_SERVICE_SHARED_SECRET` / `MON_SERVICE_USER_ID` 是否完整。显式环境认证必须完整提供，整体覆盖文件绑定，不混合账号或调度状态。认证内容不写入诊断消息。Core 连接错误显示底层错误码与目标 origin，不包含令牌、请求体或 URL 查询参数。
+启动会检查配置格式、文件可读性以及 `MON_SERVICE_SHARED_SECRET` / `MON_SERVICE_USER_ID` 是否完整。显式环境认证必须完整提供；同一部署可用绝对路径 `MONOS_SELF_AWAKE_STATE_PATH` 指定可读的 MonOs 调度状态文件。显式环境配置不与 `mon-service.json` 混合；未指定调度文件时，自醒定时工具不可用。认证内容不写入诊断消息。Core 连接错误显示底层错误码与目标 origin，不包含令牌、请求体或 URL 查询参数。
 
 若 Web 启动出现 `ENOSPC` 且 syscall 为 `watch`，可临时使用 `CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=1000 npm run dev` 绕过文件监听数量限制；这与认证路径缺失是两类问题，不需要复制认证文件或修改系统限制。

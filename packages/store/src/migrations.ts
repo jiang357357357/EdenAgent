@@ -536,6 +536,12 @@ export const migrations: readonly string[] = [
      PRIMARY KEY(session_id,ref_id)
    );
    CREATE INDEX web_resources_recent ON web_resources(session_id,created_at DESC,ref_id DESC);`,
+  `CREATE TABLE qq_channel_pending_files (
+     owner_id TEXT NOT NULL, bot_qq TEXT NOT NULL, contact_qq TEXT NOT NULL,
+     message_id TEXT NOT NULL, attachments_json TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(owner_id,bot_qq,contact_qq,message_id)
+   );
+   CREATE INDEX qq_channel_pending_files_expiry ON qq_channel_pending_files(created_at);`,
 ]
 
 export const databaseSchemaVersion = migrations.length

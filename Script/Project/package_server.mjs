@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, cp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import path from 'node:path'
@@ -12,6 +12,9 @@ if (existsSync(output)) throw new Error(`Refusing to replace existing runtime di
 if (process.versions.node !== '22.23.1') throw new Error('Package with the pinned Node 22.23.1 runtime')
 const entry = path.join(root, 'dist/server/main.mjs')
 await stat(entry)
+await import('../../Server/scripts/build-tui.mjs')
+const tuiEntry = path.join(root, 'dist/server/tui.mjs')
+await stat(tuiEntry)
 const packages = serverDependencyPlan(root)
 const nodeDirectory = path.dirname(process.execPath)
 const license = [path.join(nodeDirectory, 'LICENSE'), path.join(nodeDirectory, '../LICENSE')].find(existsSync)
@@ -23,6 +26,12 @@ try {
   await mkdir(path.join(staging, 'server'))
   await cp(entry, path.join(staging, 'server/main.mjs'))
   await cp(`${entry}.map`, path.join(staging, 'server/main.mjs.map'))
+  await cp(tuiEntry, path.join(staging, 'server/tui.mjs'))
+  await cp(`${tuiEntry}.map`, path.join(staging, 'server/tui.mjs.map'))
+  await mkdir(path.join(staging, 'bin'))
+  await cp(path.join(root, 'Server/bin/eden'), path.join(staging, 'bin/eden'))
+  await cp(path.join(root, 'Server/bin/eden.cmd'), path.join(staging, 'bin/eden.cmd'))
+  await chmod(path.join(staging, 'bin/eden'), 0o755)
   await mkdir(path.join(staging, 'node'))
   await cp(process.execPath, path.join(staging, 'node', process.platform === 'win32' ? 'node.exe' : 'node'))
   await cp(license, path.join(staging, 'node/LICENSE'))
@@ -36,6 +45,7 @@ try {
   await writeFile(path.join(staging, 'runtime-manifest.json'), JSON.stringify({
     format: 1, platform: process.platform, arch: process.arch, node: process.versions.node,
     entry: 'server/main.mjs', lockSha256: sha256(lock), entrySha256: sha256(await readFile(entry)),
+    tuiEntry: 'server/tui.mjs', tuiEntrySha256: sha256(await readFile(tuiEntry)), tuiCommand: 'bin/eden',
     packages: packages.map(({ source, ...dependency }) => dependency), connectors,
   }, null, 2) + '\n')
   await rename(staging, output)

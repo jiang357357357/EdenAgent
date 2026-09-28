@@ -92,7 +92,7 @@ export function realmEnvironment(base, origin, token, port) {
   const env = Object.fromEntries(allowed.filter(key => base[key] !== undefined).map(key => [key, base[key]]))
   const skillRootsKey = `EDEN_AGENT_${origin.toUpperCase()}_SYSTEM_SKILL_ROOTS`
   if (base[skillRootsKey] !== undefined) env[skillRootsKey] = base[skillRootsKey]
-  if (origin === 'mon') for (const key of ['MON_SERVICE_SHARED_SECRET', 'MON_SERVICE_USER_ID', 'MON_CORE_BASE_URL']) { if (base[key] !== undefined) env[key] = base[key] }
+  if (origin === 'mon') for (const key of ['MON_SERVICE_SHARED_SECRET', 'MON_SERVICE_USER_ID', 'MON_CORE_BASE_URL', 'MONOS_SELF_AWAKE_STATE_PATH']) { if (base[key] !== undefined) env[key] = base[key] }
   if (origin === 'local') {
     const provider = base.EDEN_AGENT_MODEL?.split('/')[0]
     const credential = provider ? `${provider.toUpperCase().replaceAll('-', '_')}_API_KEY` : undefined
