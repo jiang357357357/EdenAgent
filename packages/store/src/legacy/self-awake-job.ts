@@ -34,9 +34,9 @@ export function convertSelfAwakeJob(db: DatabaseSync, row: LegacyRow) {
     error: session.status === 'active' ? null : 'Imported self-awake target session is no longer active' }
 }
 
-/** Apply the single-pending-wake rule while retaining all imported audit rows. */
-export function retainLatestImportedWake(db: DatabaseSync, createdAt: number): boolean {
-  const previous = db.prepare("SELECT id,created_at FROM jobs WHERE kind='self_awake' AND state='queued'").get()
+/** Retain one pending wake per imported session while preserving all audit rows. */
+export function retainLatestImportedWake(db: DatabaseSync, createdAt: number, sessionId: string | null = null): boolean {
+  const previous = db.prepare("SELECT id,created_at FROM jobs WHERE kind='self_awake' AND state='queued' AND session_id IS ?").get(sessionId)
   if (!previous) return true
   if (Number(previous.created_at) > createdAt) return false
   db.prepare("UPDATE jobs SET state='cancelled',error='Superseded by a newer imported self-awake plan' WHERE id=?").run(previous.id!)

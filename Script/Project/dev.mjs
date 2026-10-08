@@ -3,8 +3,11 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { launchNode, realmEnvironment, resolveDevelopmentRealmRoot, stopChild, takeOverTcpPort, waitForHealth, waitForWeb } from './runtime_children.mjs'
+import workspaceIdentity from '../../frontend/desktop/src/processes/workspace-identity.cjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
+const identity = workspaceIdentity.workspaceIdentity(root)
+const serverEnv = { ...process.env, ...(identity.monWorkspaceRoot ? { MON_WORKSPACE_ROOT: identity.monWorkspaceRoot } : {}) }
 const require = createRequire(import.meta.url)
 const dataRoots = {
   mon: resolveDevelopmentRealmRoot(root, 'mon', process.env.EDEN_AGENT_MON_DATA_ROOT),
@@ -36,13 +39,14 @@ try {
   const checks = []
   for (const origin of ['mon', 'local']) {
     const child = start(['--import', 'tsx', 'Server/src/main.ts'], {
-      ...realmEnvironment(process.env, origin, tokens[origin], ports[origin]), EDEN_AGENT_DATA_ROOT: dataRoots[origin],
+      ...realmEnvironment(serverEnv, origin, tokens[origin], ports[origin]), EDEN_AGENT_DATA_ROOT: dataRoots[origin],
     })
-    checks.push(waitForHealth(ports[origin], origin, child))
+    checks.push(waitForHealth(ports[origin], origin, child, { workspaceId: identity.workspaceId }))
   }
   await Promise.all(checks)
   const clientEnv = {
-    ...process.env, EDEN_AGENT_EXTERNAL_ORIGINS: 'mon,local', EDEN_AGENT_SERVER_MODE: '',
+    ...serverEnv, EDEN_AGENT_EXTERNAL_ORIGINS: 'mon,local', EDEN_AGENT_SERVER_MODE: '',
+    VITE_EDEN_AGENT_WORKSPACE_ID: identity.workspaceId,
     EDEN_AGENT_MON_PORT: String(ports.mon), EDEN_AGENT_LOCAL_PORT: String(ports.local),
     EDEN_AGENT_MON_CAPABILITY_TOKEN: tokens.mon, EDEN_AGENT_LOCAL_CAPABILITY_TOKEN: tokens.local,
     EDEN_AGENT_MON_DATA_ROOT: dataRoots.mon, EDEN_AGENT_LOCAL_DATA_ROOT: dataRoots.local,

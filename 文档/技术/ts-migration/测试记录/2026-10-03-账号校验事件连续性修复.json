@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "platform": "win32",
+  "node": "v22.23.1",
+  "scope": "Account revalidation and ordered live WebSocket event delivery",
+  "productionCodeChanged": true,
+  "realUserDataUsed": false,
+  "runningUserServicesRestarted": false,
+  "committedOrPushed": false,
+  "implementation": {
+    "accountRefresh": "Single in-flight verification shared by concurrent callers",
+    "pendingEvents": "Retain unseen live events until the same account passes verification, then flush FIFO",
+    "verificationFailure": "Discard queue and close with code 1008",
+    "queueLimits": { "events": 1024, "serializedUtf8Bytes": 4194304, "overflowCloseCode": 1013 },
+    "lateVerificationAfterClose": "Does not resume event delivery"
+  },
+  "regression": {
+    "command": "node --import tsx --test Server/tests/regression/accounts/tool-connection.test.mjs",
+    "passed": 1,
+    "failed": 0,
+    "exitCode": 0,
+    "environment": "Temporary Mon runtime, actual WebSocket and production browser transport, local synthetic Core and recorded model HTTP",
+    "realRefreshIntervalElapsed": true,
+    "pendingCoreProfileRequests": 1,
+    "lastEventBeforeRefresh": "72",
+    "bufferedSequences": ["73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84"],
+    "bufferedEventsSentWhileUnverified": 0,
+    "bufferedEventsDeliveredExactlyOnceInOrder": true,
+    "bufferFlushedBeforeNaturalModelReplyReleased": true,
+    "closes": [],
+    "connectionStates": ["connected"],
+    "writeToolExecutions": 2,
+    "modelRequests": 4,
+    "toolResultAndNaturalReplyPresentInLiveStreamAndHistory": true,
+    "includedInDefaultTestDiscovery": true
+  },
+  "unitTests": {
+    "command": "node --import tsx --test Server/tests/unit/accounts/connection.test.ts Server/tests/unit/accounts/event-delivery.test.ts",
+    "passed": 14,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "extendedTests": {
+    "command": "node --import tsx --test Server/tests/integration/accounts/transport.test.ts Server/tests/integration/accounts/ownership.test.ts Server/tests/server-runtime.test.ts",
+    "passed": 5,
+    "failed": 1,
+    "exitCode": 1,
+    "preexistingFailure": {
+      "file": "Server/tests/integration/accounts/ownership.test.ts",
+      "line": 41,
+      "actual": "stolen",
+      "expected": "A",
+      "cause": "SessionRepository.rename updates the title before checking account ownership",
+      "baselineServerCommit": "3d0bac8370c06a9cc08ee833e88adfdc41f4c4ad",
+      "reproducedOnUnmodifiedBaselineWithTemporaryData": true,
+      "fixedInThisChange": false
+    }
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit",
+    "exitCode": 0
+  },
+  "build": {
+    "command": "node Script/Project/build_server.mjs",
+    "exitCode": 0,
+    "artifact": "dist/server/main.mjs"
+  },
+  "architecture": {
+    "command": "node Script/Architecture/check.mjs",
+    "exitCode": 1,
+    "sourceFiles": 821,
+    "errors": 35,
+    "errorsInChangedFiles": 0,
+    "thresholdsRelaxed": false
+  },
+  "limitations": [
+    "The reported user session logs were not inspected; this fixes the reproduced Mon failure path.",
+    "The production browser transport ran in a Node fixture, not a rendered Electron window.",
+    "The extended suite has one independently confirmed preexisting ownership failure; the repository architecture gate also remains failing.",
+    "The built server has not replaced or restarted running user services."
+  ]
+}

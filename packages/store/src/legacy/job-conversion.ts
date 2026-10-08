@@ -34,7 +34,7 @@ function reminderMemo(job: ConvertedJob, db: DatabaseSync) {
 }
 
 function pendingWake(db: DatabaseSync, kind: string, job: ConvertedJob, createdAt: number): ConvertedJob {
-  if (kind !== 'self_awake' || job.state !== 'queued' || retainLatestImportedWake(db, createdAt)) return job
+  if (kind !== 'self_awake' || job.state !== 'queued' || retainLatestImportedWake(db, createdAt, job.sessionId)) return job
   return { ...job, state: 'cancelled', error: 'Superseded by a newer imported self-awake plan' }
 }
 

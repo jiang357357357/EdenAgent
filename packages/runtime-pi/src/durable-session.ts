@@ -3,6 +3,7 @@ import type { SessionTreeEntry, AgentMessage } from '@earendil-works/pi-agent-co
 import { toJson } from '@eden/api'
 import type { RuntimeCheckpoint } from '@eden/api'
 import { parseCheckpoint } from './checkpoint-schema.ts'
+import { RuntimePersistenceError } from './persistence-error.ts'
 
 export class DurableSessionStorage extends InMemorySessionStorage {
   private failed: unknown
@@ -19,7 +20,7 @@ export class DurableSessionStorage extends InMemorySessionStorage {
   }
 
   assertHealthy(): void {
-    if (this.failed) throw new Error('Runtime storage is unavailable; recreate from the durable checkpoint', { cause: this.failed })
+    if (this.failed) throw this.failed
   }
 
   async snapshot(entries?: SessionTreeEntry[]): Promise<RuntimeCheckpoint> {
@@ -38,7 +39,7 @@ export class DurableSessionStorage extends InMemorySessionStorage {
       id: entry.id, parentId: entry.parentId, timestamp: entry.timestamp, data: { message: entry.message } } : entry
     const snapshot = await this.snapshot([...await this.getEntries(), stored])
     try { await this.commit(snapshot) }
-    catch (error) { this.failed = error; throw error }
+    catch (error) { this.failed = new RuntimePersistenceError('Checkpoint commit failed', error); throw this.failed }
     await super.appendEntry(stored)
     if (transient) this.transientNextUser = false
   }

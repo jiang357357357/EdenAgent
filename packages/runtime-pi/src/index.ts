@@ -1,4 +1,7 @@
 export { createRuntime } from './harness-runtime.ts'
+export { createIsolatedRuntime } from './process-runtime.ts'
+export type { IsolatedRuntime } from './process-runtime.ts'
+export { completeTextIsolated } from './process-text.ts'
 export type { RuntimeOptions, RuntimeModel, RuntimeTool, RuntimeCallbacks, EdenRuntime, RuntimeImage, ToolOutcome } from './contracts.ts'
 export { completeText, TextCompletionError } from './text-completion.ts'
 export type { TextCompletionRequest } from './text-completion.ts'
@@ -7,3 +10,5 @@ export { defaultModelRetryPolicy, modelRetryDelay, retryableModelFailure, waitFo
 export type { ModelRetryPolicy } from './model-retry.ts'
 
 export { legacyContextCheckpoint } from './legacy-checkpoint.ts'
+export { RuntimePersistenceError, isRuntimePersistenceFailure } from './persistence-error.ts'
+export { assertRuntimeCheckpoint } from './checkpoint-schema.ts'

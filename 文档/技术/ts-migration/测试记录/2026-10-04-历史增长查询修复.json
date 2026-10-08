@@ -1,0 +1,293 @@
+{
+  "date": "2026-10-04",
+  "cwd": "E:/EDEN/Agent",
+  "runtime": {
+    "node": "22.23.1",
+    "sqlite": "3.51.3"
+  },
+  "summary": {
+    "distinctPassed": 112,
+    "newTests": 27,
+    "distinctFiles": 34,
+    "failed": 0,
+    "skipped": 0
+  },
+  "groups": [
+    {
+      "name": "selfAwake",
+      "passed": 14,
+      "added": 8,
+      "files": [
+        "packages/store/tests/self-awake-activation.test.ts",
+        "Server/tests/regression/self-awake/activation-publication.test.ts",
+        "Server/tests/integration/self-awake/activation.test.ts",
+        "Server/tests/self-awake-timer-publication.test.ts"
+      ],
+      "command": "node --import tsx --test packages/store/tests/self-awake-activation.test.ts Server/tests/regression/self-awake/activation-publication.test.ts Server/tests/integration/self-awake/activation.test.ts Server/tests/self-awake-timer-publication.test.ts"
+    },
+    {
+      "name": "modelHeads",
+      "passed": 33,
+      "added": 9,
+      "files": [
+        "Server/tests/regression/sessions/model-heads.test.ts",
+        "Server/tests/regression/sessions/model-heads-migration.test.ts",
+        "Server/tests/request-persistence.test.ts",
+        "Server/tests/request-context.test.ts",
+        "Server/tests/session-context-usage.test.ts",
+        "Server/tests/integration/sessions/runtime-stream-coalescing.test.ts",
+        "Server/tests/integration/sessions/runtime-stream-lifecycle.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/regression/sessions/model-heads.test.ts Server/tests/regression/sessions/model-heads-migration.test.ts Server/tests/request-persistence.test.ts Server/tests/request-context.test.ts Server/tests/session-context-usage.test.ts Server/tests/integration/sessions/runtime-stream-coalescing.test.ts Server/tests/integration/sessions/runtime-stream-lifecycle.test.ts"
+    },
+    {
+      "name": "listFairness",
+      "passed": 7,
+      "added": 7,
+      "files": [
+        "Server/tests/unit/sessions/list-async.test.ts",
+        "Server/tests/regression/sessions/list-fairness.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/unit/sessions/list-async.test.ts Server/tests/regression/sessions/list-fairness.test.ts"
+    },
+    {
+      "name": "listHttp",
+      "passed": 1,
+      "added": 1,
+      "files": [
+        "Server/tests/regression/sessions/list-health.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/regression/sessions/list-health.test.ts"
+    },
+    {
+      "name": "accountImport",
+      "passed": 6,
+      "added": 2,
+      "files": [
+        "Server/tests/integration/accounts/partition-projections.test.ts",
+        "Server/tests/integration/accounts/partition.test.ts",
+        "Server/tests/integration/accounts/partition-failures.test.ts",
+        "Server/tests/integration/accounts/partition-content.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/integration/accounts/partition-projections.test.ts Server/tests/integration/accounts/partition.test.ts Server/tests/integration/accounts/partition-failures.test.ts Server/tests/integration/accounts/partition-content.test.ts"
+    },
+    {
+      "name": "storeCompatibility",
+      "passed": 11,
+      "added": 0,
+      "files": [
+        "packages/store/tests/database.test.ts",
+        "packages/store/tests/event-indexes.test.ts",
+        "packages/store/tests/event-patch.test.ts",
+        "packages/store/tests/remove-intentions-migration.test.ts",
+        "packages/store/tests/schema-history.test.ts",
+        "packages/store/tests/self-awake-queue.test.ts",
+        "packages/store/tests/tool-name-migration.test.ts"
+      ],
+      "command": "node --import tsx --test packages/store/tests/database.test.ts packages/store/tests/event-indexes.test.ts packages/store/tests/event-patch.test.ts packages/store/tests/remove-intentions-migration.test.ts packages/store/tests/schema-history.test.ts packages/store/tests/self-awake-queue.test.ts packages/store/tests/tool-name-migration.test.ts"
+    },
+    {
+      "name": "idleSyncAndEventReads",
+      "passed": 28,
+      "added": 0,
+      "files": [
+        "Server/tests/regression/mon/sync-worker.test.ts",
+        "Server/tests/unit/sessions/event-history-reading.test.ts",
+        "Server/tests/unit/sessions/event-kind-projections.test.ts",
+        "Server/tests/regression/sessions/metadata-query.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/regression/mon/sync-worker.test.ts Server/tests/unit/sessions/event-history-reading.test.ts Server/tests/unit/sessions/event-kind-projections.test.ts Server/tests/regression/sessions/metadata-query.test.ts"
+    },
+    {
+      "name": "contextTitlesActorsAndProjection",
+      "passed": 11,
+      "added": 0,
+      "files": [
+        "Server/tests/session-context.test.ts",
+        "Server/tests/session-title.test.ts",
+        "Server/tests/actor-checkpoints.test.ts",
+        "Server/tests/regression/mon/session-projection.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/session-context.test.ts Server/tests/session-title.test.ts Server/tests/actor-checkpoints.test.ts Server/tests/regression/mon/session-projection.test.ts"
+    },
+    {
+      "name": "millionIdle",
+      "passed": 1,
+      "added": 0,
+      "files": [
+        "Server/tests/regression/mon/idle-health.test.ts"
+      ],
+      "command": "node --import tsx --test Server/tests/regression/mon/idle-health.test.ts"
+    }
+  ],
+  "checks": {
+    "typescript": {
+      "command": "node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit",
+      "exitCode": 0
+    },
+    "architecture": {
+      "command": "node Script/Architecture/check.mjs",
+      "exitCode": 0,
+      "sourceFiles": 926,
+      "errors": 0,
+      "existingWarnings": 21
+    }
+  },
+  "benchmarks": {
+    "selfAwakeFinalRecheck": {
+      "runs": 20000,
+      "events": 60000,
+      "old100MedianMs": 0.206,
+      "old20000MedianMs": 23.1245,
+      "indexed20000MedianMs": 0.0026,
+      "migrationMs": 69.562,
+      "reopenMs": 3.2676,
+      "note": "128→130总打开/升级时间；新查询耗时不含文件IO。门禁修复包导入后的复验，不新增用例计数。"
+    },
+    "modelHeads": {
+      "oldEvents": 144000,
+      "requests": 12000,
+      "actors": 40,
+      "failedResponses": 11999,
+      "migrationMs": 27.61,
+      "rounds": 20,
+      "oldActorAggregationsMs": 172.79,
+      "headsActorAndSummaryReadsMs": 25.45,
+      "note": "旧分组仅返回序号；新轮次恢复完整context、缺失角色查询和会话摘要。不同范围，不计算端到端加速倍数。"
+    },
+    "listFairness": {
+      "sessions": 3000,
+      "returned": 1000,
+      "syncMs": 126,
+      "asyncMs": 195,
+      "syncCpuMs": 125,
+      "asyncCpuMs": 187,
+      "idSelectionMs": 3.677,
+      "intermediateOpportunities": 39,
+      "maxReadGap": 25,
+      "note": "吞吐并未提高；分批使其他I/O获得执行机会。"
+    },
+    "listHttp": {
+      "sessions": 1200,
+      "returnedPerList": 1000,
+      "rounds": 20,
+      "elapsedMs": 2698,
+      "healthRequests": 295,
+      "healthMinMs": 0.533,
+      "healthP95Ms": 7.912,
+      "healthMaxMs": 34.854,
+      "normalErrors": 0,
+      "normalSocketCloses": 0,
+      "healthHandledBeforeEachListCompleted": true,
+      "explicitCancellationReads": 75,
+      "healthAfterCancellation": 200,
+      "note": "真实loopback HTTP +生产healthHandler及sessionRoutes，测试HTTP外壳；非完整WS/桌面宿主。"
+    },
+    "millionIdle": {
+      "syntheticStreamEvents": 1000000,
+      "totalEvents": 1000163,
+      "connectedSessions": 160,
+      "websocketClients": 0,
+      "sqliteVersion": "3.51.3",
+      "statistics": "absent",
+      "seedMs": 5738,
+      "baseline": {
+        "name": "legacy metadata/title SQL: three idle rounds, two hot sessions",
+        "elapsedMs": 3113,
+        "mainThreadCpuMs": 2765,
+        "healthMs": 3115,
+        "healthHandledDuringPass": 0
+      },
+      "legacyPlans": {
+        "metadata": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+        ],
+        "title": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+        ],
+        "semanticTime": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)",
+          "LIST SUBQUERY 1",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ],
+        "projection": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=? AND seq>? AND seq<?)",
+          "LIST SUBQUERY 1",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ]
+      },
+      "priming": {
+        "name": "initial semantic projection",
+        "elapsedMs": 983,
+        "mainThreadCpuMs": 625,
+        "healthMs": 39,
+        "healthHandledDuringPass": 1
+      },
+      "idle": [
+        {
+          "name": "idle 1",
+          "elapsedMs": 22,
+          "mainThreadCpuMs": 31,
+          "healthMs": 7,
+          "healthHandledDuringPass": 1
+        },
+        {
+          "name": "idle 2",
+          "elapsedMs": 24,
+          "mainThreadCpuMs": 16,
+          "healthMs": 6,
+          "healthHandledDuringPass": 1
+        },
+        {
+          "name": "idle 3",
+          "elapsedMs": 27,
+          "mainThreadCpuMs": 31,
+          "healthMs": 10,
+          "healthHandledDuringPass": 1
+        }
+      ],
+      "streamOnly": {
+        "name": "one new non-semantic stream event",
+        "elapsedMs": 28,
+        "mainThreadCpuMs": 31,
+        "healthMs": 16,
+        "healthHandledDuringPass": 1
+      },
+      "fixedPlans": [
+        {
+          "sql": "SELECT seq,payload_json,created_at FROM events\\n    WHERE session_id=? AND kind=? ORDER BY seq DESC LIMIT 1",
+          "plan": [
+            "SEARCH events USING INDEX events_session_kind_seq (session_id=? AND kind=?)"
+          ]
+        }
+      ],
+      "idleDeepReads": 0,
+      "streamOnlyMetadataReads": 0,
+      "fixedHealthMaxMs": 39
+    }
+  },
+  "correctedDuringValidation": [
+    "新测试误将写入内容去重查询当作历史还原，已修断言",
+    "新测试事件ID改用合法UUID",
+    "测试跨包引用改为@eden/store/testing，回调参数显式string，最终门禁通过"
+  ],
+  "deployment": {
+    "schemaFrom": 128,
+    "schemaTo": 130,
+    "productVersionChanged": false,
+    "realDatabaseTouched": false,
+    "portableRebuilt": false,
+    "servicesRestarted": false,
+    "committed": false,
+    "pushed": false
+  },
+  "limitations": [
+    "首次升级有一次性历史回填，客户11GB数据库尚未测量",
+    "未取得客户重启前退出记录，未断言截图故障由本轮热点造成",
+    "未进行客户真实数据或长时间完整桌面验收",
+    "仍有同步会话ID筛选、磁盘锁等待与其他业务负载",
+    "批量逐行修改删除模型历史会逐次重聚合，当前生产追加路径不触发"
+  ]
+}

@@ -12,6 +12,8 @@ if (existsSync(output)) throw new Error(`Refusing to replace existing runtime di
 if (process.versions.node !== '22.23.1') throw new Error('Package with the pinned Node 22.23.1 runtime')
 const entry = path.join(root, 'dist/server/main.mjs')
 await stat(entry)
+const runtimeProcess = path.join(root, 'dist/server/runtime-process.mjs')
+await stat(runtimeProcess)
 await import('../../Server/scripts/build-tui.mjs')
 const tuiEntry = path.join(root, 'dist/server/tui.mjs')
 await stat(tuiEntry)
@@ -26,6 +28,8 @@ try {
   await mkdir(path.join(staging, 'server'))
   await cp(entry, path.join(staging, 'server/main.mjs'))
   await cp(`${entry}.map`, path.join(staging, 'server/main.mjs.map'))
+  await cp(runtimeProcess, path.join(staging, 'server/runtime-process.mjs'))
+  await cp(`${runtimeProcess}.map`, path.join(staging, 'server/runtime-process.mjs.map'))
   await cp(tuiEntry, path.join(staging, 'server/tui.mjs'))
   await cp(`${tuiEntry}.map`, path.join(staging, 'server/tui.mjs.map'))
   await mkdir(path.join(staging, 'bin'))
@@ -45,6 +49,7 @@ try {
   await writeFile(path.join(staging, 'runtime-manifest.json'), JSON.stringify({
     format: 1, platform: process.platform, arch: process.arch, node: process.versions.node,
     entry: 'server/main.mjs', lockSha256: sha256(lock), entrySha256: sha256(await readFile(entry)),
+    runtimeProcess: 'server/runtime-process.mjs', runtimeProcessSha256: sha256(await readFile(runtimeProcess)),
     tuiEntry: 'server/tui.mjs', tuiEntrySha256: sha256(await readFile(tuiEntry)), tuiCommand: 'bin/eden',
     packages: packages.map(({ source, ...dependency }) => dependency), connectors,
   }, null, 2) + '\n')

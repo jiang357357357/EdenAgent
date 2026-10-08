@@ -16,13 +16,20 @@ export const initializeSchema = z.object({
   protocolVersion: z.literal(protocolVersion), runtimeOrigin: runtimeOriginSchema,
   clientName: z.string(), clientVersion: z.string(), capabilities: z.array(z.string()),
   coreToken: z.string().min(1).max(8192).optional(),
-}).strict()
+  workspaceId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sessionId: z.string().uuid().optional(),
+  eventMode: z.enum(['all', 'discovery', 'reminders']).optional(),
+  afterSeq: z.string().regex(/^\d+$/).max(20).optional(),
+}).strict().refine(value => value.afterSeq === undefined || value.sessionId !== undefined,
+  { message: 'A replay cursor requires a session channel' })
+  .refine(value => value.sessionId === undefined || value.eventMode === undefined || value.eventMode === 'all',
+    { message: 'Discovery and reminder events are only available on a control connection' })
 export const sessionIdSchema = z.object({ sessionId: z.string().uuid() }).strict()
 export const sessionTitleSchema = sessionIdSchema.extend({ title: z.string().min(1).max(500) })
 export const sessionCompactSchema = sessionIdSchema.extend({ instructions: z.string().max(10000).default('') })
 export const turnQueueSchema = sessionIdSchema.extend({ text: z.string().trim().min(1).max(1_000_000) })
 export const workspaceSwitchSchema = sessionIdSchema.extend({ path: z.string().min(1).max(4096) })
-export const workspacePathSchema = z.object({ path: z.string().max(4096) }).strict()
+export const workspacePathSchema = sessionIdSchema.extend({ path: z.string().max(4096) }).strict()
 export const sessionParticipantsSchema = sessionIdSchema.extend({ participants: z.array(jsonValue).max(32) })
 export const messageListSchema = sessionIdSchema.extend({ before: z.string().uuid().nullish(), limit: z.number().int().min(1).max(100).default(50) })
 export const sessionCreateSchema = z.object({

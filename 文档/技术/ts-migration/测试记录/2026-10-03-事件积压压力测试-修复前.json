@@ -1,0 +1,91 @@
+{
+  "recordedDate": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "phase": "before-durable-cursor-backlog-fix",
+  "node": "v22.23.1",
+  "command": "node --import tsx --test Server/tests/regression/accounts/event-backlog-load.test.mjs",
+  "nodeExecutable": "C:/Users/Lenovo/AppData/Local/Temp/eden-node22-repro-c35129cca3bf4fc6ab86b7f7618670cd/node-v22.23.1-win-x64/node.exe",
+  "workingDirectory": "E:/EDEN/Agent",
+  "exitCode": 1,
+  "durationMs": 36079.0919,
+  "scenarioCount": 2,
+  "failedScenarios": 2,
+  "testRunner": { "tests": 3, "passed": 0, "failed": 3, "cancelled": 0, "skipped": 0 },
+  "method": {
+    "independentChildProcesses": true,
+    "productionComponents": ["AccountRuntimes", "AccountConnection", "AccountEventDelivery", "attachWebsocket", "browser rpc-transport.ts"],
+    "core": "Temporary localhost HTTP server; preserve the real 30-second refresh cadence and hold the slow token's profile response during generation",
+    "load": "Explicit synthetic fixture.synthetic_backlog events appended through repository.events.append; no model calls or tool executions",
+    "sessionsPerScenario": 4,
+    "healthyPeer": "Second real WebSocket, same account with a separate promptly validated fixture token",
+    "networkPacing": "Yield with setImmediate after every persisted event",
+    "data": "Disposable OS temporary directories; removed on completion; no real user database or credentials"
+  },
+  "expectedInvariant": "Successful account refresh must preserve all persisted events on the original browser connection without disconnecting for auth backlog",
+  "observedFailure": "Both scenarios triggered WebSocket close 1013: Event stream lagged during account verification; the browser reconnected and paginated history recovered all events",
+  "scenarios": [
+    {
+      "scenario": "count",
+      "processId": 34124,
+      "durationMs": 35899.445,
+      "syntheticEvents": 1200,
+      "sessions": 4,
+      "eventsPerSession": 300,
+      "totalBytes": 389666,
+      "maximumFrameBytes": 326,
+      "loadDurationMs": 1679,
+      "profileRequests": 9,
+      "receivedWhileUnverified": 0,
+      "liveDelivered": 0,
+      "recovered": 1200,
+      "healthyPeerReceived": 1200,
+      "healthyPeerCloses": [],
+      "closedBeforeCoreSuccess": [{ "code": 1013, "reason": "Event stream lagged during account verification" }],
+      "connections": [
+        { "id": 1, "closes": [{ "code": 1013, "reason": "Event stream lagged during account verification" }], "maxBufferedAmount": 0 },
+        { "id": 2, "closes": [], "maxBufferedAmount": 0 },
+        { "id": 3, "closes": [], "maxBufferedAmount": 0 }
+      ],
+      "connectionStates": ["connected", "disconnected", "connected"],
+      "historyPagesPerSession": [5, 5, 5, 5],
+      "historyPageSize": 64,
+      "historyCompleteWithoutDuplicates": true,
+      "refreshOutcome": { "error": "RPC connection closed; pending execution outcomes are unconfirmed" }
+    },
+    {
+      "scenario": "bytes",
+      "processId": 40356,
+      "durationMs": 34552.4937,
+      "syntheticEvents": 12,
+      "sessions": 4,
+      "eventsPerSession": 3,
+      "payloadTextBytesPerEvent": 393216,
+      "totalBytes": 4722062,
+      "maximumFrameBytes": 393506,
+      "loadDurationMs": 103,
+      "profileRequests": 9,
+      "receivedWhileUnverified": 0,
+      "liveDelivered": 0,
+      "recovered": 12,
+      "healthyPeerReceived": 12,
+      "healthyPeerCloses": [],
+      "closedBeforeCoreSuccess": [],
+      "connections": [
+        { "id": 1, "closes": [{ "code": 1013, "reason": "Event stream lagged during account verification" }], "maxBufferedAmount": 0 },
+        { "id": 2, "closes": [], "maxBufferedAmount": 0 },
+        { "id": 3, "closes": [], "maxBufferedAmount": 0 }
+      ],
+      "connectionStates": ["connected", "disconnected", "connected"],
+      "historyPagesPerSession": [2, 2, 2, 2],
+      "historyPageSize": 2,
+      "historyCompleteWithoutDuplicates": true,
+      "refreshOutcome": { "error": "RPC connection closed; pending execution outcomes are unconfirmed" },
+      "observationNote": "The socket close event callback had not fired at the pre-success sample; its final recorded close code and reason identify the account-verification backlog limit"
+    }
+  ],
+  "limits": [
+    "This run exceeded each limit separately but did not record the exact append index at which socket.close was invoked",
+    "The recorded maximum socket.bufferedAmount was zero on both peers, separating this failure from ordinary socket send-buffer backpressure",
+    "These are synthetic event-pressure tests, not model-stream or graphical UI load tests"
+  ]
+}

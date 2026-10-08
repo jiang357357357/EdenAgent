@@ -1,0 +1,94 @@
+{
+  "recordedDate": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "phase": "after-durable-cursor-backlog-fix-final-strict-order-run",
+  "node": "v22.23.1",
+  "command": "node --import tsx --test Server/tests/regression/accounts/event-backlog-load.test.mjs",
+  "nodeExecutable": "C:/Users/Lenovo/AppData/Local/Temp/eden-node22-repro-c35129cca3bf4fc6ab86b7f7618670cd/node-v22.23.1-win-x64/node.exe",
+  "workingDirectory": "E:/EDEN/Agent",
+  "exitCode": 0,
+  "durationMs": 36424.0456,
+  "scenarioCount": 2,
+  "failedScenarios": 0,
+  "testRunner": { "tests": 3, "passed": 3, "failed": 0, "cancelled": 0, "skipped": 0 },
+  "method": {
+    "independentChildProcesses": true,
+    "productionComponents": ["AccountRuntimes", "AccountConnection", "AccountEventDelivery", "attachWebsocket", "browser rpc-transport.ts"],
+    "core": "Temporary localhost HTTP server; preserve the real 30-second refresh cadence and hold the slow token's profile response during generation",
+    "load": "Explicit synthetic fixture.synthetic_backlog events appended through repository.events.append; no model calls or tool executions",
+    "sessionsPerScenario": 4,
+    "healthyPeer": "Second real WebSocket, same account with a separate promptly validated fixture token",
+    "networkPacing": "Yield with setImmediate after every persisted event",
+    "data": "Disposable OS temporary directories; removed on completion; no real user database or credentials"
+  },
+  "verifiedInvariants": [
+    "The unverified browser receives zero pressure events before Core validation succeeds",
+    "Core HTTP success preserves the original browser connection: no close invocation, no close event, no disconnected status",
+    "Every pressure event is delivered live exactly once",
+    "Live event IDs exactly match global durable append order across all four sessions",
+    "Each session retains its own contiguous persisted event order",
+    "Per-session paginated event.list recovers every pressure event without duplicates",
+    "The independently verified same-account peer receives every event and remains connected",
+    "Each pressure event frame is below 2 MiB; count and byte limits are exceeded separately"
+  ],
+  "scenarios": [
+    {
+      "scenario": "count",
+      "processId": 27576,
+      "durationMs": 36248.6509,
+      "syntheticEvents": 1200,
+      "sessions": 4,
+      "eventsPerSession": 300,
+      "totalBytes": 389666,
+      "maximumFrameBytes": 326,
+      "loadDurationMs": 1774,
+      "profileRequests": 6,
+      "receivedWhileUnverified": 0,
+      "liveDelivered": 1200,
+      "recovered": 1200,
+      "healthyPeerReceived": 1200,
+      "healthyPeerCloses": [],
+      "closedBeforeCoreSuccess": [],
+      "connections": [
+        { "id": 1, "closeRequests": [], "closes": [], "maxBufferedAmount": 0 },
+        { "id": 2, "closeRequests": [], "closes": [], "maxBufferedAmount": 0 }
+      ],
+      "connectionStates": ["connected"],
+      "historyPagesPerSession": [5, 5, 5, 5],
+      "historyPageSize": 64,
+      "refreshOutcome": { "ok": true }
+    },
+    {
+      "scenario": "bytes",
+      "processId": 28004,
+      "durationMs": 34366.2614,
+      "syntheticEvents": 12,
+      "sessions": 4,
+      "eventsPerSession": 3,
+      "payloadTextBytesPerEvent": 393216,
+      "totalBytes": 4722062,
+      "maximumFrameBytes": 393506,
+      "loadDurationMs": 102,
+      "profileRequests": 7,
+      "receivedWhileUnverified": 0,
+      "liveDelivered": 12,
+      "recovered": 12,
+      "healthyPeerReceived": 12,
+      "healthyPeerCloses": [],
+      "closedBeforeCoreSuccess": [],
+      "connections": [
+        { "id": 1, "closeRequests": [], "closes": [], "maxBufferedAmount": 1180524 },
+        { "id": 2, "closeRequests": [], "closes": [], "maxBufferedAmount": 0 }
+      ],
+      "connectionStates": ["connected"],
+      "historyPagesPerSession": [2, 2, 2, 2],
+      "historyPageSize": 2,
+      "refreshOutcome": { "ok": true }
+    }
+  ],
+  "limits": [
+    "These are synthetic event-pressure tests, not model-stream or graphical UI load tests",
+    "These scenarios do not simulate an indefinitely blocked network receiver or exhaust operating-system memory",
+    "A first post-fix run passed the per-session checks; this recorded final run also restores and passes the stricter global durable append-order assertion"
+  ]
+}

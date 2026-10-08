@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-03",
+  "nodeVersion": "22.23.1",
+  "command": "node --import tsx --test Server/tests/regression/sessions/long-history.test.ts",
+  "result": "passed",
+  "testCount": 1,
+  "fixture": {
+    "data": "OS temporary SQLite database; synthetic legacy full message_update snapshots; no user data",
+    "transport": "real local HTTP and WebSocket through production startServer and RPC routes",
+    "model": "local recorded HTTP model, no external provider"
+  },
+  "metrics": {
+    "syntheticHistoricalEvents": 192392,
+    "totalHistoricalSessionEventsIncludingCreation": 192393,
+    "pages": 193,
+    "replayMs": 109970,
+    "healthAndPeerSamples": 805,
+    "worstHealthAndPingMs": 861,
+    "preservedHistoricalEvents": 192392,
+    "modelCalls": 1,
+    "turnFinishedAfterPage": 2,
+    "connectionCloses": 0,
+    "testDurationMs": 115151.5733,
+    "runnerDurationMs": 121329.595
+  },
+  "assertions": [
+    "Every historical event is returned with its original contiguous sequence",
+    "HTTP health and ping on a second WebSocket progress during full replay",
+    "A new conversation finishes before full replay completes",
+    "Normal message.list returns the latest 50 completed messages with a continuation cursor",
+    "Historical reads do not rerun models or tools",
+    "No historical fixture event was deleted"
+  ],
+  "limits": [
+    "Not a replay of the user's actual database or a before/after performance comparison",
+    "Full raw-event replay still takes about 110 seconds; this verifies responsiveness, not fast complete replay",
+    "No real model provider, visible Electron UI, deployment or long-term disk-capacity acceptance"
+  ]
+}

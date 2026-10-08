@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-03",
+  "runtime": "Node.js 22.23.1 on Windows",
+  "scope": "Web 主聊天、审批/问题/工具卡、角色及到期提醒；连接状态和恢复快照反馈",
+  "implementation": {
+    "sharedComponents": ["NoticeCard", "noticeSurface", "noticeActionClass"],
+    "connectionPhases": ["connecting", "reconnecting", "restoring", "restored", "sync-error", "idle"],
+    "recovery": "成功提示等待当前会话和待处理请求重新读取；账号/世界/连接代际失效后忽略旧读取与错误；切换会话后等待新会话快照",
+    "transport": "保留关闭码与原因，区分事件缺序、鉴权失败、慢消费、网络与服务异常；不自动重放副作用 RPC",
+    "accessibility": "语义角色、标题关联、原生详情折叠、命名关闭按钮、键盘焦点；忙碌图标不阻塞整张卡片的读屏播报"
+  },
+  "checks": [
+    {
+      "cwd": "frontend/web",
+      "command": "node --experimental-strip-types --test --test-timeout=45000 tests/*.test.mjs",
+      "tests": 311,
+      "passed": 306,
+      "failed": 5,
+      "cancelled": 0,
+      "skipped": 0,
+      "exitCode": 1,
+      "durationMs": 13250.2091,
+      "log": "C:/Users/Lenovo/AppData/Local/Temp/eden-notice-web-tests-final-20261003.tap"
+    },
+    {
+      "description": "最终全量中与本轮直接相关的卡片/连接/工具行为用例",
+      "files": [
+        "connection-diagnostics.test.mjs", "connection-feedback.test.mjs", "notice-card.test.mjs",
+        "request-card-rendering.test.mjs", "chat-connection-notice.test.mjs", "event-stream-recovery.test.mjs",
+        "tool-connection-recovery.test.mjs", "runtime-error.test.mjs", "tool-lifecycle.test.mjs",
+        "session-runtime-recovery.test.mjs"
+      ],
+      "passed": 50,
+      "failed": 0,
+      "method": "生产 React 组件 SSR；生产连接控制器与传输配合受控 WebSocket；真实 useSessionRuntime/reducer 配合受控 hooks 调度器及 RPC 边界，不等同于 React DOM 或真实浏览器验收"
+    },
+    { "cwd": "frontend/web", "command": "node ../../node_modules/typescript/bin/tsc --noEmit", "exitCode": 0 },
+    { "cwd": "frontend/web", "command": "node ../../node_modules/vite/bin/vite.js build", "exitCode": 0, "modules": 3207, "warning": "构建仍有超过 500 kB 的 bundle 提醒" },
+    { "cwd": "frontend/web", "command": "node scripts/check-theme.mjs", "exitCode": 0, "files": 242 },
+    { "command": "git diff --check (root and frontend)", "exitCode": 0 }
+  ],
+  "existingFailures": {
+    "verifiedBaseline": "frontend HEAD 2fbb12b1070c660766cdad43734d70693d72bb00",
+    "method": "git show 导出 HEAD 的测试和依赖源码到 OS 临时目录；4 个源码读取测试直接运行，TokenMeter SSR 只隔离临时 Vite 配置，原断言不变",
+    "staticBaseline": { "tests": 19, "passed": 15, "failed": 4, "log": "C:/Users/Lenovo/AppData/Local/Temp/eden-head-static-baseline-6hgHxu/baseline.tap" },
+    "modelUsageBaseline": { "tests": 3, "passed": 2, "failed": 1, "log": "C:/Users/Lenovo/AppData/Local/Temp/eden-head-model-baseline-QGg4OK/baseline.tap" },
+    "cases": [
+      { "file": "chat-composer-layout.test.mjs:10", "reason": "旧上下文仪表布局源码正则不匹配" },
+      { "file": "local-character.test.mjs:108", "reason": "旧测试连接按钮源码正则不匹配" },
+      { "file": "model-usage-display.test.mjs:26", "reason": "期望角色人设（估算），现有 UI 为角色人设" },
+      { "file": "runtime-origin.test.mjs:56", "reason": "旧单行四参数 next.connect 源码正则不匹配" },
+      { "file": "voice-bridge.test.mjs:13", "reason": "旧语音 RPC 字符串在 agent-client 中的源码正则不匹配" }
+    ],
+    "action": "记录为既有失败，未修改这些失败断言或相关产品行为"
+  },
+  "testFixtureRepairs": [
+    "SSR Vite 夹具关闭 WebSocket，避免固定 24678 端口争用",
+    "SSR 夹具关闭客户端依赖自动发现，避免关闭时扫描错误和并发缓存干扰",
+    "附件世界切换测试精确匹配现有错误并用 finally 恢复模拟凭据和 fetch，避免污染下一用例导致挂起",
+    "两处受本轮重构影响的 hook 源码写法断言调整；enabled 门控和重连刷新模型由真实 hook 受控延迟测试覆盖"
+  ],
+  "limitations": [
+    "cua 创建 iab 返回 Browser is not available，listBrowsers 返回空；未完成浏览器/Electron 截图、深浅主题视觉、键盘或点击验收",
+    "恢复沿用最近 50 条消息快照，更早页需重新分页，未保证保留历史阅读位置",
+    "连接卡仅在主聊天视图展示；没有新增全局 Toast 系统或统一所有设置页内联提示",
+    "未操作用户数据库、重启在线服务、更新安装版或提交推送",
+    "预览使用本地演示数据且按钮无真实副作用，临时预览进程已经停止"
+  ],
+  "manualPreview": {
+    "cwd": "frontend/web",
+    "command": "node tests/fixtures/notice-preview-server.mjs",
+    "entry": "tests/fixtures/notice-preview.html"
+  }
+}

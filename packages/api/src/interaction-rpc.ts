@@ -5,7 +5,7 @@ import { permissionModeInfoSchema } from './permission-mode.ts'
 import { jsonValue } from './json.ts'
 import { permissionListSchema, permissionResolveSchema, permissionRequestIdSchema } from './plugins.ts'
 import { questionItemSchema, questionListSchema, questionResolveSchema, questionIdSchema } from './questions.ts'
-import { workspaceSwitchSchema, workspacePathSchema } from './rpc.ts'
+import { workspaceSwitchSchema, workspacePathSchema, sessionIdSchema } from './rpc.ts'
 
 export const permissionRequestSchema = z.object({
   id: z.string().uuid(), sessionId: z.string().uuid(), turnId: z.string().uuid(),
@@ -16,7 +16,11 @@ export const questionRequestSchema = z.object({
   id: z.string().uuid(), sessionId: z.string().uuid(), turnId: z.string().uuid(),
   state: z.string(), questions: z.array(questionItemSchema), createdAt: z.number().int(),
 })
-const workspaceInfoSchema = z.object({ name: z.string(), path: z.string() })
+const workspaceInfoSchema = z.object({
+  name: z.string(), path: z.string(),
+  status: z.enum(['ready', 'missing', 'inaccessible', 'invalid', 'unselected']),
+  kind: z.enum(['managed', 'external', 'none']), defaultPath: z.string().nullable(), error: z.string().nullable(),
+})
 const workspaceSelectionSchema = z.object({
   currentPath: z.string(), pendingPath: z.null(), pendingSessionId: z.null(), requestedAt: z.null(), updatedAt: z.number().int(),
 })
@@ -40,8 +44,9 @@ export const interactionRpcMethods = {
   'question.list': { params: questionListSchema, result: z.array(questionRequestSchema) },
   'question.resolve': { params: questionResolveSchema, result: questionRequestSchema },
   'question.reject': { params: questionIdSchema, result: questionRequestSchema },
-  'workspace.info': { params: z.object({}).strict(), result: workspaceInfoSchema },
+  'workspace.info': { params: sessionIdSchema, result: workspaceInfoSchema },
   'workspace.switch': { params: workspaceSwitchSchema, result: workspaceSelectionSchema },
+  'workspace.useDefault': { params: sessionIdSchema, result: workspaceSelectionSchema },
   'workspace.list': { params: workspacePathSchema, result: workspaceDirectorySchema },
   'workspace.read': { params: workspacePathSchema, result: workspaceFileSchema },
 } as const

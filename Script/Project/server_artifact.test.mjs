@@ -2,18 +2,20 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { fork } from 'node:child_process'
 import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { WebSocket } from 'ws'
 
-const artifact = fileURLToPath(new URL('../../dist/server/main.mjs', import.meta.url))
-async function host(root, origin) {
+const artifact = path.resolve(process.env.EDEN_AGENT_ARTIFACT_ENTRY || fileURLToPath(new URL('../../dist/server/main.mjs', import.meta.url)))
+async function host(root, origin, coreBaseUrl) {
   const token = (origin === 'local' ? 'l' : 'm').repeat(43)
   const child = fork(artifact, [], { cwd: root, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { PATH: process.env.PATH, EDEN_AGENT_RUNTIME_ORIGIN: origin, EDEN_AGENT_DATA_ROOT: path.join(root, origin),
-      EDEN_AGENT_CAPABILITY_TOKEN: token, EDEN_AGENT_PORT: '0' } })
+      EDEN_AGENT_CAPABILITY_TOKEN: token, EDEN_AGENT_PORT: '0', EDEN_AGENT_LOG_FORMAT: 'json',
+      ...(coreBaseUrl ? { MON_CORE_BASE_URL: coreBaseUrl } : {}) } })
   let stderr = '', stdout = ''
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-8000) })
   const exit = once(child, 'exit')
@@ -59,7 +61,8 @@ async function client(server, origin) {
     }
     socket.on('message', receive); socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
   })
-  try { await rpc('initialize', { protocolVersion: 2, runtimeOrigin: origin, clientName: 'artifact-test', clientVersion: '1', capabilities: [] }) }
+  try { await rpc('initialize', { protocolVersion: 2, runtimeOrigin: origin, clientName: 'artifact-test', clientVersion: '1', capabilities: [],
+    ...(origin === 'mon' ? { coreToken: 'artifact-account' } : {}) }) }
   catch (error) { socket.terminate(); throw error }
   return { rpc, close: () => socket.terminate() }
 }
@@ -67,9 +70,19 @@ async function client(server, origin) {
 test('built dual hosts isolate sessions and blobs and preserve local state after process restart', { timeout: 60000 }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'eden-artifact-live-'))
   const servers = [], clients = []
-  t.after(async () => { for (const client of clients) client.close(); await Promise.all(servers.map(server => server.close())); await rm(root, { recursive: true, force: true }) })
+  const core = createServer((request, response) => {
+    if (request.headers.authorization !== 'Token artifact-account') { response.writeHead(401).end(); return }
+    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ id: '101' }))
+  })
+  core.listen(0, '127.0.0.1'); await once(core, 'listening')
+  t.after(async () => {
+    for (const client of clients) client.close()
+    await Promise.all(servers.map(server => server.close()))
+    core.closeAllConnections(); await new Promise(resolve => core.close(resolve))
+    await rm(root, { recursive: true, force: true })
+  })
   const local = await host(root, 'local'); servers.push(local)
-  const mon = await host(root, 'mon'); servers.push(mon)
+  const mon = await host(root, 'mon', `http://127.0.0.1:${core.address().port}`); servers.push(mon)
   const localClient = await client(local, 'local'); clients.push(localClient)
   const monClient = await client(mon, 'mon'); clients.push(monClient)
   const session = await localClient.rpc('session.create', { title: 'Persisted artifact session', participants: [] })
@@ -77,12 +90,12 @@ test('built dual hosts isolate sessions and blobs and preserve local state after
   const upload = await fetch(`http://127.0.0.1:${local.port}/blobs`, { method: 'POST', headers: { Authorization: `Bearer ${local.token}`, 'Content-Type': 'text/plain' }, body: 'local-only' })
   assert.equal(upload.status, 200)
   const blob = await upload.json()
-  assert.equal((await fetch(`http://127.0.0.1:${mon.port}/blobs/${blob.id}`, { headers: { Authorization: `Bearer ${mon.token}` } })).status, 404)
+  assert.equal((await fetch(`http://127.0.0.1:${mon.port}/blobs/${blob.id}`, { headers: { Authorization: `Bearer ${mon.token}`, 'x-eden-core-token': 'artifact-account' } })).status, 404)
   assert.equal((await fetch(`http://127.0.0.1:${local.port}/blobs/${blob.id}`, { headers: { Authorization: `Bearer ${mon.token}` } })).status, 401)
   assert.equal((await localClient.rpc('skill.catalog_status', {})).error, null)
   for (const connection of [localClient, monClient]) {
     const skills = await connection.rpc('skill.list', {})
-    assert.deepEqual(skills.map(skill => skill.name).sort(), ['eden-memory', 'eden-reminders', 'eden-self-awake', 'eden-workspace'])
+    assert.deepEqual(skills.map(skill => skill.name).sort(), ['eden-contact', 'eden-memory', 'eden-reminders', 'eden-self-awake', 'eden-workspace', 'web-research'])
     assert.ok(skills.every(skill => skill.content === null))
   }
   localClient.close(); await local.close()

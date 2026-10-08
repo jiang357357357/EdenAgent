@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-04",
+  "timezone": "Asia/Shanghai",
+  "node": "22.23.1",
+  "schemaVersion": 130,
+  "purpose": "在历史增长性能修复后复验多会话连接、事件隔离与补发",
+  "productionChanges": false,
+  "realUserDataUsed": false,
+  "portableUpdated": false,
+  "tests": [
+    {
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test Server/tests/regression/accounts/multi-session-connection.test.mjs Server/tests/unit/accounts/multi-session-delivery.test.ts",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "runnerDurationMs": 38692.7924,
+      "realMultiSessionDurationMs": 33766.9223
+    },
+    {
+      "cwd": "E:/EDEN/Agent/frontend/web",
+      "command": "node --experimental-strip-types --test tests/tool-connection-recovery.test.mjs",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "runnerDurationMs": 3619.2224
+    }
+  ],
+  "metrics": {
+    "stage": "multi-session-regression-passed",
+    "node": "v22.23.1",
+    "accounts": 2,
+    "connections": 3,
+    "concurrentToolSessions": 2,
+    "bufferedBySession": [
+      {
+        "name": "first",
+        "events": 29
+      },
+      {
+        "name": "second",
+        "events": 30
+      }
+    ],
+    "connectionStates": [
+      true
+    ],
+    "peerProgressDuringRefresh": true,
+    "crossAccountLeak": false,
+    "toolExecutions": 2,
+    "modelRequests": [
+      2,
+      2
+    ]
+  },
+  "totalPassed": 12,
+  "verified": [
+    "两个工具会话同时等待审批并各完成一次工具写入",
+    "同账号另一连接和另一账号在一个连接重新鉴权期间继续工作",
+    "每会话事件与持久历史一致，无漏重或跨账号泄露",
+    "重新鉴权后没有重复执行工具或模型请求",
+    "前端按sessionId隔离事件序号和同名工具调用卡片",
+    "一个会话缺序会重连共享socket，并暂时影响该连接上的其他会话"
+  ],
+  "limits": [
+    "Core认证和模型供应商为受控本地HTTP夹具，WebSocket与浏览器传输使用生产代码；非真实供应商/Electron可见界面验收",
+    "测试验证两个同时执行的会话，不代表160/1000会话同时调用模型，也未给出高并发承载上限",
+    "同账号工作区、Node事件循环和SQLite仍共享；大部分同一socket普通RPC串行",
+    "当前事件补发使用持久游标，不再沿用旧报告的1024事件内存缓存限额；socket发送超时或缺序仍会影响共享连接",
+    "服务进程重启与客户端重连不同：中断输入不会盲目自动重放",
+    "客户便携包未更新，源码验证不能直接当作客户包验收"
+  ]
+}

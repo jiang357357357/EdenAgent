@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "platform": "win32",
+  "node": "v22.23.1",
+  "additionalProductionChanges": false,
+  "realUserDataUsed": false,
+  "servicesRestarted": false,
+  "realTransportRegression": {
+    "command": "node --import tsx --test Server/tests/regression/accounts/multi-session-connection.test.mjs",
+    "passed": 1,
+    "failed": 0,
+    "exitCode": 0,
+    "durationMs": 34583.282,
+    "accounts": 2,
+    "webSocketConnections": 3,
+    "concurrentToolSessionsOnBrowserConnection": 2,
+    "realRefreshIntervalElapsed": true,
+    "pendingProfileRequestsForDelayedConnection": 1,
+    "bufferedEventCountsBySession": [29, 30],
+    "bufferedEventsSentWhileUnverified": 0,
+    "completeEventOrderMatchesLivePeer": true,
+    "perSessionEventsMatchDurableHistoryExactly": true,
+    "browserConnectionStates": ["connected"],
+    "sameAccountPeerProgressedWhileBrowserWasVerifying": true,
+    "otherAccountProgressedWhileBrowserWasVerifying": true,
+    "crossAccountEventLeak": false,
+    "toolExecutions": 2,
+    "modelRequestsBySession": [2, 2]
+  },
+  "deliveryUnitTests": {
+    "command": "node --import tsx --test Server/tests/unit/accounts/multi-session-delivery.test.ts",
+    "passed": 5,
+    "failed": 0,
+    "accountVerification": "Controllable interface stub; production AccountEventDelivery",
+    "coverage": [
+      "Interleaved independent session sequences including BigInt values",
+      "Independent refresh completion on separate connections",
+      "Authentication failure does not close another connection",
+      "Shared per-connection event count overflow does not consume another connection budget",
+      "Shared per-connection UTF-8 byte overflow does not consume another connection budget"
+    ]
+  },
+  "frontendTests": {
+    "cwd": "frontend/web",
+    "command": "node --experimental-strip-types --test tests/tool-connection-recovery.test.mjs",
+    "passed": 6,
+    "failed": 0,
+    "newCases": 2,
+    "coverageAdded": [
+      "Independent session cursors and tool cards with reused tool-call identifiers",
+      "A gap in one session reconnects the shared socket and temporarily interrupts other sessions"
+    ]
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit",
+    "exitCode": 0
+  },
+  "limitations": [
+    "The 1024-event and 4-MiB budgets aggregate all sessions on one WebSocket; an overloaded session can close that whole connection.",
+    "One real sequence gap reconnects the shared WebSocket; durable state must be loaded again after reconnect.",
+    "Separate connections have separate validation and queues but share the Node event loop; this is not performance isolation.",
+    "Ordinary RPC requests on one WebSocket remain serialized.",
+    "The production browser transport ran in a Node/Vite fixture, not an Electron UI."
+  ]
+}

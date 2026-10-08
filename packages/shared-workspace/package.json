@@ -1,0 +1,6 @@
+{
+  "name": "@eden/shared-workspace",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.ts" }
+}

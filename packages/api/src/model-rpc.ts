@@ -21,6 +21,7 @@ export const modelRpcMethods = {
   'mon.sync.legacy.resolve': { params: monLegacySyncResolveSchema, result: monLegacySyncResolveResultSchema },
   'mon.sync.legacy.replay': { params: monLegacyReplaySchema, result: monLegacyReplayResultSchema },
   'mon.sync.status': { params: monSyncStatusSchema, result: monSyncResultSchema },
+  'mon.sync.resume': { params: z.object({ sessionId: z.uuid(), confirm: z.literal(true) }).strict(), result: z.object({ resumed: z.boolean() }) },
 } as const
 import { z } from 'zod'
 import { monOperationListSchema, monOperationInfoSchema } from './mon-operations.ts'

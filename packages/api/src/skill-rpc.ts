@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { jsonValue } from './json.ts'
 import { skillReadSchema, skillEnableSchema, skillInspectSchema, skillPreviewInstallSchema, skillFileSchema, skillCreateSchema } from './skills.ts'
 const source = z.object({ type: z.string(), uri: z.string(), ref: z.string(), subpath: z.string() })
+const workspaceScope = { sessionId: z.string().uuid().optional() }
 const codeTool = z.object({ name: z.string(), label: z.string(), description: z.string(), parameters: z.record(z.string(), jsonValue),
   outputSchema: z.record(z.string(), jsonValue).optional(), command: z.array(z.string()), testCommand: z.array(z.string()), timeoutSeconds: z.number().int() })
 export const skillInfoSchema = z.object({
@@ -17,14 +18,14 @@ export const skillPreviewInfoSchema = skillInfoSchema.pick({ displayName: true, 
 })
 export type SkillInfo = z.infer<typeof skillInfoSchema>
 export const skillRpcMethods = {
-  'skill.catalog_status': { params: z.object({}).strict(), result: z.object({ error: z.string().nullable(), refreshing: z.boolean(), codeToolsAvailable: z.boolean() }) },
-  'skill.refresh': { params: z.object({}).strict(), result: z.object({ refreshed: z.literal(true) }) },
-  'skill.list': { params: z.object({}).strict(), result: z.array(skillInfoSchema) },
-  'skill.read': { params: skillReadSchema, result: skillInfoSchema },
-  'skill.inspect': { params: skillInspectSchema, result: skillPreviewInfoSchema },
-  'skill.install_preview': { params: skillPreviewInstallSchema, result: skillInfoSchema },
-  'skill.install': { params: skillCreateSchema, result: skillInfoSchema },
-  'skill.enable': { params: skillEnableSchema, result: skillInfoSchema },
-  'skill.uninstall': { params: skillReadSchema, result: z.object({ name: z.string(), deleted: z.boolean() }) },
-  'skill.file': { params: skillFileSchema, result: z.object({ name: z.string(), path: z.string(), encoding: z.literal('base64'), content: z.string(), contentHash: z.string() }) },
+  'skill.catalog_status': { params: z.object(workspaceScope).strict(), result: z.object({ error: z.string().nullable(), refreshing: z.boolean(), codeToolsAvailable: z.boolean() }) },
+  'skill.refresh': { params: z.object(workspaceScope).strict(), result: z.object({ refreshed: z.literal(true) }) },
+  'skill.list': { params: z.object(workspaceScope).strict(), result: z.array(skillInfoSchema) },
+  'skill.read': { params: skillReadSchema.extend(workspaceScope), result: skillInfoSchema },
+  'skill.inspect': { params: skillInspectSchema.extend(workspaceScope), result: skillPreviewInfoSchema },
+  'skill.install_preview': { params: skillPreviewInstallSchema.extend(workspaceScope), result: skillInfoSchema },
+  'skill.install': { params: skillCreateSchema.extend(workspaceScope), result: skillInfoSchema },
+  'skill.enable': { params: skillEnableSchema.extend(workspaceScope), result: skillInfoSchema },
+  'skill.uninstall': { params: skillReadSchema.extend(workspaceScope), result: z.object({ name: z.string(), deleted: z.boolean() }) },
+  'skill.file': { params: skillFileSchema.extend(workspaceScope), result: z.object({ name: z.string(), path: z.string(), encoding: z.literal('base64'), content: z.string(), contentHash: z.string() }) },
 } as const

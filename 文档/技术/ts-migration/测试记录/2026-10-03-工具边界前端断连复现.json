@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "platform": "win32",
+  "node": "v22.23.1",
+  "scope": "Temporary Mon account runtime, real WebSocket and production browser RPC transport; local synthetic Core and recorded model",
+  "productionCodeChanged": false,
+  "realUserDataUsed": false,
+  "baseline": { "disconnected": false, "modelRequests": 2 },
+  "reproduction": {
+    "command": "node --import tsx Server/tests/regression/accounts/tool-connection.repro.mjs",
+    "expectedExitCode": 1,
+    "assertion": "BUG REPRODUCED: successful account refresh silently loses tool events and disconnects the frontend",
+    "coreRefreshStatus": 200,
+    "lastBeforeRefresh": { "seq": "72", "type": "permission.requested" },
+    "missing": [
+      { "seq": "73", "type": "permission.resolved" },
+      { "seq": "74", "type": "operation.completed" },
+      { "seq": "75", "type": "agent.tool_execution_end" },
+      { "seq": "76", "type": "agent.message_start" },
+      { "seq": "77", "type": "runtime.checkpoint" },
+      { "seq": "78", "type": "agent.message_end" },
+      { "seq": "79", "type": "agent.turn_end" },
+      { "seq": "80", "type": "runtime.checkpoint" },
+      { "seq": "81", "type": "agent.save_point" },
+      { "seq": "82", "type": "agent.tools_update" },
+      { "seq": "83", "type": "agent.turn_start" },
+      { "seq": "84", "type": "model.request" }
+    ],
+    "closes": [{ "code": 1000, "reason": "client closed" }],
+    "connectionStates": ["connected", "disconnected", "connected"],
+    "toolCompleted": true,
+    "historyRecovered": true,
+    "modelRequests": 4,
+    "profileRequests": 6,
+    "continuation": "Natural model response after the completed tool, without a synthetic session event or forced client close"
+  },
+  "controls": [
+    {
+      "cwd": "repository root",
+      "command": "node --import tsx --test packages/runtime-pi/tests/post-tool-disconnect.test.ts packages/runtime-pi/tests/model-retry.test.ts Server/tests/attachment-rpc.test.ts",
+      "passed": 9,
+      "failed": 0
+    },
+    {
+      "cwd": "frontend/web",
+      "command": "node --experimental-strip-types --test tests/tool-connection-recovery.test.mjs",
+      "passed": 4,
+      "failed": 0
+    }
+  ],
+  "limitations": [
+    "The reported user session logs were not inspected; this reproduces one matching Mon failure path.",
+    "The production browser transport ran under the Node test fixture, not a rendered Electron window.",
+    "The production defect remains unfixed; the explicit reproducer intentionally exits with a failed invariant."
+  ]
+}

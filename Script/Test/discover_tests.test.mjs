@@ -17,7 +17,7 @@ test('discovers flat and nested test files in stable order', async () => {
     const discovered = await discoverTestFiles(['tests'], root)
     assert.deepEqual(
       discovered.map(file => path.relative(root, file)),
-      ['tests/root.test.ts', 'tests/unit/mon/device-tools.test.ts'],
+      [path.join('tests', 'root.test.ts'), path.join('tests', 'unit', 'mon', 'device-tools.test.ts')],
     )
   } finally {
     await rm(root, { recursive: true, force: true })

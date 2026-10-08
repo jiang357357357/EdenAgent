@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { runtimeCheckpointSchema } from '@eden/api'
 import type { RuntimeCheckpoint } from '@eden/api'
 import type { SessionTreeEntry } from '@earendil-works/pi-agent-core'
+import { RuntimePersistenceError } from './persistence-error.ts'
 
 const content = z.array(z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string() }).passthrough(),
@@ -36,6 +37,13 @@ const entry = z.discriminatedUnion('type', [
 ])
 
 export function parseCheckpoint(value: RuntimeCheckpoint, sessionId: string): SessionTreeEntry[] {
+  try { return validatedEntries(value, sessionId) }
+  catch (error) { throw new RuntimePersistenceError('Invalid durable checkpoint', error) }
+}
+
+export function assertRuntimeCheckpoint(value: RuntimeCheckpoint, sessionId: string): void { parseCheckpoint(value, sessionId) }
+
+function validatedEntries(value: RuntimeCheckpoint, sessionId: string): SessionTreeEntry[] {
   const checkpoint = runtimeCheckpointSchema.parse(value)
   if (checkpoint.sessionId !== sessionId) throw new Error('Checkpoint session mismatch')
   const entries = z.array(entry).parse(checkpoint.entries)

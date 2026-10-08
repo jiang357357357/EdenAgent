@@ -1,0 +1,237 @@
+{
+  "date": "2026-10-04",
+  "nodeVersion": "22.23.1",
+  "sqliteVersion": "3.51.3",
+  "workingDirectory": "E:/EDEN/Agent",
+  "executable": "E:/EDEN/.release/acceptance-1.11.4/EDEN_win/runtime/agent/node/node.exe",
+  "command": "& 'E:/EDEN/.release/acceptance-1.11.4/EDEN_win/runtime/agent/node/node.exe' --import tsx --test Server/tests/regression/mon/idle-health.test.ts",
+  "testFile": "Server/tests/regression/mon/idle-health.test.ts",
+  "result": "passed",
+  "testCount": 1,
+  "fixture": {
+    "storage": "独立操作系统临时目录中的真实 EdenDatabase / SQLite；只生成合成小 payload，不读取用户数据库",
+    "syntheticStreamEvents": 1000000,
+    "hotSessions": 2,
+    "streamEventsPerHotSession": 500000,
+    "sessionCount": 160,
+    "initialTotalEvents": 1000162,
+    "finalTotalEvents": 1000163,
+    "websocketClients": 0,
+    "statistics": "sqlite_stat1 不存在；未执行 ANALYZE，也未删除系统统计表",
+    "sparseSemanticEvents": "首个热点会话的 metadata/title 位于 seq 2/3；第二个只有 seq 1 创建记录，没有 metadata.updated 或 title 事件",
+    "synchronization": "真实 SessionRepository、MonConnectionRepository、MonSessionProjection 与 MonSyncWorker.syncPending",
+    "health": "随机 loopback HTTP 端口与生产 healthHandler；预热 keepAlive 连接，无 WebSocket 客户端",
+    "remoteProjection": "仅 MonClient.post/put 使用测试替身，不调用外部 Core；其它 fetch 被测试明确拒绝",
+    "cleanup": "测试关闭服务、SQLite 和连接后清理临时目录；保留本机所有真实服务与用户数据"
+  },
+  "comparisonScope": {
+    "baseline": "精确保留修复前 metadata/title 的 IN + ORDER BY seq DESC LIMIT 1 SQL，在相同临时数据库的两个热点会话执行 3 轮，共 12 次查询。不是完整旧 MonSyncWorker 的耗时，也不是旧客户进程的性能采样。",
+    "baselinePlanOnly": [
+      "semanticTime",
+      "projection"
+    ],
+    "fixed": "当前真实 worker：160 个关联会话首次语义投影、3 轮完全空闲扫描，再追加 1 个非语义流事件的一轮扫描。",
+    "thresholds": "断言作用域、查询/元数据调用次数、游标、历史保留以及 HTTP 在同步结束前得到处理；不硬编码耗时门槛或性能倍数。",
+    "cpu": "Node process.threadCpuUsage 差值，记录主线程 user + system CPU 毫秒；毫秒指标四舍五入。"
+  },
+  "metrics": {
+    "seedMs": 5470,
+    "baseline": {
+      "elapsedMs": 1847,
+      "mainThreadCpuMs": 1812,
+      "healthMs": 1849,
+      "healthHandledDuringPass": 0
+    },
+    "initialSemanticProjection": {
+      "elapsedMs": 695,
+      "mainThreadCpuMs": 453,
+      "healthMs": 24,
+      "healthHandledDuringPass": 1
+    },
+    "idleRounds": [
+      {
+        "round": 1,
+        "elapsedMs": 17,
+        "mainThreadCpuMs": 16,
+        "healthMs": 8,
+        "healthHandledDuringPass": 1
+      },
+      {
+        "round": 2,
+        "elapsedMs": 18,
+        "mainThreadCpuMs": 16,
+        "healthMs": 8,
+        "healthHandledDuringPass": 1
+      },
+      {
+        "round": 3,
+        "elapsedMs": 16,
+        "mainThreadCpuMs": 15,
+        "healthMs": 8,
+        "healthHandledDuringPass": 1
+      }
+    ],
+    "streamOnly": {
+      "newEvents": 1,
+      "elapsedMs": 17,
+      "mainThreadCpuMs": 15,
+      "healthMs": 7,
+      "healthHandledDuringPass": 1,
+      "sessionReadCalls": 0,
+      "metadataReadCalls": 0,
+      "projectionBatchCalls": 1
+    },
+    "idleSessionReadCalls": 0,
+    "idleMetadataReadCalls": 0,
+    "idleProjectionBatchCalls": 0,
+    "fixedHealthMaxMs": 24,
+    "testDurationMs": 8655.2995,
+    "runnerDurationMs": 10934.5243
+  },
+  "queryPlans": {
+    "legacy": {
+      "metadata": [
+        "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+      ],
+      "title": [
+        "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+      ],
+      "semanticTime": [
+        "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)",
+        "LIST SUBQUERY 1",
+        "SCAN json_each VIRTUAL TABLE INDEX 1:",
+        "CREATE BLOOM FILTER"
+      ],
+      "projection": [
+        "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=? AND seq>? AND seq<?)",
+        "LIST SUBQUERY 1",
+        "SCAN json_each VIRTUAL TABLE INDEX 1:",
+        "CREATE BLOOM FILTER"
+      ]
+    },
+    "fixedObservedMetadata": {
+      "sql": "SELECT seq,payload_json,created_at FROM events\n    WHERE session_id=? AND kind=? ORDER BY seq DESC LIMIT 1",
+      "plan": [
+        "SEARCH events USING INDEX events_session_kind_seq (session_id=? AND kind=?)"
+      ]
+    }
+  },
+  "assertions": [
+    "早期 metadata/title 和缺失 title 的真实仓库读取保持正确",
+    "首次投影后 160 个会话的游标达到各自最大序号且没有同步错误",
+    "三个完全空闲扫描不重复 read、readMetadata 或 projectionBatch",
+    "新流事件只进行一次必要的 projectionBatch，不重读会话元数据，游标正常前进",
+    "首次投影、每轮空闲和非语义更新期间，真实健康请求均在同步结束前处理",
+    "数据库始终没有 sqlite_stat1，事件最终数量等于初始数量加新增的一条，没有删除历史"
+  ],
+  "fixtureCorrection": {
+    "firstRun": "failed",
+    "error": "ECONNRESET",
+    "cause": "造数阶段长于测试 HTTP 服务默认 keepAlive 空闲时间，预热连接在测量前已到期",
+    "change": "仅将临时 HTTP 服务的 keepAliveTimeout 设为 180000 毫秒；未修改产品 HTTP 行为",
+    "subsequentRun": "同一命令 1/1 通过；上方指标来自修正后的通过运行"
+  },
+  "limits": [
+    "基线仅测旧热点 SQL，不可把它与完整新 worker 结果换算成端到端性能倍数",
+    "这是单机合成数据的结构性回归，不是用户实际数据库、客户可见 UI 或旧/新发行二进制对比验收",
+    "真实 HTTP 仅挂载生产 healthHandler，未启动全部 Agent 宿主或真实 MonCore",
+    "SQL 计划受 SQLite 版本影响；记录的是本次 Node 22.23.1 内置 SQLite 3.51.3 的观察值",
+    "验证百万流事件下的空闲和单次流更新负载，不覆盖任意数量关联会话、所有历史形态或长时间运行"
+  ],
+  "finalVerification": {
+    "date": "2026-10-04",
+    "stage": "等待配置、后台会话和损坏元数据隔离最终补丁后的复验",
+    "workingDirectory": "E:/EDEN/Agent",
+    "command": "& 'E:/EDEN/EDEN-portable/EDEN_win/runtime/agent/node/node.exe' --import tsx --test Server/tests/regression/mon/idle-health.test.ts",
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "testDurationMs": 8214.898,
+    "runnerDurationMs": 10445.797,
+    "metrics": {
+      "syntheticStreamEvents": 1000000,
+      "totalEvents": 1000163,
+      "connectedSessions": 160,
+      "websocketClients": 0,
+      "sqliteVersion": "3.51.3",
+      "statistics": "absent",
+      "seedMs": 5126,
+      "baseline": {
+        "name": "legacy metadata/title SQL: three idle rounds, two hot sessions",
+        "elapsedMs": 1814,
+        "mainThreadCpuMs": 1797,
+        "healthMs": 1816,
+        "healthHandledDuringPass": 0
+      },
+      "legacyPlans": {
+        "metadata": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+        ],
+        "title": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)"
+        ],
+        "semanticTime": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=?)",
+          "LIST SUBQUERY 1",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ],
+        "projection": [
+          "SEARCH events USING INDEX sqlite_autoindex_events_2 (session_id=? AND seq>? AND seq<?)",
+          "LIST SUBQUERY 1",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ]
+      },
+      "priming": {
+        "name": "initial semantic projection",
+        "elapsedMs": 696,
+        "mainThreadCpuMs": 390,
+        "healthMs": 23,
+        "healthHandledDuringPass": 1
+      },
+      "idle": [
+        {
+          "name": "idle 1",
+          "elapsedMs": 18,
+          "mainThreadCpuMs": 16,
+          "healthMs": 9,
+          "healthHandledDuringPass": 1
+        },
+        {
+          "name": "idle 2",
+          "elapsedMs": 16,
+          "mainThreadCpuMs": 16,
+          "healthMs": 6,
+          "healthHandledDuringPass": 1
+        },
+        {
+          "name": "idle 3",
+          "elapsedMs": 18,
+          "mainThreadCpuMs": 31,
+          "healthMs": 11,
+          "healthHandledDuringPass": 1
+        }
+      ],
+      "streamOnly": {
+        "name": "one new non-semantic stream event",
+        "elapsedMs": 16,
+        "mainThreadCpuMs": 16,
+        "healthMs": 7,
+        "healthHandledDuringPass": 1
+      },
+      "fixedPlans": [
+        {
+          "sql": "SELECT seq,payload_json,created_at FROM events\\n    WHERE session_id=? AND kind=? ORDER BY seq DESC LIMIT 1",
+          "plan": [
+            "SEARCH events USING INDEX events_session_kind_seq (session_id=? AND kind=?)"
+          ]
+        }
+      ],
+      "idleDeepReads": 0,
+      "streamOnlyMetadataReads": 0,
+      "fixedHealthMaxMs": 23
+    },
+    "cpuPrecision": "Windows 短窗口 CPU 计时有粒度与边界误差，不把十几毫秒窗口换算为长期 CPU 百分比。"
+  }
+}

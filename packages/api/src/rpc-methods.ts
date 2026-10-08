@@ -1,4 +1,5 @@
 import { uiPreferenceRpcMethods } from './ui-preferences.ts'
+import { sharedWorkspaceRpcMethods } from './shared-workspace-rpc.ts'
 import { connectionRpcMethods } from './connection-rpc.ts'
 import { migrationRpcMethods } from './migration-rpc.ts'
 import { operationRpcMethods } from './operations.ts'
@@ -25,6 +26,7 @@ import { mcpResultReadSchema, mcpResultViewSchema, mcpResultExportSchema } from 
 
 /** Migrated methods share runtime validation and inferred browser types. Add remaining domains here. */
 export const rpcMethods = {
+  ...sharedWorkspaceRpcMethods,
   ...uiPreferenceRpcMethods,
   ...migrationRpcMethods,
   ...connectionRpcMethods,

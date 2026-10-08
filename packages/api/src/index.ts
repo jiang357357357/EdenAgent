@@ -1,4 +1,5 @@
 export { jsonValue, toJson } from './json.ts'
+export { sharedWorkspaceStatusSchema } from './shared-workspace-rpc.ts'
 export type { JsonValue } from './json.ts'
 export { runtimeOriginSchema, durableEventSchema, runtimeCheckpointSchema } from './runtime.ts'
 export type { RuntimeOrigin, DurableEvent, RuntimeCheckpoint } from './runtime.ts'
@@ -121,6 +122,8 @@ export { monSyncResultSchema } from './mon-sync.ts'
 export type { MonSyncResult } from './mon-sync.ts'
 export { sessionSummarySchema, sessionEventSchema } from './session-rpc.ts'
 export type { SessionSummary, SessionEvent } from './session-rpc.ts'
+export { replyTimerTurnSchema, replyTimerSnapshotSchema, replyTimerBreakdownSchema } from './session-timing.ts'
+export type { ReplyTimerTurn, ReplyTimerSnapshot, ReplyTimerBreakdown } from './session-timing.ts'
 export { sessionPurposeSchema, sessionSourceChannelSchema } from './session-classification.ts'
 export type { SessionPurpose, SessionSourceChannel } from './session-classification.ts'
 
@@ -182,3 +185,6 @@ export { accentThemeSchema, type AccentTheme } from "./ui-preferences.ts"
 export { baseThemeSchema, type BaseTheme } from "./ui-preferences.ts"
 
 export { replyLengthSchema } from "./ui-preferences.ts"
+export { DEFAULT_PANEL_OPACITY, panelOpacitySchema } from "./ui-preferences.ts"
+export { OperationFailure } from './operation-failure.ts'
+export type { OperationFailureDetails } from './operation-failure.ts'

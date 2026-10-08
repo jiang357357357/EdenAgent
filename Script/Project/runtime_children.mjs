@@ -50,7 +50,7 @@ export async function stopChild(child) {
   }
 }
 
-export async function waitForHealth(port, origin, child, { timeoutMs = 60000, intervalMs = 100 } = {}) {
+export async function waitForHealth(port, origin, child, { timeoutMs = 60000, intervalMs = 100, workspaceId } = {}) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(intervalMs) || intervalMs < 0) throw new Error('Invalid startup wait bounds')
   const started = performance.now()
   const endpoint = `http://127.0.0.1:${port}/healthz`
@@ -64,8 +64,9 @@ export async function waitForHealth(port, origin, child, { timeoutMs = 60000, in
       requestError = ''
       detail = `HTTP ${response.status}`
       const health = await response.json()
-      if (response.ok && health.runtimeOrigin === origin && health.serverVersion === '2.0.0-dev.0') return
+      if (response.ok && health.runtimeOrigin === origin && health.serverVersion === '2.0.0-dev.0' && (!workspaceId || health.workspaceId === workspaceId)) return
       detail += `; origin=${health.runtimeOrigin}, version=${health.serverVersion}`
+      if (workspaceId && health.workspaceId !== workspaceId) detail += '; workspace mismatch'
     } catch (error) {
       requestError = `; request failed: ${error.cause?.code ?? error.message}`.slice(0, 500)
     }
@@ -88,7 +89,7 @@ export async function waitForWeb(port, child) {
 }
 
 export function realmEnvironment(base, origin, token, port) {
-  const allowed = ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TZ', 'EDEN_AGENT_ALLOWED_ORIGINS', 'EDEN_AGENT_MAX_BLOB_BYTES', 'EDEN_AGENT_TERMINAL_SETTINGS_PATH']
+  const allowed = ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TZ', 'MON_WORKSPACE_ROOT', 'EDEN_AGENT_ALLOWED_ORIGINS', 'EDEN_AGENT_MAX_BLOB_BYTES', 'EDEN_AGENT_TERMINAL_SETTINGS_PATH']
   const env = Object.fromEntries(allowed.filter(key => base[key] !== undefined).map(key => [key, base[key]]))
   const skillRootsKey = `EDEN_AGENT_${origin.toUpperCase()}_SYSTEM_SKILL_ROOTS`
   if (base[skillRootsKey] !== undefined) env[skillRootsKey] = base[skillRootsKey]

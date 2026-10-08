@@ -1,6 +1,7 @@
 import { z } from 'zod'
 export const voiceSynthesizeSchema = z.object({
   requestId: z.string().uuid().optional(),
+  intent: z.enum(['auto', 'manual']).optional(),
   sessionId: z.string().uuid(), messageId: z.string().min(1).max(256), segmentGroupId: z.string().min(1).max(256),
   groupIndex: z.number().int().nonnegative().max(4294967295), sequence: z.number().int().nonnegative().max(4294967295),
   text: z.string().trim().min(1).max(10000), configId: z.union([z.number().int().safe(), z.string().regex(/^\d{1,20}$/)]),

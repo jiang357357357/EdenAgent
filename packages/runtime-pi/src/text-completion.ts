@@ -17,6 +17,7 @@ export async function completeText(request: TextCompletionRequest): Promise<stri
   let recordingFailed = false
   let recordingError: unknown
   const { models, model } = createRuntimeModels(request.model, {
+    retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 0 },
     signal: () => request.signal,
     async record(snapshot) {
       request.signal.throwIfAborted()

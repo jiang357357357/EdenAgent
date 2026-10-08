@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "platform": "win32",
+  "node": "v22.23.1",
+  "scope": "Authentication backlog pressure, durable event catch-up, multi-session tools and real TCP backpressure",
+  "realUserDataUsed": false,
+  "runningUserServicesRestarted": false,
+  "committedOrPushed": false,
+  "implementation": {
+    "queue": "Per-connection per-session afterSeq/throughSeq metadata; event payloads remain persisted",
+    "databaseRead": "Exact next sequence through the session/seq covering index; MIN(rowid) merges candidates before loading one payload",
+    "databasePlan": [
+      "SEARCH events USING INTEGER PRIMARY KEY (rowid=?)",
+      "SCALAR SUBQUERY",
+      "SEARCH pending VIRTUAL TABLE",
+      "SEARCH candidate USING COVERING INDEX sqlite_autoindex_events_2 (session_id=? AND seq=?)"
+    ],
+    "memory": "Connection cursor metadata grows with pending sessions; process one event at a time, rather than retaining all payloads",
+    "send": "Wait for the ws.send callback before fetching another event; yield after every 32 events",
+    "formerAuthenticationBacklogLimitsRemoved": { "events": 1024, "serializedBytes": 4194304 },
+    "authenticationFailureCloseCode": 1008,
+    "networkSendTimeoutMs": 10000,
+    "networkSendTimeoutCloseCode": 1013,
+    "ordinaryRpcResponseBufferedAmountLimitUnchanged": 4194304,
+    "schemaMigrationRequired": false
+  },
+  "finalIntegrationAndRegressionRun": {
+    "command": "node --import tsx --test Server/tests/regression/accounts/tool-connection.test.mjs Server/tests/regression/accounts/multi-session-connection.test.mjs Server/tests/regression/accounts/authentication-failure.test.mjs Server/tests/regression/accounts/event-backlog-load.test.mjs Server/tests/integration/accounts/event-backpressure.test.mjs Server/tests/integration/accounts/transport.test.ts Server/tests/server-runtime.test.ts",
+    "afterQueryOptimization": true,
+    "exitCode": 0,
+    "runnerTests": 13,
+    "passed": 13,
+    "failed": 0,
+    "durationMs": 37852.0199,
+    "runnerCountIncludesPressureParentTest": true,
+    "log": "C:/Users/Lenovo/AppData/Local/Temp/eden-connection-final-validation.log",
+    "coverage": [
+      "1200 synthetic persisted events across four sessions survive successful real account refresh without disconnect",
+      "12 synthetic persisted events totaling 4722062 bytes survive successful real account refresh without disconnect",
+      "Global append order, per-session sequences, exactly-once live delivery and paginated durable history",
+      "Original real write-tool scenario and two concurrent write-tool sessions do not replay side effects",
+      "Real Core 401 and changed account identity close only the affected connection and send no held events",
+      "Account RPC and Blob isolation, restart persistence and credential boundaries",
+      "Real paused TCP receiver resumes to receive all 256 frames while another connection progresses",
+      "Real continuously paused TCP receiver times out with 1013 while another connection remains live"
+    ]
+  },
+  "unitTests": {
+    "command": "node --import tsx --test Server/tests/unit/accounts/connection.test.ts Server/tests/unit/accounts/event-delivery.test.ts Server/tests/unit/accounts/multi-session-delivery.test.ts Server/tests/unit/accounts/event-sender.test.ts Server/tests/unit/sessions/pending-events.test.ts",
+    "passed": 34,
+    "failed": 0,
+    "exitCode": 0,
+    "queryTestsRerunAfterOptimization": { "passed": 7, "failed": 0 }
+  },
+  "frontendTests": {
+    "cwd": "frontend/web",
+    "command": "node --experimental-strip-types --test tests/tool-connection-recovery.test.mjs",
+    "passed": 6,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit",
+    "exitCode": 0
+  },
+  "build": {
+    "command": "node Script/Project/build_server.mjs",
+    "exitCode": 0,
+    "artifact": "dist/server/main.mjs"
+  },
+  "architecture": {
+    "command": "node Script/Architecture/check.mjs",
+    "sourceFiles": 825,
+    "errors": 35,
+    "errorsInChangedFiles": 0,
+    "exitCode": 1,
+    "thresholdsRelaxed": false
+  },
+  "limitations": [
+    "Synthetic pressure events and recorded models do not measure real provider quality or production-scale capacity.",
+    "Production browser transport ran in Node/Vite; no visible Electron UI was exercised.",
+    "No long-running soak, operating-system memory exhaustion or full repository suite was run.",
+    "Ordinary RPC responses retain their preexisting network buffer protection; unrelated real sequence gaps still reconnect the shared WebSocket.",
+    "The previously baseline-confirmed ownership rename failure remains a separate issue.",
+    "Running user services have not been replaced or restarted."
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "project": "Agent",
+  "useCase": "logo-brand",
+  "generationMode": "built-in image_gen",
+  "prompt": "Use case: logo-brand. Create one extremely simple, polished Windows taskbar application icon for a software project named Agent. Final design: a solid #7350C7 rounded-square tile, with one large solid white four-point sparkle, with softly curved concave sides and four sharp points. A single central star only, no extra small stars centered on it. Geometric flat vector-like shapes, generous bold silhouette, high contrast. NO text, NO letters, NO tiny lines, NO decorative marks, NO gradients, NO shadows, NO 3D, NO border. Color palette: #7350C7 and white #FFFFFF only. The rounded square occupies about 90 percent of the square canvas, leaving transparent outer corners/margins. The white symbol occupies about 62 percent of the tile. Strong visual clarity at 16x16 and 32x32 pixels. Front-facing, balanced composition, crisp edges. Deliver only this single icon centered on a transparent square canvas.",
+  "sourceImage": "C:\\Users\\Lenovo\\.codex\\generated_images\\01a108a7-88f5-7512-9295-734daa010c82\\exec-918f8651-e442-4a6f-a8c6-95bae7b674f8.png",
+  "png": "agent-spark-v1.png",
+  "ico": "agent-spark-v1.ico",
+  "icoSizes": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256
+  ]
+}

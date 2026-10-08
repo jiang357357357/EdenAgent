@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import workspaceIdentity from '../../frontend/desktop/src/processes/workspace-identity.cjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const built = process.argv[2] === '--built'
@@ -10,7 +11,9 @@ if (!['mon', 'local'].includes(origin)) throw new Error('Unsupported runtime ori
 const dataRoot = path.resolve(process.env.EDEN_AGENT_DATA_ROOT
   ?? process.env[origin === 'mon' ? 'EDEN_AGENT_MON_DATA_ROOT' : 'EDEN_AGENT_LOCAL_DATA_ROOT']
   ?? path.join(root, 'Data', 'realms', origin))
-const environment = { ...process.env, EDEN_AGENT_DATA_ROOT: dataRoot }
+const identity = workspaceIdentity.workspaceIdentity(root)
+const environment = { ...process.env, EDEN_AGENT_DATA_ROOT: dataRoot,
+  ...(identity.monWorkspaceRoot ? { MON_WORKSPACE_ROOT: identity.monWorkspaceRoot } : {}) }
 const child = spawn(process.execPath, built ? ['dist/server/main.mjs'] : ['--import', 'tsx', 'Server/src/main.ts'], {
   cwd: root, env: environment, stdio: 'inherit',
 })

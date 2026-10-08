@@ -14,6 +14,8 @@ export const baseThemeSchema = z.enum(["night", "cream", "peach", "sage", "laven
 export type BaseTheme = z.infer<typeof baseThemeSchema>
 export const accentThemeSchema = z.enum(["mist", "blue", "mint", "rose", "amber"])
 export type AccentTheme = z.infer<typeof accentThemeSchema>
+export const DEFAULT_PANEL_OPACITY = 85
+export const panelOpacitySchema = z.number().int().min(0).max(100).default(DEFAULT_PANEL_OPACITY)
 const appearance = z
   .object({
     baseTheme: baseThemeSchema.default("night"),
@@ -21,6 +23,7 @@ const appearance = z
     accentTheme: accentThemeSchema.default("mist"),
     chatFontScale: z.number().int().min(80).max(140),
     componentFontScale: z.number().int().min(80).max(140),
+    panelOpacity: panelOpacitySchema,
   })
   .strict()
 export const uiPreferenceRpcMethods = {

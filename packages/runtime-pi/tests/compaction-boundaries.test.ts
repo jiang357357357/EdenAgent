@@ -17,7 +17,7 @@ test('compaction request persistence failure prevents its HTTP request', async (
     await runtime.prompt('Context '.repeat(500))
     await assert.rejects(runtime.compact('Summarize'))
     assert.equal(model.requests.length, 1)
-    await assert.rejects(runtime.prompt('Do not continue'), /persistence/)
+    await assert.rejects(runtime.prompt('Do not continue'), /Compaction request storage failed/)
   } finally { await model.close() }
 })
 

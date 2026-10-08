@@ -1,0 +1,294 @@
+{
+  "date": "2026-10-04",
+  "timezone": "Asia/Shanghai",
+  "purpose": "多会话故障隔离与用户自主选择文件夹",
+  "schemaVersion": 132,
+  "nodeVersion": "22.23.1",
+  "nodeExecutablesUsed": [
+    "E:/EDEN/EDEN-portable/EDEN_win/runtime/agent/node/node.exe",
+    "E:/EDEN/.release/acceptance-1.11.4/EDEN_win/runtime/agent/node/node.exe",
+    "C:/Users/Lenovo/AppData/Local/Temp/eden-node22-repro-c35129cca3bf4fc6ab86b7f7618670cd/node-v22.23.1-win-x64/node.exe"
+  ],
+  "commandConvention": "node均为本机上述固定22.23.1可执行文件；<files>按该组files数组传入，分组/复验记录见note与executions。不是一次全仓运行。cargo=C:/Users/Lenovo/.cargo/bin/cargo.exe。",
+  "realUserDataUsed": false,
+  "realProviderUsed": false,
+  "portableUpdated": false,
+  "productVersionChanged": false,
+  "committed": false,
+  "pushed": false,
+  "groups": [
+    {
+      "name": "模型进程与临时搬迁制品",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test packages/runtime-pi/tests/process-isolation.test.ts packages/runtime-pi/tests/process-parent-watch.test.ts; node --test Script/Project/process_artifact.test.mjs",
+      "files": [
+        "packages/runtime-pi/tests/process-isolation.test.ts",
+        "packages/runtime-pi/tests/process-parent-watch.test.ts",
+        "Script/Project/process_artifact.test.mjs"
+      ],
+      "passed": 8,
+      "note": "分次执行。模型进程6；父进程退出1；临时编译并搬迁worker1。"
+    },
+    {
+      "name": "模型及会话执行兼容",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test <files>",
+      "files": [
+        "Server/tests/actor-execution.test.ts",
+        "Server/tests/actor-compaction-recovery.test.ts",
+        "Server/tests/director-planning.test.ts",
+        "Server/tests/session-title.test.ts"
+      ],
+      "passed": 12,
+      "note": "actor3先通过；director6+title3与worker6最后联合15/15。修复持久化错误包装、辅助请求重复重试；标题等待上限改为允许进程启动。"
+    },
+    {
+      "name": "运行状态和持久输入回归",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test --test-concurrency=3 <files>",
+      "files": [
+        "Server/tests/server-runtime.test.ts",
+        "Server/tests/durable-inputs.test.ts",
+        "Server/tests/input-signals.test.ts",
+        "Server/tests/restart-user-input.test.ts",
+        "Server/tests/regression/sessions/stop-request.test.ts",
+        "Server/tests/attachment-input.test.ts",
+        "packages/runtime-pi/tests/text-completion.test.ts",
+        "packages/runtime-pi/tests/live-tool-refresh.test.ts",
+        "packages/runtime-pi/tests/compaction-boundaries.test.ts",
+        "packages/runtime-pi/tests/automatic-compaction.test.ts",
+        "packages/runtime-pi/tests/tool-outcome.test.ts",
+        "packages/runtime-pi/tests/persistence-boundaries.test.ts"
+      ],
+      "passed": 40,
+      "note": "联合首轮39通过、1旧断言不符既有held恢复政策；只更正input-signals恢复用例，整文件4/4复验通过。重复用例不计。"
+    },
+    {
+      "name": "账号分区、搬迁及schema历史",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test <files>",
+      "files": [
+        "packages/store/tests/schema-history.test.ts",
+        "Server/tests/integration/accounts/partition-projections.test.ts",
+        "Server/tests/integration/accounts/transport.test.ts",
+        "Server/tests/integration/accounts/workspace-startup.test.ts",
+        "Server/tests/integration/accounts/workspace-portable-move.test.ts"
+      ],
+      "passed": 13,
+      "note": "schema2+partition3+accounts8。partition在legacy_request_id导入修订后最后3/3通过。"
+    },
+    {
+      "name": "会话故障不影响宿主健康",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test Server/tests/unit/sessions/health-isolation.test.ts",
+      "files": [
+        "Server/tests/unit/sessions/health-isolation.test.ts"
+      ],
+      "passed": 1
+    },
+    {
+      "name": "项目技能及目录预览归属",
+      "cwd": "E:/EDEN/Agent/frontend/web",
+      "command": "node --experimental-strip-types --test <files>",
+      "files": [
+        "tests/skill-session-scope.test.mjs",
+        "tests/subagent-state.test.mjs",
+        "tests/workspace-scope-events.test.mjs"
+      ],
+      "passed": 5,
+      "runnerDurationMs": 629.4673
+    },
+    {
+      "name": "Windows组装与worker哈希",
+      "cwd": "E:/EDEN/Script/portable/windows",
+      "command": "$env:PYTHONPATH='E:/EDEN'; & 'E:/EDEN/Core/.venv/Scripts/python.exe' -m unittest test_agent_relocation test_assemble",
+      "files": [
+        "test_agent_relocation.py",
+        "test_assemble.py"
+      ],
+      "passed": 14,
+      "note": "从根目录直接运行曾因import assemble失败；按模块所在目录和项目PYTHONPATH执行最终14/14，非测试跳过。"
+    },
+    {
+      "name": "工作区及共享目录隔离",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test <files>",
+      "files": [
+        "Server/tests/unit/workspace/selection.test.ts",
+        "Server/tests/workspace-concurrency.test.ts",
+        "Server/tests/workspace-tools.test.ts",
+        "Server/tests/workspace-read.test.ts",
+        "Server/tests/regression/workspace/session-isolation.test.ts",
+        "Server/tests/host-command-policy.test.ts",
+        "Server/tests/skill-catalog-refresh.test.ts",
+        "Server/tests/skill-tools-live.test.ts",
+        "Server/tests/subagent-execution-budget.test.ts",
+        "Server/tests/regression/workspace/dependent-scopes.test.ts",
+        "Server/tests/integration/shared-workspace/rpc-lifecycle.test.ts",
+        "Server/tests/integration/workspace/runtime-recovery.test.ts",
+        "Server/tests/regression/workspace/shared-folder-scopes.test.ts",
+        "Server/tests/unit/shared-workspace/service.test.ts",
+        "Server/tests/regression/workspace/shared-folder-restart.test.ts"
+      ],
+      "passed": 54,
+      "newTests": 17,
+      "note": "分组34/34、9/9、10/10（rpc-lifecycle重复1项），新增restart2/2；54去重。registry完成后11/11相关组、rpc1/1及restart2/2复验不重复计数。"
+    },
+    {
+      "name": "前端会话连接、选择目录与首次发送",
+      "cwd": "E:/EDEN/Agent/frontend/web",
+      "command": "node --experimental-strip-types --test <files>",
+      "files": [
+        "tests/account-switch.test.mjs",
+        "tests/event-stream-recovery.test.mjs",
+        "tests/session-channel-isolation.test.mjs",
+        "tests/session-runtime-recovery.test.mjs",
+        "tests/shared-workspace-client.test.mjs",
+        "tests/workspace-client.test.mjs",
+        "tests/workspace-loading.test.mjs",
+        "tests/workspace-conversation.test.mjs",
+        "tests/tool-connection-recovery.test.mjs"
+      ],
+      "passed": 63,
+      "newTests": 18,
+      "executions": [
+        {
+          "passed": 57,
+          "runnerDurationMs": 4574.1763,
+          "note": "9文件初次完整执行"
+        },
+        {
+          "passed": 22,
+          "runnerDurationMs": 1576.1884,
+          "files": [
+            "tests/session-runtime-recovery.test.mjs",
+            "tests/workspace-conversation.test.mjs",
+            "tests/workspace-client.test.mjs"
+          ],
+          "note": "新增6用例后的最终3文件，其他6文件未再改变；去重63，不称一次执行63"
+        }
+      ]
+    },
+    {
+      "name": "真实WebSocket通道隔离",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test Server/tests/integration/sessions/channel-isolation.test.ts",
+      "files": [
+        "Server/tests/integration/sessions/channel-isolation.test.ts"
+      ],
+      "passed": 1,
+      "runnerDurationMs": 3689.0847,
+      "testDurationMs": 246.3663
+    },
+    {
+      "name": "真实30秒重新鉴权并发",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test Server/tests/regression/accounts/multi-session-connection.test.mjs",
+      "files": [
+        "Server/tests/regression/accounts/multi-session-connection.test.mjs"
+      ],
+      "passed": 1,
+      "runnerDurationMs": 43428.8458,
+      "testDurationMs": 39075.8251,
+      "metrics": {
+        "accounts": 2,
+        "connections": 5,
+        "concurrentToolSessions": 2,
+        "bufferedBySession": [
+          29,
+          0
+        ],
+        "controlConnectionStates": [
+          true
+        ],
+        "modelRequests": [
+          2,
+          2
+        ],
+        "crossAccountLeak": false,
+        "toolReplay": false
+      }
+    },
+    {
+      "name": "Agent自醒隔离",
+      "cwd": "E:/EDEN/Agent",
+      "command": "node --import tsx --test <files>",
+      "files": [
+        "Server/tests/self-awake-bridge-status.test.ts",
+        "Server/tests/self-awake-deadline.test.ts",
+        "Server/tests/self-awake-execution.test.ts",
+        "Server/tests/self-awake-list.test.ts",
+        "Server/tests/self-awake-queue.test.ts",
+        "Server/tests/self-awake-submission-contract.test.ts",
+        "Server/tests/self-awake-timer-publication.test.ts",
+        "Server/tests/integration/self-awake/activation.test.ts",
+        "Server/tests/integration/self-awake/context-and-timer.test.ts",
+        "Server/tests/integration/self-awake/diary-clear.test.ts",
+        "Server/tests/integration/self-awake/diary.test.ts",
+        "Server/tests/integration/self-awake/http-authorization.test.ts",
+        "Server/tests/integration/self-awake/schedule-source.test.ts",
+        "Server/tests/integration/self-awake/scheduled-wake.test.ts",
+        "Server/tests/integration/self-awake/session-isolation.test.ts",
+        "Server/tests/integration/self-awake/shared-topics.test.ts",
+        "Server/tests/integration/self-awake/write-diary-tool.test.ts",
+        "Server/tests/regression/self-awake/activation-publication.test.ts",
+        "packages/store/tests/self-awake-activation.test.ts",
+        "packages/store/tests/self-awake-queue.test.ts"
+      ],
+      "passed": 53,
+      "newTests": 8,
+      "runnerDurationMs": 12859.5
+    },
+    {
+      "name": "MonOs既有lib",
+      "cwd": "E:/EDEN/BaseOs",
+      "command": "cargo test --offline --lib --no-fail-fast",
+      "passed": 17,
+      "skipped": 2,
+      "testDurationMs": 110,
+      "note": "两个既有BGE/FAISS资源测试ignored；此轮发生在新增租约unit前，下组单独记录。"
+    },
+    {
+      "name": "MonOs会话真实HTTP和重启",
+      "cwd": "E:/EDEN/BaseOs",
+      "command": "cargo test --offline --test session_self_awake -- --test-threads=1",
+      "files": [
+        "tests/session_self_awake.rs"
+      ],
+      "passed": 6,
+      "newTests": 6,
+      "testDurationMs": 230
+    },
+    {
+      "name": "MonOs能力租约生命周期",
+      "cwd": "E:/EDEN/BaseOs",
+      "command": "cargo test --offline --lib self_awake_scopes::tests::capability_lease_is_live_only_while_the_session_coordinator_is_running",
+      "files": [
+        "src/self_awake_scopes.rs"
+      ],
+      "passed": 1,
+      "newTests": 1,
+      "testDurationMs": 30
+    }
+  ],
+  "totalPassed": 289,
+  "totalSkipped": 2,
+  "finalFailures": 0,
+  "checks": {
+    "serverTypes": "passed",
+    "frontendTypes": "passed",
+    "architecture": {
+      "sourceFiles": 951,
+      "errors": 0,
+      "warnings": 23
+    },
+    "diffCheck": "passed"
+  },
+  "limits": [
+    "SQLite、工具宿主、OS、磁盘和外部服务仍共享；非OS沙箱，不能保证永不离线。",
+    "选择同一目录有意共享内容；应用锁不控制外部程序任意写入。",
+    "未进行客户11GB数据库、真实双机局域网、Electron可见界面或长期并发浸泡验收。",
+    "需要部署匹配的Agent/Frontend/MonOs及runtime-process制品，当前客户包未替换。",
+    "未安装缺失rustfmt；Cargo出现已有LNK4098链接警告。"
+  ]
+}

@@ -62,6 +62,7 @@ export interface RuntimeOptions {
 }
 
 export interface EdenRuntime {
+  dispose?(): Promise<void>
   prompt(text: string, images?: readonly RuntimeImage[]): Promise<JsonValue>
   steer(text: string, images?: readonly RuntimeImage[]): Promise<void>
   followUp(text: string, images?: readonly RuntimeImage[]): Promise<void>

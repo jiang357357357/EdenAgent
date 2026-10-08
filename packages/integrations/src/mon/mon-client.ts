@@ -2,18 +2,16 @@ import { monFetch } from './transport.ts'
 import { fetchMonAudio } from './audio.ts'
 import { jsonValue, modelEndpointSchema } from '@eden/api'
 import type { JsonValue } from '@eden/api'
-
-export class MonHttpError extends Error {
-  constructor(readonly status: number) {
-    super(status === 401 || status === 403 ? `Mon authentication rejected (${status})` : `Mon request failed (${status})`)
-  }
-}
+import { readMonHttpError } from './http-error.ts'
+import type { MonCredentials } from './credentials.ts'
+export { MonHttpError } from './http-error.ts'
+export type { MonCredentials } from './credentials.ts'
 
 export class MonClient {
   private readonly base: URL
   private readonly token: string
 
-  constructor(baseUrl: string, token: string) {
+  constructor(baseUrl: string, token: string, private readonly credentials?: MonCredentials) {
     this.base = new URL(`${modelEndpointSchema.parse(baseUrl).replace(/\/+$/, '')}/`)
     if (!token.trim() || /[\r\n]/.test(token)) throw new Error('Mon authentication token is invalid')
     this.token = token.trim()
@@ -68,7 +66,15 @@ export class MonClient {
     return url.href
   }
 
-  fetchAudio(source: string, signal?: AbortSignal) { return fetchMonAudio(this.base, this.token, source, signal) }
+  async fetchAudio(source: string, signal?: AbortSignal) {
+    const token = await this.credentials?.token(signal) ?? this.token
+    return fetchMonAudio(this.base, token, source, signal, this.credentials)
+  }
+
+  async freshRealtimeSttUrl(signal?: AbortSignal) {
+    const token = await this.credentials?.token(signal) ?? this.token
+    return new MonClient(this.base.href, token).realtimeSttUrl()
+  }
 
   private endpointUrl(endpoint: string): URL {
     const pathname = endpoint.split('?')[0]!
@@ -83,14 +89,21 @@ export class MonClient {
   }
 
   private async request(method: string, endpoint: string, body?: JsonValue, signal?: AbortSignal): Promise<JsonValue> {
-    const response = await monFetch(this.endpointUrl(endpoint), {
+    const url = this.endpointUrl(endpoint)
+    const token = await this.credentials?.token(signal) ?? this.token
+    const send = (token: string) => monFetch(url, {
       method, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]),
-      headers: { Authorization: `Token ${this.token}`, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      headers: { Authorization: `Token ${token}`, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
-    if (!response.ok) {
+    let response = await send(token)
+    // Core authentication runs before endpoint side effects. Only a confirmed 401 is replayed once.
+    if (response.status === 401 && this.credentials) {
       await response.body?.cancel()
-      throw new MonHttpError(response.status)
+      response = await send(await this.credentials.token(signal, token))
+    }
+    if (!response.ok) {
+      throw await readMonHttpError(response, url.pathname)
     }
     const reader = response.body?.getReader()
     if (!reader) throw new Error('Mon returned an empty response body')

@@ -9,6 +9,9 @@ export function serviceSignature(secret: string, service: string, scope: string,
   return createHmac('sha256', secret).update([service, scope, timestamp, nonce, 'POST', path, hash].join('\n')).digest('hex')
 }
 export async function acquireMonServiceToken(identity: MonServiceIdentity, signal: AbortSignal): Promise<string> {
+  return (await acquireMonServiceLease(identity, signal)).token
+}
+export async function acquireMonServiceLease(identity: MonServiceIdentity, signal: AbortSignal) {
   const base = modelEndpointSchema.parse(identity.coreBaseUrl).replace(/\/$/, '')
   const pathname = '/api/internal/service-token/'
   const body = Buffer.from(JSON.stringify({ audience: 'monagent', requested_scope: 'self_awake:user_context' }))
@@ -32,7 +35,11 @@ export async function acquireMonServiceToken(identity: MonServiceIdentity, signa
       chunks.push(chunk.value)
     }
   } finally { reader.releaseLock() }
-  const result = z.object({ user_id: z.union([z.string(), z.number().int()]), token: z.string().min(1).max(8192) }).parse(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+  const result = z.object({ user_id: z.union([z.string(), z.number().int()]), token: z.string().min(1).max(8192),
+    expires_in: z.number().positive().optional(), expires_at: z.string().optional() }).parse(JSON.parse(Buffer.concat(chunks).toString('utf8')))
   if (String(result.user_id) !== identity.userId) throw new Error('Core service identity user mismatch')
-  return result.token
+  const absolute = result.expires_at ? Date.parse(result.expires_at) : NaN
+  const expiresAt = Math.min(Number.isFinite(absolute) ? absolute : Infinity, Date.now() + (result.expires_in ?? 1200) * 1000)
+  if (expiresAt <= Date.now()) throw new Error('Core returned an expired service credential')
+  return { token: result.token, expiresAt }
 }

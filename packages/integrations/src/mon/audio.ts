@@ -1,11 +1,19 @@
 import { monFetch } from './transport.ts'
+import { readMonHttpError } from './http-error.ts'
+import type { MonCredentials } from './credentials.ts'
 /** Only Core's own media origin may receive its authentication token. */
-export async function fetchMonAudio(base: URL, token: string, source: string, signal?: AbortSignal) {
+export async function fetchMonAudio(base: URL, token: string, source: string, signal?: AbortSignal, credentials?: MonCredentials) {
   const url = monMediaUrl(source, base)
-  const response = await monFetch(url, {
+  const send = (token: string) => monFetch(url, {
     redirect: 'error', headers: { Authorization: `Token ${token}` },
     signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])])
   })
+  let response = await send(token)
+  if (response.status === 401 && credentials) {
+    await response.body?.cancel()
+    response = await send(await credentials.token(signal, token))
+  }
+  if (!response.ok) throw await readMonHttpError(response, url.pathname)
   const max = 32 * 1024 * 1024
   if (!response.ok || !response.body || Number(response.headers.get('content-length')) > max) {
     await response.body?.cancel(); throw new Error('Mon audio download failed or exceeded its size limit')

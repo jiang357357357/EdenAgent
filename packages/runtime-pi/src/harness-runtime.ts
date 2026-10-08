@@ -10,7 +10,7 @@ import { compactConversation } from './compaction.ts'
 import { automaticCompactor } from './automatic-compaction.ts'
 import { defaultModelRetryPolicy, modelRetryDelay, retryableModelFailure, waitForModelRetry } from './model-retry.ts'
 
-export function createRuntime(options: RuntimeOptions): EdenRuntime {
+export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adaptTool = adaptTool): EdenRuntime {
   const storage = new DurableSessionStorage(options.sessionId, options.callbacks.checkpoint, options.checkpoint, options.transientInput)
   let fatal: unknown
   let requests = 0
@@ -24,7 +24,7 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
   let revisions = new Map(options.tools.map(tool => [tool.name, tool.revision]))
   const healthy = () => {
     storage.assertHealthy()
-    if (fatal) throw new Error('Runtime persistence failed; restore before continuing', { cause: fatal })
+    if (fatal) throw fatal
   }
   const fail = (error: unknown): never => { fatal = error; throw error }
   const callbacks: RuntimeCallbacks = {
@@ -40,7 +40,7 @@ export function createRuntime(options: RuntimeOptions): EdenRuntime {
       await options.callbacks.beforeTool?.(name, callId, revision, input)
     },
   }
-  const tools = (items: RuntimeTool[]) => items.map(tool => adaptTool<Record<string, never>>(tool, callbacks, healthy, fail, options.toolCallPrefix))
+  const tools = (items: RuntimeTool[]) => items.map(tool => toolAdapter<Record<string, never>>(tool, callbacks, healthy, fail, options.toolCallPrefix))
   const provider = createRuntimeModels(options.model, {
     signal: () => controller.signal,
     retry: retryPolicy,

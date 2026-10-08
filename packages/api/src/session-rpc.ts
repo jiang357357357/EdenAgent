@@ -5,6 +5,7 @@ import { runtimeOriginSchema } from './runtime.ts'
 import { sessionPurposeSchema, sessionSourceChannelSchema } from './session-classification.ts'
 import { sessionCreateSchema, sessionListSchema, sessionIdSchema, sessionTitleSchema, sessionParticipantsSchema } from './rpc.ts'
 import { eventListSchema, messageListSchema } from './rpc.ts'
+import { replyTimerSnapshotSchema } from './session-timing.ts'
 
 export const sessionSummarySchema = z.object({
   id: z.string().uuid(), title: z.string(), titleSource: z.string(),
@@ -26,6 +27,7 @@ export const sessionRpcMethods = {
   'session.create': { params: sessionCreateSchema, result: sessionSummarySchema },
   'session.list': { params: sessionListSchema, result: z.array(sessionSummarySchema) },
   'session.read': { params: sessionIdSchema, result: sessionSummarySchema },
+  'session.timing.read': { params: sessionIdSchema, result: replyTimerSnapshotSchema },
   'session.context': { params: sessionIdSchema, result: z.object({ requests: z.array(sessionEventSchema) }) },
   'session.rename': { params: sessionTitleSchema, result: sessionSummarySchema },
   'session.set_participants': { params: sessionParticipantsSchema, result: sessionSummarySchema },
