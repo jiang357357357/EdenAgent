@@ -16,7 +16,7 @@ const artifact = path.resolve(process.env.EDEN_AGENT_ARTIFACT_ENTRY
 const report = await artifactReport(artifact, process.env.EDEN_AGENT_ARTIFACT_REPORT)
 after(() => report.finish())
 
-test('the built host starts with a missing legacy workspace and persists explicit recovery across IPC process restarts', { timeout: 120000 }, async context => {
+test('the built host starts with a missing legacy workspace and persists explicit recovery across IPC process restarts', { timeout: 240000 }, async context => {
   const root = await mkdtemp(path.join(tmpdir(), 'eden-workspace-artifact-'))
   const hosts = [], clients = []
   let passed = false
@@ -81,7 +81,7 @@ test('the built host starts with a missing legacy workspace and persists explici
 })
 
 test('the exact bundled host preserves managed and explicit workspaces when the complete portable directory moves',
-  { timeout: 120000 }, context => verifyPortableRelocation(context, artifact, report))
+  { timeout: 240000 }, context => verifyPortableRelocation(context, artifact, report))
 
 test('the exact bundled host repairs 21 inherited dead defaults, preserves three chosen projects and stops poisoning new sessions',
-  { timeout: 120000 }, context => verifyLegacyDefaultRecovery(context, artifact, report))
+  { timeout: 240000 }, context => verifyLegacyDefaultRecovery(context, artifact, report))

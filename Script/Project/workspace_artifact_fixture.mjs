@@ -64,7 +64,9 @@ export async function artifactHost(entry, root, dataRoot, { origin = 'local', co
   }
   try {
     const port = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Artifact startup timeout: ${stderr}`)), 15000)
+      // Fresh Windows copies need time for dependency loading and antivirus scans.
+      // Keep this bounded, and retain startup diagnostics if the real artifact stalls.
+      const timer = setTimeout(() => reject(new Error(`Artifact startup timeout: ${stderr}\n${stdout}`)), 45000)
       child.once('exit', () => { clearTimeout(timer); reject(new Error(`Artifact exited before startup: ${stderr}`)) })
       child.stdout.on('data', chunk => {
         stdout += String(chunk)
