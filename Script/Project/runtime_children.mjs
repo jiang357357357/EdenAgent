@@ -89,7 +89,7 @@ export async function waitForWeb(port, child) {
 }
 
 export function realmEnvironment(base, origin, token, port) {
-  const allowed = ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TZ', 'MON_WORKSPACE_ROOT', 'EDEN_AGENT_ALLOWED_ORIGINS', 'EDEN_AGENT_MAX_BLOB_BYTES', 'EDEN_AGENT_TERMINAL_SETTINGS_PATH']
+  const allowed = ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TZ', 'MON_WORKSPACE_ROOT', 'EDEN_AGENT_ALLOWED_ORIGINS', 'EDEN_AGENT_MAX_BLOB_BYTES', 'EDEN_AGENT_TERMINAL_SETTINGS_PATH', 'EDEN_AGENT_DESKTOP_BROKER_ROOT']
   const env = Object.fromEntries(allowed.filter(key => base[key] !== undefined).map(key => [key, base[key]]))
   const skillRootsKey = `EDEN_AGENT_${origin.toUpperCase()}_SYSTEM_SKILL_ROOTS`
   if (base[skillRootsKey] !== undefined) env[skillRootsKey] = base[skillRootsKey]

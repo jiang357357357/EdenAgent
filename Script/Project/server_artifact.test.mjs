@@ -14,7 +14,7 @@ async function host(root, origin, coreBaseUrl) {
   const token = (origin === 'local' ? 'l' : 'm').repeat(43)
   const child = fork(artifact, [], { cwd: root, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { PATH: process.env.PATH, EDEN_AGENT_RUNTIME_ORIGIN: origin, EDEN_AGENT_DATA_ROOT: path.join(root, origin),
-      EDEN_AGENT_CAPABILITY_TOKEN: token, EDEN_AGENT_PORT: '0', EDEN_AGENT_LOG_FORMAT: 'json',
+      EDEN_AGENT_CAPABILITY_TOKEN: token, EDEN_AGENT_PORT: '0', EDEN_AGENT_OS_PORT: '0', EDEN_AGENT_LOG_FORMAT: 'json',
       ...(coreBaseUrl ? { MON_CORE_BASE_URL: coreBaseUrl } : {}) } })
   let stderr = '', stdout = ''
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-8000) })
@@ -95,7 +95,7 @@ test('built dual hosts isolate sessions and blobs and preserve local state after
   assert.equal((await localClient.rpc('skill.catalog_status', {})).error, null)
   for (const connection of [localClient, monClient]) {
     const skills = await connection.rpc('skill.list', {})
-    assert.deepEqual(skills.map(skill => skill.name).sort(), ['eden-browser', 'eden-contact', 'eden-memory', 'eden-reminders', 'eden-self-awake', 'eden-shared-library', 'eden-workspace', 'web-research'])
+    assert.deepEqual(skills.map(skill => skill.name).sort(), ['character-stickers', 'cua-computer-use', 'eden-browser', 'eden-contact', 'eden-memory', 'eden-reminders', 'eden-self-awake', 'eden-shared-library', 'eden-workspace', 'video-context', 'web-research'])
     assert.ok(skills.every(skill => skill.content === null))
   }
   localClient.close(); await local.close()

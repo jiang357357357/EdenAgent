@@ -8,6 +8,7 @@ export interface RuntimeTool {
   executionMode?: 'parallel' | 'sequential'
   identity?: string
   source?: 'builtin' | 'plugin' | 'mcp' | 'skill'
+  /** Controls model schema/prompt presentation only; registered tools remain executable. */
   exposure?: 'direct' | 'deferred' | 'hidden'
   /** Resolved before accounting; forwarding is one logical invocation. */
   target?(input: Record<string, unknown>): { identity: string; input: Record<string, unknown> } | undefined
@@ -15,7 +16,7 @@ export interface RuntimeTool {
   assertCurrent?(): void
   outcome?(result: JsonValue): ToolOutcome
   failureOutcome?(error: unknown): ToolOutcome
-  modelResult?(result: JsonValue): JsonValue
+  modelResult?(result: JsonValue, input?: Record<string, unknown>): JsonValue
   /** Private host audit view; execution still receives the validated original input. */
   auditInput?(input: Record<string, unknown>): JsonValue
   /** Host-owned discovery instructions included in each model request. */
@@ -53,6 +54,8 @@ export interface RuntimeCallbacks {
 export interface RuntimeOptions {
   sessionId: string
   systemPrompt: string
+  /** Immutable reference material for this turn; never persisted as chat history. */
+  turnContext?: string
   contextSources?: JsonValue[]
   model: RuntimeModel
   tools: RuntimeTool[]

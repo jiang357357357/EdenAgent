@@ -333,7 +333,8 @@ export interface RpcMethodMap {
   "turn.cancel": { params: SessionReadParams; result: { sessionId: SessionId; cancellationRequested: boolean } }
   "event.list": { params: EventListParams; result: EventPage }
   "message.list": { params: MessageListParams; result: EventPage }
-  "message.delete": { params: { sessionId: SessionId; messageId: string }; result: { sessionId: SessionId; messageId: string; deleted: true } }
+  "message.delete": { params: { sessionId: SessionId; messageId: string; scope?: "message" | "reply" }; result: { sessionId: SessionId; messageId: string; deleted: true; messageIds?: string[] } }
+  "message.reply.read": { params: { sessionId: SessionId; messageId: string }; result: { sessionId: SessionId; messageId: string; messageIds: string[]; text: string } }
   "permission.list": { params: PermissionListParams; result: PermissionRequestInfo[] }
   "permission.mode.get": { params: Record<string, never>; result: { mode: "restricted" | "full_access" | "takeover" } }
   "command.execution.get": { params: Record<string, never>; result: CommandExecutionInfo }

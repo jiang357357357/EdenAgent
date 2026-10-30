@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createServer as createSecureServer } from 'node:https'
 import { LanError } from './contracts.ts'
 import { endpoint, privateAddress } from './validation.ts'
 
@@ -12,8 +13,8 @@ export async function readJson(stream: AsyncIterable<Uint8Array>, maximum = maxi
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
-export async function post(address: string, route: string, body: unknown, signal: AbortSignal): Promise<unknown> {
-  const base = endpoint(address)
+export async function post(address: string, route: string, body: unknown, signal: AbortSignal, allowRemote = false): Promise<unknown> {
+  const base = endpoint(address, allowRemote)
   const response = await fetch(`${base}${route}`, { method: 'POST', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!response.ok) { await response.body?.cancel(); throw new LanError(response.status, response.status === 403 ? '设备配对失效或没有共享权限' : '局域网设备暂时无法处理请求') }
@@ -29,15 +30,18 @@ export class LanHttpServer {
   private readonly allowed: () => boolean
   private readonly host: string
   private readonly requestedPort: number
-  constructor(handler: (route: string, body: unknown, source: string) => Promise<unknown>, allowed: () => boolean, host = '0.0.0.0', requestedPort = 0) {
+  constructor(handler: (route: string, body: unknown, source: string) => Promise<unknown>, allowed: () => boolean, host = '0.0.0.0', requestedPort = 0,
+    private readonly options: { allowRemote?: boolean; tls?: { cert: Buffer; key: Buffer } } = {}) {
     this.handler = handler; this.allowed = allowed; this.host = host; this.requestedPort = requestedPort
   }
   async start() {
     if (this.server) return
-    const server = createServer((req, res) => {
+    const handle = (req: IncomingMessage, res: ServerResponse) => {
       const work = this.handle(req, res); this.requests.add(work)
       void work.finally(() => this.requests.delete(work)).catch(() => { req.destroy(); res.destroy() })
-    }); this.server = server
+    }
+    const server = this.options.tls ? createSecureServer(this.options.tls, handle) : createServer(handle)
+    this.server = server
     server.requestTimeout = 30_000; server.headersTimeout = 10_000; server.keepAliveTimeout = 1000; server.maxConnections = 16
     await new Promise<void>((resolve, reject) => {
       const failed = (error: Error) => { this.server = undefined; reject(error) }
@@ -51,7 +55,7 @@ export class LanHttpServer {
   private async handle(req: IncomingMessage, res: ServerResponse) {
     let counted = false
     try {
-      if (!this.allowed() || !privateAddress(req.socket.remoteAddress ?? '')) throw new LanError(403, '局域网共享不可用')
+      if (!this.allowed() || (!this.options.allowRemote && !privateAddress(req.socket.remoteAddress ?? ''))) throw new LanError(403, '共享服务不可用')
       if (req.method !== 'POST' || (req.url !== '/eden-lan/v2/pair' && req.url !== '/eden-lan/v2/rpc')) throw new LanError(404, '接口不存在')
       if (this.active >= 8) throw new LanError(429, '共享请求过多，请稍后重试')
       this.active++; counted = true

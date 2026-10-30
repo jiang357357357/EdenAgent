@@ -10,7 +10,10 @@ import { AUTOMATIC_COMPACTION_INSTRUCTION, historicalMessageSegment } from './mo
 export function contextSize(value: unknown): number {
   let images = 0
   const text = JSON.stringify(value, (_key, item) => {
-    if (item?.type === 'image' && typeof item.data === 'string') { images++; return { type: 'image', mimeType: item.mimeType } }
+    if (item?.type === 'image' && typeof item.data === 'string' && item.data.length >= 4
+      && item.data.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(item.data)) {
+      images++; return { type: 'image', mimeType: item.mimeType }
+    }
     return item
   }) ?? ''
   let wide = 0
@@ -19,12 +22,12 @@ export function contextSize(value: unknown): number {
 }
 
 export function automaticCompactor(storage: DurableSessionStorage, provider: ReturnType<typeof createRuntimeModels>, model: RuntimeModel,
-  callbacks: RuntimeCallbacks, configuration: () => { system: string; tools: RuntimeTool[]; signal: AbortSignal }) {
+  callbacks: RuntimeCallbacks, configuration: () => { system: string; tools: RuntimeTool[]; signal: AbortSignal; turnContext?: string }) {
   return async (messages: AgentMessage[]): Promise<AgentMessage[]> => {
-    const { system, tools, signal } = configuration()
+    const { system, tools, signal, turnContext } = configuration()
     const persistent = storage.persistentContext(messages)
     const transientSize = Math.max(0, contextSize(storage.transientContext(messages)) - contextSize(persistent))
-    const fixed = transientSize + contextSize({ system, tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })) })
+    const fixed = transientSize + contextSize(turnContext ?? '') + contextSize({ system, tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })) })
     const budget = model.contextWindow - model.maxTokens - Math.max(512, Math.ceil(model.contextWindow * 0.05))
     const before = fixed + contextSize(persistent)
     if (before <= budget) return messages

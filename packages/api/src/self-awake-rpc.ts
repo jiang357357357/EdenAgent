@@ -14,7 +14,11 @@ export const selfAwakeRunInfoSchema = z.object({
 })
 export type SelfAwakeRunInfo = z.infer<typeof selfAwakeRunInfoSchema>
 const notificationReviewSchema = z.object({ fingerprint: z.string(), record: jsonValue, state: z.string() })
+const scheduleSchema = z.object({ status: z.enum(['scheduled', 'disabled', 'unscheduled', 'retrying', 'unavailable', 'pending', 'queued', 'running', 'failed', 'blocked', 'overdue']), nextWakeAt: z.string().nullable(), reason: z.string() })
+const controlSchema = z.object({ enabled: z.boolean(), updatedAt: z.number().int().nonnegative(), publicationError: z.string().nullable(), schedule: scheduleSchema.nullable() })
 export const selfAwakeRpcMethods = {
+  'self_awake.control.get': { params: z.object({}).strict(), result: controlSchema },
+  'self_awake.control.update': { params: z.object({ enabled: z.boolean(), expectedUpdatedAt: z.number().int().nonnegative() }).strict(), result: controlSchema },
   'self_awake.diaries.clear': { params: z.object({ confirmClear: z.literal(true) }).strict(), result: z.object({ deleted: z.number().int().nonnegative(), clearedAt: z.number().int() }) },
   'self_awake.history.clear': { params: z.object({ confirmClear: z.literal(true) }).strict(), result: z.object({ deleted: z.number().int().nonnegative(), clearedAt: z.number().int() }) },
   'self_awake.run.review': { params: selfAwakeExecutionSchema, result: z.object({ fingerprint: z.string(), state: z.string() }) },
@@ -28,7 +32,7 @@ export const selfAwakeRpcMethods = {
   'self_awake.job.resubmit': { params: jobIdSchema.extend({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     note: z.string().trim().min(1).max(4000), confirmResubmit: z.literal(true) }), result: jobInfoSchema },
   'self_awake.list': { params: selfAwakeListSchema, result: z.object({
-    schedule: z.object({ status: z.enum(['scheduled', 'disabled', 'unscheduled', 'retrying', 'unavailable']), nextWakeAt: z.string().nullable(), reason: z.string() }).nullable(),
+    schedule: scheduleSchema.nullable(),
     count: z.number().int(), page: z.number().int(), pageSize: z.number().int(), totalPages: z.number().int(), results: z.array(selfAwakeRunInfoSchema),
   }) },
   'self_awake.execution': { params: selfAwakeExecutionSchema, result: z.object({ path: z.string(), record: jsonValue }) },

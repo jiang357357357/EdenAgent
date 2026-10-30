@@ -41,7 +41,7 @@ export async function artifactHost(entry, root, dataRoot, { origin = 'local', co
     execArgv: source ? ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href] : [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR,
       TEMP: root, TMP: root, EDEN_AGENT_RUNTIME_ORIGIN: origin, EDEN_AGENT_DATA_ROOT: dataRoot,
-      EDEN_AGENT_PORT: '0', EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken, EDEN_AGENT_LOG_FORMAT: 'json',
+      EDEN_AGENT_PORT: '0', EDEN_AGENT_OS_PORT: '0', EDEN_AGENT_CAPABILITY_TOKEN: capabilityToken, EDEN_AGENT_LOG_FORMAT: 'json',
       ...(coreUrl ? { MON_CORE_BASE_URL: coreUrl } : {}),
       ...(serviceIdentity ? { MON_SERVICE_SHARED_SECRET: serviceIdentity.secret, MON_SERVICE_USER_ID: serviceIdentity.userId } : {}),
       ...(model ? { EDEN_AGENT_MODEL: `${model.provider}/${model.id}`, EDEN_AGENT_BASE_URL: model.baseUrl } : {}),

@@ -14,6 +14,9 @@ import { qqReferencesSchema } from './schema/qq-references.ts'
 import { messageStreamSchema } from './schema/message-stream.ts'
 import { selfAwakeRoleSchema } from './schema/self-awake-role.ts'
 import { sessionArchiveSchema } from './schema/session-archive.ts'
+import { desktopControlSchema } from './schema/desktop-control.ts'
+import { appContactSchema } from './schema/app-contact.ts'
+import { sessionPinSchema } from './schema/session-pin.ts'
 
 export const migrations: readonly string[] = [
   sessionSchema[1],
@@ -153,6 +156,9 @@ export const migrations: readonly string[] = [
   messageStreamSchema,
   selfAwakeRoleSchema,
   sessionArchiveSchema,
+  desktopControlSchema,
+  appContactSchema,
+  sessionPinSchema,
 ]
 
 export const databaseSchemaVersion = migrations.length

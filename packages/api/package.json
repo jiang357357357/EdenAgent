@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./rpc": "./src/rpc.ts",
     "./legacy-wire": "./src/legacy-wire.ts",
     "./connector": "./src/connector-api.ts"
   },

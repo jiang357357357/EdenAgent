@@ -41,11 +41,22 @@ export function privateAddress(value: string): boolean {
   const [a, b] = address.split('.').map(Number)
   return a === 10 || a === 127 || (a === 172 && b! >= 16 && b! <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)
 }
-export function endpoint(value: unknown): string {
+export function endpoint(value: unknown, allowRemote = false): string {
   const url = new URL(text(value, 200))
-  if (url.protocol !== 'http:' || !privateAddress(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname !== '/')
-    throw new LanError(400, '只接受局域网 IPv4 地址和端口，例如 http://192.168.1.10:40195')
+  const scheme = url.protocol === 'http:' || (allowRemote && url.protocol === 'https:')
+  if (!scheme || (!allowRemote && !privateAddress(url.hostname)) || extraUrlParts(url))
+    throw new LanError(400, allowRemote ? '请输入有效主机 IP、端口或 HTTPS 地址' : '只接受局域网 IPv4 地址和端口，例如 http://192.168.1.10:40195')
+  if (allowRemote && (!url.hostname || url.hostname === '0.0.0.0' || url.hostname === '255.255.255.255' || url.hostname.startsWith('[')))
+    throw new LanError(400, '主机地址必须是可连接的 IPv4 或域名')
   return url.origin
+}
+function extraUrlParts(url: URL): boolean { return Boolean(url.username || url.password || url.search || url.hash || url.pathname !== '/') }
+export function hostEndpoint(value: unknown): string {
+  const address = text(value, 200)
+  const explicitScheme = address.includes('://')
+  const url = new URL(explicitScheme ? address : `http://${address}`)
+  if (!explicitScheme && !/:\d+$/.test(address)) url.port = '40195'
+  return endpoint(url.toString(), true)
 }
 export function commit(value: unknown): ValidCommit {
   const data = record(value), deleted = data.deleted

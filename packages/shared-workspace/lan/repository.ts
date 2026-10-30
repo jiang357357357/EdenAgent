@@ -3,13 +3,15 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { SharedFile, Commit } from '../client/contracts.ts'
-import { LanError, type Identity, type Peer, type Space, type Role, type Member } from './contracts.ts'
+import { LanError, type Identity, type Peer, type Space, type Role, type Member, type HostAdministrator } from './contracts.ts'
 import { digest } from './identity.ts'
+import type { SourceBinding } from './source-contracts.ts'
+import { containsDirectory } from './source-paths.ts'
 
 export class LanRepository {
   readonly db: DatabaseSync
   readonly device: Identity
-  constructor(root: string, device: Identity) {
+  constructor(root: string, device: Identity, private readonly administrators: HostAdministrator[] = []) {
     this.device = device
     mkdirSync(root, { recursive: true, mode: 0o700 })
     this.db = new DatabaseSync(path.join(root, 'lan.sqlite'))
@@ -17,6 +19,7 @@ export class LanRepository {
       CREATE TABLE IF NOT EXISTS lan_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS peers(id TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS libraries(id TEXT PRIMARY KEY,name TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS directory_sources(space_id TEXT PRIMARY KEY,path TEXT NOT NULL,identity TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS catalog(id TEXT PRIMARY KEY,peer_id TEXT NOT NULL,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS members(space_id TEXT NOT NULL,device_id TEXT NOT NULL,role TEXT NOT NULL,PRIMARY KEY(space_id,device_id));
       CREATE TABLE IF NOT EXISTS blobs(space_id TEXT NOT NULL,sha TEXT NOT NULL,size INTEGER NOT NULL,PRIMARY KEY(space_id,sha));
@@ -40,10 +43,18 @@ export class LanRepository {
     if (!peer) throw new LanError(403, '设备未配对或配对已撤销')
     return peer
   }
+  canManage(actor: string): boolean {
+    if (actor === this.device.deviceId) return true
+    const peer = this.peers().find(item => item.deviceId === actor && !item.revoked)
+    return !!peer && this.administrators.some(admin => admin.deviceId === actor && admin.publicKey === peer.publicKey)
+  }
   savePeer(peer: Peer) {
+    if (this.administrators.some(admin => admin.deviceId === peer.deviceId && admin.publicKey !== peer.publicKey))
+      throw new LanError(403, '主机管理员身份与部署时登记的密钥不一致')
     const existing = this.peers().find(item => item.deviceId === peer.deviceId)
     if (existing && existing.publicKey !== peer.publicKey) throw new LanError(403, '设备身份发生变化，请核对后重新配对')
-    this.db.prepare('INSERT INTO peers VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(peer.deviceId, JSON.stringify(peer))
+    const saved = peer.dedicated === undefined && existing?.dedicated !== undefined ? { ...peer, dedicated: existing.dedicated } : peer
+    this.db.prepare('INSERT INTO peers VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(peer.deviceId, JSON.stringify(saved))
   }
   revoke(id: string) {
     if (id === this.device.deviceId) throw new LanError(400, '不能撤销本机设备')
@@ -65,10 +76,28 @@ export class LanRepository {
     this.db.prepare('INSERT INTO libraries VALUES(?,?)').run(id, name)
     return { id, name, role: 'owner', hostDeviceId: this.device.deviceId, hostName: this.device.name, reachable: true }
   }
+  sourceBindings(): SourceBinding[] {
+    return this.db.prepare('SELECT space_id,path,identity FROM directory_sources').all()
+      .map(row => ({ spaceId: String(row.space_id), path: String(row.path), identity: String(row.identity) }))
+  }
+  sourceBinding(spaceId: string): SourceBinding | undefined { return this.sourceBindings().find(binding => binding.spaceId === spaceId) }
+  bindSource(binding: SourceBinding) {
+    this.role(binding.spaceId, this.device.deviceId)
+    if (this.sourceBindings().some(item => containsDirectory(item.path, binding.path) || containsDirectory(binding.path, item.path)))
+      throw new LanError(409, '云端目录已由资料库共享，不能重复或交叉绑定')
+    this.db.prepare('INSERT INTO directory_sources VALUES(?,?,?)').run(binding.spaceId, binding.path, binding.identity)
+  }
+  createSource(name: string, source: Omit<SourceBinding, 'spaceId'>) {
+    return this.transaction(() => {
+      const space = this.create(name)
+      this.bindSource({ ...source, spaceId: space.id })
+      return space
+    })
+  }
   role(spaceId: string, actor: string, required = true): Role | null {
     const own = this.db.prepare('SELECT id FROM libraries WHERE id=?').get(spaceId)
     let role: Role | null = null
-    if (own && actor === this.device.deviceId) role = 'owner'
+    if (own && this.canManage(actor)) role = 'owner'
     else if (own) {
       const peer = this.peers().find(item => item.deviceId === actor && !item.revoked)
       if (peer) { const row = this.db.prepare('SELECT role FROM members WHERE space_id=? AND device_id=?').get(spaceId, actor); role = row ? row.role as Role : null }
@@ -82,12 +111,13 @@ export class LanRepository {
   members(spaceId: string, actor: string): Member[] {
     this.role(spaceId, actor)
     return [{ deviceId: this.device.deviceId, name: this.device.name, role: 'owner' },
+      ...this.peers().filter(peer => this.canManage(peer.deviceId)).map(peer => ({ deviceId: peer.deviceId, name: peer.name, role: 'owner' as const })),
       ...this.db.prepare('SELECT device_id,role FROM members WHERE space_id=?').all(spaceId).map(row => ({
-        deviceId: String(row.device_id), name: this.peer(String(row.device_id)).name, role: row.role as Role }))]
+        deviceId: String(row.device_id), name: this.peer(String(row.device_id)).name, role: row.role as Role })).filter(member => !this.canManage(member.deviceId))]
   }
   setMember(spaceId: string, actor: string, id: string, role: 'editor' | 'viewer' | null) {
     if (this.role(spaceId, actor) !== 'owner') throw new LanError(403, '仅发布此资料库的设备能设置共享权限')
-    if (id === this.device.deviceId) throw new LanError(400, '不能更改发布设备的权限')
+    if (this.canManage(id)) throw new LanError(400, '不能通过资料库成员操作更改主机管理员权限')
     this.peer(id)
     if (role) this.db.prepare('INSERT INTO members VALUES(?,?,?) ON CONFLICT(space_id,device_id) DO UPDATE SET role=excluded.role').run(spaceId, id, role)
     else this.db.prepare('DELETE FROM members WHERE space_id=? AND device_id=?').run(spaceId, id)

@@ -3,8 +3,11 @@ import { configuredModelSchema, modelReadSchema, modelCatalogSchema, modelSelect
 import { modelCatalogResultSchema } from './model-catalog.ts'
 import { modelStatusSchema } from './model-status.ts'
 import { modelPricingTargetSchema, modelPricingInfoSchema, modelPricingSetSchema } from './model-pricing.ts'
+import { modelContextLimitReadSchema, modelContextLimitInfoSchema, modelContextLimitSetSchema } from './model-context-limit.ts'
 import { monSyncStatusSchema, monSyncResultSchema, monLegacySyncResolveSchema, monLegacySyncResolveResultSchema } from './mon-sync.ts'
 export const modelRpcMethods = {
+  'model.context.read': { params: modelContextLimitReadSchema, result: modelContextLimitInfoSchema },
+  'model.context.set': { params: modelContextLimitSetSchema, result: modelContextLimitInfoSchema },
   'model.mon.children.list': { params: z.object({ sessionId: z.uuid() }).strict(), result: z.array(z.object({ key: z.string(), entityId: z.string(), revision: z.uuid(), current: z.boolean() })) },
   'model.mon.children.catalog': { params: z.object({ sessionId: z.uuid() }).strict(), result: z.array(z.object({ key: z.string(), entityId: z.string(), label: z.string() })) },
   'model.mon.children.bind': { params: z.object({ sessionId: z.uuid(), entityId: z.string().min(1).max(200), expectedRevision: z.uuid().nullable(), confirmBinding: z.literal(true) }).strict(), result: z.object({ key: z.string(), entityId: z.string(), revision: z.uuid() }) },

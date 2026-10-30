@@ -1,7 +1,7 @@
 import type { RuntimeOptions, RuntimeTool } from './contracts.ts'
 import { isRuntimePersistenceFailure } from './persistence-error.ts'
 
-export type ToolDescription = Pick<RuntimeTool, 'name' | 'description' | 'revision' | 'parameters' | 'executionMode' | 'promptHint'> & { handle: number }
+export type ToolDescription = Pick<RuntimeTool, 'name' | 'description' | 'revision' | 'parameters' | 'executionMode' | 'promptHint' | 'exposure'> & { handle: number }
 export type ProcessOptions = Omit<RuntimeOptions, 'tools' | 'callbacks' | 'refreshTools'> & { tools: ToolDescription[]; refresh: boolean }
 export type ProcessMessage =
   | { type: 'call'; id: number; method: string; args: unknown[] }

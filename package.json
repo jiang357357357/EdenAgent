@@ -6,6 +6,7 @@
   "type": "module",
   "packageManager": "npm@10.9.7",
   "scripts": {
+    "setup:video": "node Script/Project/setup_video_context.mjs",
     "check:architecture": "node Script/Architecture/check.mjs",
     "test:architecture": "node --test Script/Architecture/rules.test.mjs Script/Test/discover_tests.test.mjs",
     "inventory:runtime": "node Script/Project/inventory-runtime.mjs",
@@ -29,7 +30,7 @@
     "test:server-artifact": "npm run build:server && node --import tsx --test --test-concurrency=2 Script/Project/server_artifact.test.mjs Script/Project/process_artifact.test.mjs Script/Project/dialogue_latency_artifact.test.mjs",
     "test:workspace-artifact": "npm run build:server && node --test Script/Project/workspace_artifact.test.mjs",
     "test:logging-artifact": "npm run build:server && node --test Script/Project/logging_artifact.test.mjs",
-    "test:project": "node --test Script/Project/runtime_children.test.mjs Script/Project/connector_resources.test.mjs Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs frontend/tests/process-runner.test.mjs",
+    "test:project": "node --test Script/Project/runtime_children.test.mjs Script/Project/desktop_broker_environment.test.mjs Script/Project/development-realm.test.mjs Script/Project/development-launcher.test.mjs Script/Project/connector_resources.test.mjs Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs frontend/tests/process-runner.test.mjs",
     "test:maintenance": "node --import tsx --test --test-concurrency=2 Script/Project/wsl_service.test.mjs Script/Project/sanitize_memory_credentials.test.mjs Script/Project/consolidate_self_awake.test.mjs",
     "test:all": "npm test && npm --prefix frontend/web test && npm --prefix frontend/desktop test && npm run test:project && npm run test:server-artifact",
     "build:connector": "node Script/Project/package_connector.mjs"
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@electron/packager": "20.0.1",
     "@types/node": "22.19.19",
+    "@types/ssh2": "1.15.6",
     "esbuild": "0.28.1",
     "husky": "9.1.7",
     "oxlint": "1.60.0",

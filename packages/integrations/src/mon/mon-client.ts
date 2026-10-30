@@ -60,6 +60,14 @@ export class MonClient {
     return this.request('POST', endpoint, body, signal, timeoutMs)
   }
 
+  async postMultipart(endpoint: string, body: FormData, signal?: AbortSignal): Promise<JsonValue> {
+    return this.request('POST', endpoint, body, signal)
+  }
+
+  async delete(endpoint: string, signal?: AbortSignal): Promise<JsonValue> {
+    return this.request('DELETE', endpoint, undefined, signal)
+  }
+
   realtimeSttUrl(): string {
     const url = new URL('ws/stt/realtime/', this.base)
     url.protocol = this.base.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -89,13 +97,13 @@ export class MonClient {
     if (url.origin !== this.base.origin || !url.pathname.startsWith(this.base.pathname) || url.username || url.password || url.hash) throw new Error('Mon API path escaped its configured base')
   }
 
-  private async request(method: string, endpoint: string, body?: JsonValue, signal?: AbortSignal, timeoutMs = 30000): Promise<JsonValue> {
+  private async request(method: string, endpoint: string, body?: JsonValue | FormData, signal?: AbortSignal, timeoutMs = 30000): Promise<JsonValue> {
     const url = this.endpointUrl(endpoint)
     const token = await this.credentials?.token(signal) ?? this.token
     const send = (token: string) => monFetch(url, {
       method, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]),
-      headers: { Authorization: `Token ${token}`, Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      headers: { Authorization: `Token ${token}`, Accept: 'application/json', ...(body === undefined || body instanceof FormData ? {} : { 'Content-Type': 'application/json' }) },
+      ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     })
     let response = await send(token)
     // Core authentication runs before endpoint side effects. Only a confirmed 401 is replayed once.
@@ -106,6 +114,7 @@ export class MonClient {
     if (!response.ok) {
       throw await readMonHttpError(response, url.pathname)
     }
+    if (response.status === 204) { await response.body?.cancel(); return null }
     const reader = response.body?.getReader()
     if (!reader) throw new Error('Mon returned an empty response body')
     const chunks: Uint8Array[] = []

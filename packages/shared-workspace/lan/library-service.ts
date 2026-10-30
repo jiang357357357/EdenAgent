@@ -4,13 +4,15 @@ import { LanRepository } from './repository.ts'
 import { LanError, type LibraryRequest, type LibraryResponse } from './contracts.ts'
 import { binary, commit, hash, integer, record, text, uuid } from './validation.ts'
 import { digest } from './identity.ts'
+import type { DirectorySources } from './directory-sources.ts'
 
 export class LanLibraryService {
   readonly repository: LanRepository
   private readonly snapshots: SnapshotStore
   private readonly active: () => boolean
   private readonly canPublish: () => boolean
-  constructor(repository: LanRepository, snapshots: SnapshotStore, active: () => boolean, canPublish: () => boolean) {
+  constructor(repository: LanRepository, snapshots: SnapshotStore, active: () => boolean, canPublish: () => boolean,
+    private readonly host: { dedicated?: boolean; invite?(): { code: string; expiresAt: number }; sources?: DirectorySources } = {}) {
     this.repository = repository; this.snapshots = snapshots; this.active = active; this.canPublish = canPublish
   }
   assertActive() { if (!this.active()) throw new LanError(503, '局域网共享已关闭或本机账号已退出') }
@@ -20,23 +22,93 @@ export class LanLibraryService {
     const { method, path, body } = request
     const url = new URL(path, 'http://library/'), parts = url.pathname.split('/')
     if (url.origin !== 'http://library' || path.includes('..') || /%|\\/.test(path)) throw new LanError(400, '无效共享接口路径')
-    const global = this.globalRequest(actor, method, path, body)
+    const global = await this.globalRequest(actor, method, path, body)
     if (global) return global
     if (parts[1] !== 'spaces' || !parts[2]) throw new LanError(404, '局域网共享接口不存在')
     this.assertPublishing()
     const id = uuid(parts[2]); this.repository.role(id, actor)
-    return this.spaceRequest(actor, id, method, url, parts, body)
+    if (parts[3] === 'source') return this.sourceRequest(actor, id, method, parts, body)
+    const synchronize = await this.synchronizeSource(actor, id, method, parts[3] ?? '')
+    const response = await this.spaceRequest(actor, id, method, url, parts, body)
+    if (synchronize && response.status === 200 && method === 'POST' && parts[3] === 'commit') await this.host.sources?.sync(id)
+    return response
   }
-  private globalRequest(actor: string, method: string, path: string, body: unknown): LibraryResponse | undefined {
-    const local = actor === this.repository.device.deviceId
-    if (path === 'capabilities' && method === 'GET') return this.ok({ protocolVersion: 2, maxFileBytes: MAX_FILE_BYTES, canPublish: this.canPublish() })
-    if (path === 'spaces' && method === 'GET') return this.ok({ spaces: this.canPublish() ? this.repository.ownSpaces(actor) : [] })
-    if (path === 'spaces' && method === 'POST' && local) { this.assertPublishing(); return this.ok({ space: this.repository.create(text(record(body).name)) }) }
-    if (path === 'devices' && method === 'GET' && local) return this.ok({ devices: [
+  private async synchronizeSource(actor: string, id: string, method: string, resource: string) {
+    if (actor === this.repository.device.deviceId || resource === 'members') return false
+    if (['changes', 'files', 'commit'].includes(resource)) await this.host.sources?.sync(id)
+    this.host.sources?.assertAvailable(id, method === 'POST' && resource === 'commit')
+    return true
+  }
+  private async globalRequest(actor: string, method: string, path: string, body: unknown): Promise<LibraryResponse | undefined> {
+    const manager = this.repository.canManage(actor)
+    if (path === 'capabilities' && method === 'GET') return this.ok({ protocolVersion: 2, maxFileBytes: MAX_FILE_BYTES,
+      canPublish: this.canPublish(), canManage: manager, dedicated: this.host.dedicated === true, directorySources: !!this.host.sources, directoryCreate: !!this.host.sources })
+    if (['directories/list', 'directories/create'].includes(path) && method === 'POST') {
+      return this.directoryRequest(manager, path, body)
+    }
+    if (path === 'spaces' && method === 'GET') return this.ok({ spaces: this.canPublish() ? this.repository.ownSpaces(actor).map(space => {
+      const source = manager ? this.host.sources?.describe(space.id) : undefined
+      return source ? { ...space, source } : space
+    }) : [] })
+    return this.managementRequest(actor, method, path, body, manager)
+  }
+  private async directoryRequest(manager: boolean, route: string, body: unknown) {
+    if (!manager) throw new LanError(403, '仅云主机管理员可以浏览或创建源目录')
+    if (!this.host.sources) throw new LanError(501, '此主机尚不支持云端目录，请更新云主机共享服务')
+    const data = record(body)
+    if (route === 'directories/create') {
+      this.assertPublishing()
+      return this.ok(await this.host.sources.createDirectory(text(data.parent, 4096), text(data.name, 255)))
+    }
+    return this.ok(await this.host.sources.browse(typeof data.path === 'string' ? data.path : undefined,
+      typeof data.after === 'string' ? data.after : undefined))
+  }
+  private async managementRequest(actor: string, method: string, path: string, body: unknown, manager: boolean): Promise<LibraryResponse | undefined> {
+    if (path === 'spaces' && method === 'POST') {
+      return this.createSpace(manager, body)
+    }
+    if (path === 'pairing/invite' && method === 'POST' && this.host.invite) {
+      if (!manager) throw new LanError(403, '仅主机管理员可以创建配对邀请')
+      this.assertPublishing(); return this.ok(this.host.invite())
+    }
+    if (/^devices\/[^/]+$/.test(path) && method === 'DELETE' && manager) {
+      const id = uuid(path.slice(8))
+      if (id === actor) throw new LanError(400, '不能通过当前连接撤销自己')
+      this.repository.revoke(id); return this.ok({ revoked: true })
+    }
+    if (path === 'devices' && method === 'GET' && manager) return this.ok({ devices: [
       { deviceId: this.repository.device.deviceId, name: this.repository.device.name, revoked: false, local: true },
       ...this.repository.peers().map(peer => ({ deviceId: peer.deviceId, name: peer.name, revoked: peer.revoked, local: false })),
     ] })
     return undefined
+  }
+  private async createSpace(manager: boolean, body: unknown) {
+    if (!manager) throw new LanError(403, '仅主机管理员可以创建资料库')
+    this.assertPublishing()
+    const data = record(body), name = text(data.name)
+    if (this.host.sources) {
+      if (data.confirmSource !== true) throw new LanError(400, '请明确确认共享云端源目录')
+      return this.ok({ space: await this.host.sources.create(name, text(data.sourceDirectory, 4096)) })
+    }
+    if (data.sourceDirectory !== undefined) throw new LanError(501, '此主机尚不支持云端源目录')
+    return this.ok({ space: this.repository.create(name) })
+  }
+  private async sourceRequest(actor: string, id: string, method: string, parts: string[], body: unknown) {
+    if (!this.repository.canManage(actor)) throw new LanError(403, '仅云主机管理员可以管理源目录')
+    const sources = this.host.sources
+    if (!sources) throw new LanError(501, '此主机尚不支持云端源目录，请更新云主机共享服务')
+    if (method === 'POST' && parts.length === 4) {
+      const data = record(body)
+      if (data.confirmSource !== true) throw new LanError(400, '请明确确认共享云端源目录')
+      return this.ok({ source: await sources.bind(id, text(data.path, 4096)) })
+    }
+    if (method === 'GET' && parts[4] === 'conflicts') return this.ok(await sources.conflicts(id))
+    if (method === 'POST' && parts[4] === 'resolve') {
+      const data = record(body)
+      if (data.strategy !== 'local' && data.strategy !== 'remote') throw new LanError(400, '无效云端冲突处理方式')
+      return this.ok({ source: await sources.resolve(id, text(data.conflictId), data.strategy) })
+    }
+    throw new LanError(404, '云端源目录操作不存在')
   }
   private async spaceRequest(actor: string, id: string, method: string, url: URL, parts: string[], body: unknown): Promise<LibraryResponse> {
     switch (parts[3]) {

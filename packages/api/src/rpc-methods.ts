@@ -1,4 +1,7 @@
 import { uiPreferenceRpcMethods } from './ui-preferences.ts'
+import { desktopRpcMethods } from './desktop-control.ts'
+import { promptModeRpcMethods } from './prompt-mode.ts'
+import { memoryModelRpcMethods } from './memory-model.ts'
 import { sharedWorkspaceRpcMethods } from './shared-workspace-rpc.ts'
 import { connectionRpcMethods } from './connection-rpc.ts'
 import { migrationRpcMethods } from './migration-rpc.ts'
@@ -26,8 +29,11 @@ import { mcpResultReadSchema, mcpResultViewSchema, mcpResultExportSchema } from 
 
 /** Migrated methods share runtime validation and inferred browser types. Add remaining domains here. */
 export const rpcMethods = {
+  ...desktopRpcMethods,
   ...sharedWorkspaceRpcMethods,
   ...uiPreferenceRpcMethods,
+  ...promptModeRpcMethods,
+  ...memoryModelRpcMethods,
   ...migrationRpcMethods,
   ...connectionRpcMethods,
   ...operationRpcMethods,

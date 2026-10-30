@@ -10,13 +10,13 @@ export class McpClient {
   private capabilities: Record<string, JsonValue> | undefined
   private initializing = false
   constructor(private readonly channel: McpChannel) {}
-  async initialize(signal: AbortSignal) {
+  async initialize(signal: AbortSignal, timeoutMs = 15000) {
     if (this.initializing || this.capabilities) throw new Error('MCP initialization already requested')
     this.initializing = true
     try {
       const result = z.object({ protocolVersion: z.enum(['2024-11-05', '2025-03-26', '2025-06-18']),
         capabilities: z.record(z.string(), jsonValue), serverInfo: z.object({ name: z.string().max(256), version: z.string().max(256) }) })
-        .parse(await this.channel.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'Eden Agent', version: '2.0.0' } }, signal, 15000))
+        .parse(await this.channel.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'Eden Agent', version: '2.0.0' } }, signal, timeoutMs))
       await this.channel.notify('notifications/initialized')
       this.capabilities = result.capabilities
       return result

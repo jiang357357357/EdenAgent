@@ -3,6 +3,7 @@ import { runtimeCheckpointSchema } from '@eden/api'
 import type { RuntimeCheckpoint } from '@eden/api'
 import type { SessionTreeEntry } from '@earendil-works/pi-agent-core'
 import { RuntimePersistenceError } from './persistence-error.ts'
+import { assertCheckpointImages } from './checkpoint-images.ts'
 
 const content = z.array(z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string() }).passthrough(),
@@ -37,7 +38,7 @@ const entry = z.discriminatedUnion('type', [
 ])
 
 export function parseCheckpoint(value: RuntimeCheckpoint, sessionId: string): SessionTreeEntry[] {
-  try { return validatedEntries(value, sessionId) }
+  try { assertCheckpointImages(value); return validatedEntries(value, sessionId) }
   catch (error) { throw new RuntimePersistenceError('Invalid durable checkpoint', error) }
 }
 

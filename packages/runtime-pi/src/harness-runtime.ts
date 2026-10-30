@@ -5,18 +5,22 @@ import type { EdenRuntime, RuntimeCallbacks, RuntimeOptions, RuntimeTool } from 
 import { DurableSessionStorage } from './durable-session.ts'
 import { createRuntimeModels } from './model-provider.ts'
 import { adaptTool } from './tool-adapter.ts'
+import { modelTools } from './tool-presentation.ts'
 import { runtimeImages } from './images.ts'
 import { compactConversation } from './compaction.ts'
 import { automaticCompactor } from './automatic-compaction.ts'
+import { TurnContext } from './turn-context.ts'
 import { defaultModelRetryPolicy, modelRetryDelay, retryableModelFailure, waitForModelRetry } from './model-retry.ts'
 
 export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adaptTool = adaptTool): EdenRuntime {
   const storage = new DurableSessionStorage(options.sessionId, options.callbacks.checkpoint, options.checkpoint, options.transientInput)
+  const turnContext = new TurnContext(options.turnContext)
   let fatal: unknown
   let requests = 0
   let controller = new AbortController()
   let active: Promise<JsonValue> | undefined
-  let currentTools = options.tools
+  let presentedTools = modelTools(options.tools)
+  let presentedNames = new Set(presentedTools.map(tool => tool.name))
   let retryAttempt = 0
   let toolExecutionStarted = false
   const retryPolicy = { ...defaultModelRetryPolicy, ...options.modelRetry }
@@ -43,6 +47,7 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
   const tools = (items: RuntimeTool[]) => items.map(tool => toolAdapter<Record<string, never>>(tool, callbacks, healthy, fail, options.toolCallPrefix))
   const provider = createRuntimeModels(options.model, {
     signal: () => controller.signal,
+    toolVisible: name => presentedNames.has(name),
     retry: retryPolicy,
     async event(kind, payload) {
       try { await callbacks.event(kind, payload) }
@@ -59,7 +64,7 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
       try {
         const value = snapshot as Record<string, JsonValue>
         const definitions = value.tools as Record<string, JsonValue>[]
-        await options.callbacks.request(toJson({ ...value, contextSources: [...(options.contextSources ?? []), ...currentTools.flatMap(tool => tool.promptHint ? [{ kind: tool.name === 'list_skills' ? 'skills' : 'system', title: tool.name === 'list_skills' ? '技能目录' : `工具指引：${tool.name}`, content: tool.promptHint }] : [])], promptHints: currentTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []), tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
+        await options.callbacks.request(toJson({ ...value, contextSources: [...(options.contextSources ?? []), ...presentedTools.flatMap(tool => tool.promptHint ? [{ kind: tool.name === 'list_skills' ? 'skills' : 'system', title: tool.name === 'list_skills' ? '技能目录' : `工具指引：${tool.name}`, content: tool.promptHint }] : [])], promptHints: presentedTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []), tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
       } catch (error) { fatal = error; throw error }
     },
   }, options.sessionId)
@@ -70,12 +75,13 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
       if (options.refreshTools) {
         const items = await options.refreshTools()
         await harness.setTools(tools(items), items.map(tool => tool.name))
-        currentTools = items
+        presentedTools = modelTools(items)
+        presentedNames = new Set(presentedTools.map(tool => tool.name))
         revisions = new Map(items.map(tool => [tool.name, tool.revision]))
       }
       return {}
     },
-    systemPrompt: () => [options.systemPrompt, ...currentTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'),
+    systemPrompt: () => [options.systemPrompt, ...presentedTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'),
     tools: tools(options.tools), thinkingLevel: options.model.reasoning ?? 'off', streamOptions: { maxRetries: 0 },
     retry: { enabled: false, maxRetries: 0, baseDelayMs: 0 },
   })
@@ -83,9 +89,9 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
   const autoCompact = automaticCompactor(storage, provider, options.model, { ...options.callbacks,
     async event(kind, payload) { try { await options.callbacks.event(kind, payload) } catch (error) { fail(error) } },
   }, () => ({
-    system: [options.systemPrompt, ...currentTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'), tools: currentTools, signal: controller.signal,
+    system: [options.systemPrompt, ...presentedTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'), tools: presentedTools, signal: controller.signal, ...(options.turnContext ? { turnContext: options.turnContext } : {}),
   }))
-  harness.on('context', async event => ({ messages: storage.transientContext(await autoCompact(event.messages)) }))
+  harness.on('context', async event => ({ messages: turnContext.apply(storage.transientContext(await autoCompact(event.messages))) }))
   harness.subscribe(async event => {
     healthy()
     try { await callbacks.event(event.type, jsonSnapshot({ ...event, costConfigured: options.model.cost !== undefined })) }
@@ -106,6 +112,7 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
     async prompt(text, images) {
       const copied = runtimeImages(images)
       return run(async () => {
+        turnContext.reset()
         const originalLeaf = await storage.getLeafId()
         for (;;) {
           const result = toJson(await harness.prompt(text, { images: copied }))
@@ -131,7 +138,8 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
     snapshot: () => storage.snapshot(),
     async replaceTools(items) {
       healthy(); await active; await harness.waitForIdle(); await harness.setTools(tools(items), items.map(tool => tool.name))
-      currentTools = items
+      presentedTools = modelTools(items)
+      presentedNames = new Set(presentedTools.map(tool => tool.name))
       revisions = new Map(items.map(tool => [tool.name, tool.revision]))
     },
   }

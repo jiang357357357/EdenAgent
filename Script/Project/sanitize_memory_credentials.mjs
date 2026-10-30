@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { credentialValues, redactCredentialJson } from '../../packages/api/src/credential-redaction.ts'
+import { isRuntimeProtocolField, isSignedThinking } from '../../packages/api/src/runtime-protocol-fields.ts'
+import { mapModelHistoryText } from '../../Server/src/modules/tool-results/index.ts'
 import { restoreStreamPayload } from '../../Server/src/modules/sessions/stream-persistence.ts'
 
 const historyColumns = {
@@ -77,11 +79,7 @@ export function sanitizeMemory({ filename, sessionId, characterId, memoryId, exp
 
 function mask(value, known) {
   if (typeof value !== 'string') return value
-  try {
-    const parsed = JSON.parse(value), masked = redactCredentialJson(parsed, known, false)
-    return JSON.stringify(masked) === JSON.stringify(parsed) ? value : JSON.stringify(masked)
-  }
-  catch { return redactCredentialJson(value, known, false) }
+  return redactCredentialJson(value, known, false, mapModelHistoryText)
 }
 function expandStreams(db, hidden) {
   const cache = new Map(), groups = new Map(), affected = new Set(), result = new Map()
@@ -103,18 +101,22 @@ function expandStreams(db, hidden) {
   return result
 }
 function maskStream(value, hidden) {
-  const masked = redactCredentialJson(value, hidden, true)
-  const visit = item => {
-    if (typeof item === 'string') {
-      for (const secret of hidden) for (let length = secret.length - 1; length >= 2; length--) {
-        const prefix = secret.slice(0, length)
-        if (item.endsWith(prefix)) return item.slice(0, -length) + '[已隐藏凭据片段]'
-      }
-      return item
+  const masked = redactCredentialJson(value, hidden, true, mapModelHistoryText)
+  const fragment = item => {
+    for (const secret of hidden) for (let length = secret.length - 1; length >= 2; length--) {
+      const prefix = secret.slice(0, length)
+      if (item.endsWith(prefix)) return item.slice(0, -length) + '[已隐藏凭据片段]'
     }
+    return item
+  }
+  const visit = item => {
+    if (typeof item === 'string') return mapModelHistoryText(item, visit, fragment)
     if (Array.isArray(item)) return item.map(visit)
-    if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, child]) =>
-      [key, /^(?:id|.*Id|.*ID|name|type|role|format|runtimeVersion|revision|sha256|parentId)$/.test(key) ? child : visit(child)]))
+    if (item && typeof item === 'object') {
+      if (isSignedThinking(item)) return item
+      return Object.fromEntries(Object.entries(item).map(([key, child]) =>
+        [key, isRuntimeProtocolField(key, item) || /^(?:id|.*Id|.*ID|name|type|role|format|runtimeVersion|revision|sha256|parentId)$/.test(key) ? child : visit(child)]))
+    }
     return item
   }
   return visit(masked)

@@ -6,11 +6,13 @@ export type { RuntimeOptions, RuntimeModel, RuntimeTool, RuntimeCallbacks, EdenR
 export { completeText, TextCompletionError } from './text-completion.ts'
 export type { TextCompletionRequest } from './text-completion.ts'
 export { publicHistoryCheckpoint } from './history-checkpoint.ts'
+export { mapHistoryContent } from './history-content.ts'
 export { defaultModelRetryPolicy, modelRetryDelay, retryableModelFailure, waitForModelRetry } from './model-retry.ts'
 export type { ModelRetryPolicy } from './model-retry.ts'
 
 export { legacyContextCheckpoint } from './legacy-checkpoint.ts'
 export { RuntimePersistenceError, isRuntimePersistenceFailure } from './persistence-error.ts'
 export { assertRuntimeCheckpoint } from './checkpoint-schema.ts'
+export { assertCheckpointImages, validCheckpointImage } from './checkpoint-images.ts'
 export { removeCheckpointMessages } from './history-deletion.ts'
 export type { RuntimeHistoryDeletion } from './history-deletion.ts'

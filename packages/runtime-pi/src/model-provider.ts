@@ -1,8 +1,9 @@
 import { isDeepSeek, samplingPayload } from './sampling-parameters.ts'
 import { createModels, createProvider } from '@earendil-works/pi-ai'
-import type { Api, Model, Models } from '@earendil-works/pi-ai'
+import type { Api, Context, Model, Models } from '@earendil-works/pi-ai'
 import type { StreamOptions } from '@earendil-works/pi-ai'
 import { toJson, configuredModelSchema } from '@eden/api'
+import { assertRequestImages } from './request-images.ts'
 import type { JsonValue } from '@eden/api'
 import * as completions from '@earendil-works/pi-ai/api/openai-completions'
 import type { RuntimeModel } from './contracts.ts'
@@ -13,7 +14,7 @@ import type { ModelRetryPolicy } from './model-retry.ts'
 import { observeTransport, type TransportDiagnostics } from './model-transport-diagnostics.ts'
 import { durableResponseStream } from './response-stream.ts'
 
-interface RequestControl { record(snapshot: JsonValue): Promise<void>; signal(): AbortSignal; response?(snapshot: JsonValue): Promise<void>; failed?(error: unknown): void; event?(kind: string, payload: JsonValue): Promise<void>; retry?: ModelRetryPolicy; diagnostics?: TransportDiagnostics }
+interface RequestControl { record(snapshot: JsonValue): Promise<void>; signal(): AbortSignal; toolVisible?(name: string): boolean; response?(snapshot: JsonValue): Promise<void>; failed?(error: unknown): void; event?(kind: string, payload: JsonValue): Promise<void>; retry?: ModelRetryPolicy; diagnostics?: TransportDiagnostics }
 
 export function createRuntimeModels(config: RuntimeModel, control: RequestControl, sessionId: string = randomUUID()): { models: Models; model: Model<'openai-completions'> } {
   configuredModelSchema.parse(config)
@@ -50,12 +51,26 @@ export function createRuntimeModels(config: RuntimeModel, control: RequestContro
 
   models.setProvider(createProvider<'openai-completions'>({
     id: config.provider, models: [model], api: {
-      stream: (selected, context, options) => { assertCompletions(selected); return observe(scoped => completions.stream(selected, context, controlledOptions(options, scoped, context.tools, config))) },
-      streamSimple: (selected, context, options) => { assertCompletions(selected); return observe(scoped => completions.streamSimple(selected, context, controlledOptions(options, scoped, context.tools, config))) },
+      stream: (selected, context, options) => {
+        assertCompletions(selected)
+        const presented = modelContext(context, control)
+        return observe(scoped => completions.stream(selected, presented, controlledOptions(options, scoped, presented.tools, config)))
+      },
+      streamSimple: (selected, context, options) => {
+        assertCompletions(selected)
+        const presented = modelContext(context, control)
+        return observe(scoped => completions.streamSimple(selected, presented, controlledOptions(options, scoped, presented.tools, config)))
+      },
     },
     auth: { apiKey: { name: 'Eden configured credential', resolve: async () => ({ auth: { apiKey: config.apiKey ?? 'local' }, source: 'eden' }) } },
   }))
   return { models, model }
+}
+
+/** Do not mutate the harness context: its tools are also the execution lookup. */
+function modelContext(context: Context, control: RequestControl): Context {
+  if (!control.toolVisible || !context.tools) return context
+  return { ...context, tools: context.tools.filter(tool => control.toolVisible!(tool.name)) }
 }
 
 function assertCompletions(model: Model<Api>): asserts model is Model<'openai-completions'> {
@@ -73,6 +88,7 @@ function controlledOptions<T extends StreamOptions>(options: T | undefined, cont
     async onPayload(payload, model) {
       const changed = await options?.onPayload?.(payload, model)
       const actual = samplingPayload(changed === undefined ? payload : changed, config)
+      assertRequestImages(toJson(actual))
       await control.record(toJson({ model: model.id, provider: model.provider, payload: actual, tools: definitions ?? [], costConfigured: config.cost !== undefined }))
       return actual
     },

@@ -15,6 +15,7 @@ export class ProcessTools {
       const handle = ++this.nextHandle
       this.handles.set(handle, tool)
       return { handle, name: tool.name, description: tool.description, revision: tool.revision, parameters: tool.parameters,
+        ...(tool.exposure ? { exposure: tool.exposure } : {}),
         ...(tool.executionMode ? { executionMode: tool.executionMode } : {}), ...(tool.promptHint ? { promptHint: tool.promptHint } : {}) }
     })
   }
