@@ -4,7 +4,7 @@ import path from 'node:path'
 export async function copyVideoSources(root, output) {
   await mkdir(output, { recursive: true })
   await cp(path.join(root, 'Server/resources/video-context'), path.join(output, 'video-context'), {
-    recursive: true, filter: filename => !filename.includes('__pycache__') && !filename.endsWith('.pyc'),
+    recursive: true, filter: filename => !filename.includes('__pycache__') && !filename.endsWith('.pyc') && path.basename(filename) !== 'uv.lock',
   })
 }
 

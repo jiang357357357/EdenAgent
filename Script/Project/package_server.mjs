@@ -72,6 +72,7 @@ try {
     await cp(dependency.source, path.join(staging, 'node_modules', dependency.relative), {
       recursive: true, filter: source => {
         if (path.basename(source) === 'node_modules') return false
+        if (dependency.name === 'ssh2' && path.relative(dependency.source, source).split(path.sep)[0] === 'test') return false
         if (dependency.name !== 'onnxruntime-node') return true
         const parts = path.relative(dependency.source, source).split(path.sep)
         if (parts[0] !== 'bin' || parts[1] !== 'napi-v6') return true
