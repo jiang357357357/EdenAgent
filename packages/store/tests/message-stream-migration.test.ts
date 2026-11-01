@@ -6,7 +6,8 @@ import { migrateDatabase, migrations, databaseSchemaVersion } from '../src/migra
 test('v1 to v2 migration marks the format without rewriting or deleting legacy event payloads', () => {
   const database = new DatabaseSync(':memory:')
   try {
-    const previousVersion = migrations.length - 1
+    const previousVersion = migrations.findIndex(sql => sql.includes('eden.message.delta.v2'))
+    assert.ok(previousVersion > 0, 'The stream-format migration must exist')
     for (const sql of migrations.slice(0, previousVersion)) database.exec(sql)
     database.exec(`PRAGMA user_version=${previousVersion}`)
     database.exec("INSERT INTO sessions VALUES('session','fixture','local','active',0,0)")
