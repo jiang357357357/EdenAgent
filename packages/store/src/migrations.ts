@@ -17,6 +17,8 @@ import { sessionArchiveSchema } from './schema/session-archive.ts'
 import { desktopControlSchema } from './schema/desktop-control.ts'
 import { appContactSchema } from './schema/app-contact.ts'
 import { sessionPinSchema } from './schema/session-pin.ts'
+import { memoDeliverySchema } from './schema/memo-delivery.ts'
+import { memoRoleDeliverySchema } from './schema/memo-role-delivery.ts'
 
 export const migrations: readonly string[] = [
   sessionSchema[1],
@@ -159,6 +161,8 @@ export const migrations: readonly string[] = [
   desktopControlSchema,
   appContactSchema,
   sessionPinSchema,
+  memoDeliverySchema,
+  memoRoleDeliverySchema,
 ]
 
 export const databaseSchemaVersion = migrations.length

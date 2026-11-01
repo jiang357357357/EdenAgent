@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { jsonValue } from './json.ts'
 import { jobIdSchema, jobInfoSchema } from './jobs.ts'
-import { selfAwakeListSchema, selfAwakeExecutionSchema } from './self-awake.ts'
+import { selfAwakeListSchema, selfAwakeExecutionSchema, selfAwakeSchedulerStatusSchema } from './self-awake.ts'
 export const selfAwakeRunInfoSchema = z.object({
   scheduledWake: z.object({ id: z.uuid(), dueAt: z.number().int(), createdAt: z.number().int(),
     state: jobInfoSchema.shape.state, reason: z.string() }).nullable().optional(),
@@ -15,7 +15,8 @@ export const selfAwakeRunInfoSchema = z.object({
 export type SelfAwakeRunInfo = z.infer<typeof selfAwakeRunInfoSchema>
 const notificationReviewSchema = z.object({ fingerprint: z.string(), record: jsonValue, state: z.string() })
 const scheduleSchema = z.object({ status: z.enum(['scheduled', 'disabled', 'unscheduled', 'retrying', 'unavailable', 'pending', 'queued', 'running', 'failed', 'blocked', 'overdue']), nextWakeAt: z.string().nullable(), reason: z.string() })
-const controlSchema = z.object({ enabled: z.boolean(), updatedAt: z.number().int().nonnegative(), publicationError: z.string().nullable(), schedule: scheduleSchema.nullable() })
+const controlSchema = z.object({ enabled: z.boolean(), updatedAt: z.number().int().nonnegative(), publicationError: z.string().nullable(), schedule: scheduleSchema.nullable(),
+  scheduler: selfAwakeSchedulerStatusSchema.optional() })
 export const selfAwakeRpcMethods = {
   'self_awake.control.get': { params: z.object({}).strict(), result: controlSchema },
   'self_awake.control.update': { params: z.object({ enabled: z.boolean(), expectedUpdatedAt: z.number().int().nonnegative() }).strict(), result: controlSchema },

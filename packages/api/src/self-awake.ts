@@ -21,3 +21,9 @@ export const selfAwakeDecisionSchema = z.object({
   diary: z.object({ title: z.string().trim().min(1).max(1000), content: z.string().trim().min(1).max(32000) }).strict(),
 }).strict()
 export type SelfAwakeDecision = z.infer<typeof selfAwakeDecisionSchema>
+export const selfAwakeSchedulerStatusSchema = z.object({
+  status: z.enum(['internal', 'unconfigured', 'starting', 'ready', 'paused', 'unavailable', 'expired', 'incompatible', 'wrong_account', 'failed']),
+  message: z.string(), checkedAt: z.number().int().nonnegative(), expiresAt: z.number().int().nonnegative().nullable(),
+  enabled: z.boolean().nullable(), controlUpdatedAt: z.number().int().nonnegative().nullable(),
+})
+export type SelfAwakeSchedulerStatus = z.infer<typeof selfAwakeSchedulerStatusSchema>

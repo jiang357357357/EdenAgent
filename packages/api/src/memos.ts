@@ -4,7 +4,9 @@ import { jsonValue } from './json.ts'
 export const memoIntegerSchema = z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)])
   .pipe(z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER))
 export const memoIdSchema = z.object({ id: memoIntegerSchema.refine(value => value > 0) }).strict()
+export const memoDeliveryPolicySchema = z.object({ channel: z.enum(['auto', 'qq', 'email', 'device', 'app']) }).strict()
 const fields = {
+  delivery: memoDeliveryPolicySchema.optional(),
   title: z.string().trim().min(1).max(1000), content: z.string().max(64000),
   kind: z.enum(['note', 'reminder', 'todo']), status: z.enum(['active', 'done', 'archived', 'cancelled']),
   priority: z.enum(['low', 'normal', 'high']), remindAt: memoIntegerSchema.nullable(), dueAt: memoIntegerSchema.nullable(),

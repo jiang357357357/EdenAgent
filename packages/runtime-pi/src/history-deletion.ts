@@ -6,6 +6,7 @@ import { parseCheckpoint } from './checkpoint-schema.ts'
 import { LEGACY_HISTORY_PREFIX, PUBLIC_HANDOFF_HISTORY_PREFIX } from './model-prompts.ts'
 import { legacyContextEntries } from './legacy-context-deletion.ts'
 import type { LegacyContextDeletion } from './legacy-context-deletion.ts'
+import { compactionProgressType } from './compaction-progress.ts'
 
 export interface RuntimeHistoryDeletion {
   matchesMessage(message: JsonValue, entryId: string): boolean
@@ -70,7 +71,8 @@ export function removeCheckpointMessages(checkpoint: RuntimeCheckpoint, options:
   })
   const contentChanged = projected.some((entry, index) => entry !== entries[index])
   const next = projected.map(entry => {
-    if (entry.type !== 'compaction' && entry.type !== 'branch_summary') return entry
+    if (entry.type !== 'compaction' && entry.type !== 'branch_summary'
+      && !(entry.type === 'custom' && entry.customType === compactionProgressType)) return entry
     const created = Date.parse(entry.timestamp)
     return contentChanged || !Number.isFinite(created) || created <= options.invalidateSummariesBefore ? removed(entry) : entry
   })

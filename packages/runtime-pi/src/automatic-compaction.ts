@@ -1,25 +1,13 @@
-import { generateSummaryWithUsage, serializeConversation } from '@earendil-works/pi-agent-core'
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import { toJson } from '@eden/api'
 import type { DurableSessionStorage } from './durable-session.ts'
 import type { RuntimeCallbacks, RuntimeModel, RuntimeTool } from './contracts.ts'
 import type { createRuntimeModels } from './model-provider.ts'
-import { AUTOMATIC_COMPACTION_INSTRUCTION, historicalMessageSegment } from './model-prompts.ts'
+import { AUTOMATIC_COMPACTION_INSTRUCTION } from './model-prompts.ts'
+import { contextSize } from './context-size.ts'
+import { progressiveCompaction } from './progressive-compaction.ts'
 
-/** Conservative text budgeting; provider framing and image accounting are not exact locally. */
-export function contextSize(value: unknown): number {
-  let images = 0
-  const text = JSON.stringify(value, (_key, item) => {
-    if (item?.type === 'image' && typeof item.data === 'string' && item.data.length >= 4
-      && item.data.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(item.data)) {
-      images++; return { type: 'image', mimeType: item.mimeType }
-    }
-    return item
-  }) ?? ''
-  let wide = 0
-  for (const character of text) if (/[\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff]/u.test(character)) wide++
-  return wide + Math.ceil((text.length - wide) / 3) + images * 8192
-}
+export { contextSize } from './context-size.ts'
 
 export function automaticCompactor(storage: DurableSessionStorage, provider: ReturnType<typeof createRuntimeModels>, model: RuntimeModel,
   callbacks: RuntimeCallbacks, configuration: () => { system: string; tools: RuntimeTool[]; signal: AbortSignal; turnContext?: string }) {
@@ -38,13 +26,13 @@ export function automaticCompactor(storage: DurableSessionStorage, provider: Ret
     if (!history.length || fixed + contextSize(tail) >= budget) throw new Error('当前输入超过模型可用上下文，请缩小本次输入或附件。')
     await callbacks.event('auto_compaction_start', toJson({ tokensBefore: before }))
     try {
-      const summary = await summarize(history, provider, model, signal)
-      signal.throwIfAborted()
+      const { summary, usage } = await progressiveCompaction(storage, history, provider, model, signal,
+        AUTOMATIC_COMPACTION_INSTRUCTION, callbacks, budget - fixed - contextSize(tail) - 256)
       const candidate: AgentMessage[] = [{ role: 'user', content: summary, timestamp: Date.now() }, ...tail]
       const after = fixed + contextSize(candidate) + 256
       if (after >= before || after > budget) throw new Error('自动压缩后仍超出可用上下文，已保留原始历史并停止本次请求。')
       const session = storage.session()
-      const id = await session.appendCompaction(summary, undefined, before, { automatic: true, tokensAfter: after }, true, undefined, tail)
+      const id = await session.appendCompaction(summary, undefined, before, { automatic: true, tokensAfter: after }, true, usage, tail)
       await callbacks.event('session_compact', toJson({ compactionEntry: await session.getEntry(id), automatic: true, tokensAfter: after }))
       return (await session.buildContext()).messages
     } catch (error) {
@@ -52,47 +40,4 @@ export function automaticCompactor(storage: DurableSessionStorage, provider: Ret
       throw error
     }
   }
-}
-
-async function summarize(messages: AgentMessage[], provider: ReturnType<typeof createRuntimeModels>, model: RuntimeModel, signal: AbortSignal) {
-  const budget = model.contextWindow - model.maxTokens - 2048
-  if (budget <= 0) throw new Error('模型窗口不足以容纳压缩请求。')
-  let summary: string | undefined
-  let batch: AgentMessage[] = []
-  let calls = 0
-  const flush = async () => {
-    if (++calls > 32) throw new Error('自动压缩请求次数达到上限，原始历史已保留。')
-    signal.throwIfAborted()
-    const result = await generateSummaryWithUsage(batch, provider.models, provider.model, Math.min(model.maxTokens, 2048), signal,
-      AUTOMATIC_COMPACTION_INSTRUCTION, summary, 'off', { enabled: false, maxRetries: 0, baseDelayMs: 0 })
-    if (!result.ok) throw result.error
-    if (!result.value.text.trim()) throw new Error('自动压缩返回空摘要。')
-    summary = result.value.text
-    batch = []
-  }
-  for (const message of summarySegments(messages, Math.floor(budget / 2))) {
-    if (contextSize([message]) + contextSize(summary) > budget) throw new Error('单条历史消息超过压缩请求容量，原始内容已保留。')
-    if (batch.length && contextSize([...batch, message]) + contextSize(summary) > budget) await flush()
-    if (contextSize([message]) + contextSize(summary) > budget) throw new Error('历史消息与摘要超过压缩容量。')
-    batch.push(message)
-  }
-  if (batch.length) await flush()
-  return summary!
-}
-
-function summarySegments(messages: AgentMessage[], budget: number): AgentMessage[] {
-  return messages.flatMap(message => {
-    if (contextSize(message) <= budget) return [message]
-    const serialized = message.role === 'user' || message.role === 'assistant' || message.role === 'toolResult'
-      ? serializeConversation([message]) : JSON.stringify(message)
-    const characters = [...serialized]
-    const segments: AgentMessage[] = []
-    // One Unicode character per budget unit also bounds Chinese and escaped text conservatively.
-    const size = Math.max(1, Math.floor(budget / 2))
-    const total = Math.ceil(characters.length / size)
-    for (let offset = 0; offset < characters.length; offset += size) {
-      segments.push({ role: 'user', timestamp: Date.now(), content: historicalMessageSegment(Math.floor(offset / size) + 1, total, characters.slice(offset, offset + size).join('')) })
-    }
-    return segments
-  })
 }

@@ -32,7 +32,7 @@
     "test:logging-artifact": "npm run build:server && node --test Script/Project/logging_artifact.test.mjs",
     "test:project": "node --test Script/Project/runtime_children.test.mjs Script/Project/desktop_broker_environment.test.mjs Script/Project/development-realm.test.mjs Script/Project/development-launcher.test.mjs Script/Project/connector_resources.test.mjs Script/Project/local_runtime_environment.test.cjs Script/Project/server_dependency_plan.test.mjs Script/Project/monconfig.test.mjs frontend/tests/process-runner.test.mjs",
     "test:maintenance": "node --import tsx --test --test-concurrency=2 Script/Project/wsl_service.test.mjs Script/Project/sanitize_memory_credentials.test.mjs Script/Project/consolidate_self_awake.test.mjs",
-    "test:all": "npm test && npm --prefix frontend/web test && npm --prefix frontend/desktop test && npm run test:project && npm run test:server-artifact",
+    "test:all": "npm test && npm --prefix frontend/web test && npm --prefix frontend/desktop test && npm --prefix frontend run test:package && npm run test:project && npm run test:server-artifact",
     "build:connector": "node Script/Project/package_connector.mjs"
   },
   "workspaces": [

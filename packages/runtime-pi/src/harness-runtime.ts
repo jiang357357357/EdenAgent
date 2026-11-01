@@ -85,7 +85,8 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
     tools: tools(options.tools), thinkingLevel: options.model.reasoning ?? 'off', streamOptions: { maxRetries: 0 },
     retry: { enabled: false, maxRetries: 0, baseDelayMs: 0 },
   })
-  harness.on('session_before_compact', async event => ({ compaction: await compactConversation(event.branchEntries, provider, options.model, controller.signal, event.customInstructions) }))
+  harness.on('session_before_compact', async event => ({ compaction: await compactConversation(
+    event.branchEntries, provider, options.model, controller.signal, storage, callbacks, event.customInstructions) }))
   const autoCompact = automaticCompactor(storage, provider, options.model, { ...options.callbacks,
     async event(kind, payload) { try { await options.callbacks.event(kind, payload) } catch (error) { fail(error) } },
   }, () => ({

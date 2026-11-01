@@ -43,7 +43,7 @@ export { memoryCandidatesListSchema, memoryCandidatesResumeSchema } from './memo
 export { memoryCandidateViewSchema, memoryCandidatesPageSchema } from './memory-extractions.ts'
 export type { MemoryCandidateView, MemoryCandidatesPage, MemoryCandidatesList, MemoryCandidatesResume } from './memory-extractions.ts'
 
-export { memoIntegerSchema, memoCreateSchema, memoIdSchema, memoListSchema, memoPatchSchema, memoUpdateSchema, memoInfoSchema } from './memos.ts'
+export { memoDeliveryPolicySchema, memoIntegerSchema, memoCreateSchema, memoIdSchema, memoListSchema, memoPatchSchema, memoUpdateSchema, memoInfoSchema } from './memos.ts'
 export type { MemoInput, MemoPatch, MemoInfo } from './memos.ts'
 
 export { jobScheduleSchema, jobInfoSchema, jobListSchema, jobIdSchema } from './jobs.ts'
@@ -52,7 +52,8 @@ export { memoNotificationSchema, memoNotificationListSchema, memoNotificationIdS
 export type { MemoNotification } from './memos.ts'
 
 export { selfAwakeListSchema, selfAwakeExecutionSchema, selfAwakeTimerSchema, selfAwakeToolTimerSchema, selfAwakeDiaryWriteSchema, selfAwakeDecisionSchema } from './self-awake.ts'
-export type { SelfAwakeDecision } from './self-awake.ts'
+export { selfAwakeSchedulerStatusSchema } from './self-awake.ts'
+export type { SelfAwakeDecision, SelfAwakeSchedulerStatus } from './self-awake.ts'
 
 export { desktopReminderCreateSchema, desktopReminderIdSchema, desktopReminderListSchema, desktopReminderSchema } from './notifications.ts'
 export type { DesktopReminder } from './notifications.ts'

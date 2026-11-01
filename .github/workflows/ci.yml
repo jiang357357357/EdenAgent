@@ -43,3 +43,4 @@ jobs:
       - run: npm --prefix frontend/web run typecheck
       - run: npm --prefix frontend/web test
       - run: npm --prefix frontend/desktop test
+      - run: npm --prefix frontend run test:package
