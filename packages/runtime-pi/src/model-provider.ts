@@ -13,6 +13,7 @@ import { defaultModelRetryPolicy } from './model-retry.ts'
 import type { ModelRetryPolicy } from './model-retry.ts'
 import { observeTransport, type TransportDiagnostics } from './model-transport-diagnostics.ts'
 import { durableResponseStream } from './response-stream.ts'
+import { toolNameOrder } from './tool-presentation.ts'
 
 interface RequestControl { record(snapshot: JsonValue): Promise<void>; signal(): AbortSignal; toolVisible?(name: string): boolean; response?(snapshot: JsonValue): Promise<void>; failed?(error: unknown): void; event?(kind: string, payload: JsonValue): Promise<void>; retry?: ModelRetryPolicy; diagnostics?: TransportDiagnostics }
 
@@ -23,7 +24,8 @@ export function createRuntimeModels(config: RuntimeModel, control: RequestContro
     baseUrl: config.baseUrl, reasoning: config.reasoning !== undefined && (config.reasoning !== 'off' || isDeepSeek(config)), input: ['text', 'image'],
     cost: config.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: config.contextWindow, maxTokens: config.maxTokens,
-    ...(isDeepSeek(config) ? { thinkingLevelMap: { minimal: 'low', low: 'low', medium: 'high', high: 'high', xhigh: 'high', max: 'max' } } : {}),
+    ...(isDeepSeek(config) ? { compat: { maxTokensField: 'max_tokens' },
+      thinkingLevelMap: { minimal: 'low', low: 'low', medium: 'high', high: 'high', xhigh: 'high', max: 'max' } } : {}),
     ...(['opencode-go', 'opencode_go'].includes(config.provider) ? { headers: { 'User-Agent': 'eden-agent/2.0.0-dev.0',
       'x-opencode-session': createHash('sha256').update(sessionId).digest('hex') } } : {}),
   }
@@ -70,7 +72,7 @@ export function createRuntimeModels(config: RuntimeModel, control: RequestContro
 /** Do not mutate the harness context: its tools are also the execution lookup. */
 function modelContext(context: Context, control: RequestControl): Context {
   if (!control.toolVisible || !context.tools) return context
-  return { ...context, tools: context.tools.filter(tool => control.toolVisible!(tool.name)) }
+  return { ...context, tools: context.tools.filter(tool => control.toolVisible!(tool.name)).toSorted(toolNameOrder) }
 }
 
 function assertCompletions(model: Model<Api>): asserts model is Model<'openai-completions'> {

@@ -3,6 +3,7 @@ import type { RuntimeModel } from './contracts.ts'
 import { createRuntimeModels } from './model-provider.ts'
 
 export interface TextCompletionRequest {
+  diagnostic?: import('./contracts.ts').RuntimeCallbacks['diagnostic']
   model: RuntimeModel
   systemPrompt: string
   text: string

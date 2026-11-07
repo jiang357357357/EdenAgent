@@ -2,8 +2,10 @@ import { z } from 'zod'
 import { memoInfoSchema, memoCreateSchema, memoUpdateSchema, memoListSchema, memoIdSchema,
   memoNotificationListSchema, memoNotificationListResultSchema, memoNotificationIdSchema } from './memos.ts'
 import { jobListSchema, jobIdSchema, jobInfoSchema, jobPageSchema, jobCursorSchema } from './jobs.ts'
+import { memoPageRequestSchema, memoPageResultSchema } from './memos.ts'
 export const memoRpcMethods = {
   'memo.list': { params: memoListSchema, result: z.array(memoInfoSchema) },
+  'memo.page': { params: memoPageRequestSchema, result: memoPageResultSchema },
   'memo.create': { params: memoCreateSchema, result: memoInfoSchema },
   'memo.update': { params: memoUpdateSchema, result: memoInfoSchema },
   'memo.complete': { params: memoIdSchema, result: memoInfoSchema },

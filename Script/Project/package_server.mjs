@@ -22,6 +22,8 @@ const entry = path.join(buildDirectory, 'main.mjs')
 await stat(entry)
 const runtimeProcess = path.join(buildDirectory, 'runtime-process.mjs')
 await stat(runtimeProcess)
+const connectorSdk = path.join(buildDirectory, 'connector-sdk.mjs')
+await stat(connectorSdk)
 const searchWorker = path.join(buildDirectory, 'workspace-search-worker.mjs')
 await stat(searchWorker)
 const sharedHost = path.join(buildDirectory, 'shared-workspace-host.mjs')
@@ -48,7 +50,10 @@ try {
   await packageVideoRuntime(root, path.join(staging, 'server'))
   await cp(entry, path.join(staging, 'server/main.mjs'))
   await cp(`${entry}.map`, path.join(staging, 'server/main.mjs.map'))
+  for (const name of ['LICENSE', 'NOTICE'])
+    await cp(path.join(root, 'Server/src/model-prompts', `dsh-purge.${name}`), path.join(staging, 'server', `dsh-purge.${name}`))
   await cp(runtimeProcess, path.join(staging, 'server/runtime-process.mjs'))
+  await cp(connectorSdk, path.join(staging, 'server/connector-sdk.mjs'))
   await cp(`${runtimeProcess}.map`, path.join(staging, 'server/runtime-process.mjs.map'))
   await cp(searchWorker, path.join(staging, 'server/workspace-search-worker.mjs'))
   await cp(`${searchWorker}.map`, path.join(staging, 'server/workspace-search-worker.mjs.map'))
@@ -89,6 +94,7 @@ try {
       video: { engine: 'videocontext-mcp', commit: 'b1495070863fc65372c986df52f992b9e5f40c02', runtime: 'server/video-runtime' } },
     entry: 'server/main.mjs', lockSha256: sha256(lock), entrySha256: sha256(await readFile(entry)),
     runtimeProcess: 'server/runtime-process.mjs', runtimeProcessSha256: sha256(await readFile(runtimeProcess)),
+    connectorSdk: 'server/connector-sdk.mjs', connectorSdkSha256: sha256(await readFile(connectorSdk)),
     searchWorker: 'server/workspace-search-worker.mjs', searchWorkerSha256: sha256(await readFile(searchWorker)),
     sharedHost: 'server/shared-workspace-host.mjs', sharedHostSha256: sha256(await readFile(sharedHost)),
     sharedHostInstaller: 'server/shared-workspace-install.mjs', sharedHostInstallerSha256: sha256(await readFile(sharedHostInstaller)),

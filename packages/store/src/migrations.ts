@@ -19,6 +19,9 @@ import { appContactSchema } from './schema/app-contact.ts'
 import { sessionPinSchema } from './schema/session-pin.ts'
 import { memoDeliverySchema } from './schema/memo-delivery.ts'
 import { memoRoleDeliverySchema } from './schema/memo-role-delivery.ts'
+import { qqSharedSchema } from './schema/qq-shared.ts'
+import { extensionStateSchema } from './schema/extension-state.ts'
+import { connectorSharingSchema } from './schema/connector-sharing.ts'
 
 export const migrations: readonly string[] = [
   sessionSchema[1],
@@ -163,6 +166,9 @@ export const migrations: readonly string[] = [
   sessionPinSchema,
   memoDeliverySchema,
   memoRoleDeliverySchema,
+  qqSharedSchema,
+  extensionStateSchema,
+  connectorSharingSchema,
 ]
 
 export const databaseSchemaVersion = migrations.length

@@ -53,6 +53,21 @@ export class DurableSessionStorage extends InMemorySessionStorage {
     if (transient) this.transientNextUser = false
   }
 
+  async appendHistory(entries: SessionTreeEntry[]): Promise<void> {
+    if (!entries.length) return
+    this.assertHealthy()
+    try {
+      const snapshot = await this.snapshot([...await this.getEntries(), ...entries])
+      const committed = await this.commit(snapshot)
+      const projected = parseCheckpoint(committed ?? snapshot, snapshot.sessionId)
+      for (const entry of entries) {
+        const saved = projected.find(item => item.id === entry.id)
+        if (!saved || saved.parentId !== entry.parentId || saved.type !== entry.type) throw new Error('Imported history linkage changed')
+        await super.appendEntry(saved)
+      }
+    } catch (error) { this.failed = new RuntimePersistenceError('History checkpoint commit failed', error); throw this.failed }
+  }
+
   transientContext(messages: AgentMessage[]): AgentMessage[] {
     const transient = this.transientMessage
     if (!transient) return messages

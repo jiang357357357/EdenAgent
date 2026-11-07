@@ -1,5 +1,6 @@
 export type { ConnectorInitialize, ConnectorHealth, ConnectorContext, ConnectorCall, ConnectorSession, ConnectorDefinition } from './contracts.ts'
 export { runConnector } from './runner.ts'
+export { ConnectorRequestError } from './errors.ts'
 export { encodeWorkerFrame, WorkerFrameReader, maxWorkerFrame } from './frames.ts'
 export { followLog } from './log-tail.ts'
 export type { LogBatch } from './log-tail.ts'

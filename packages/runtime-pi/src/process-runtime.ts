@@ -6,20 +6,26 @@ import { ProcessPeer } from './process-protocol.ts'
 import type { ProcessMessage, ProcessOptions } from './process-protocol.ts'
 import { ProcessTools } from './process-tools.ts'
 import { ProcessDeadline } from './process-deadline.ts'
+import { resolveProcessPolicy, type ProcessPolicy } from './process-policy.ts'
+import { ProcessDiagnostics } from './process-diagnostics.ts'
+import { RuntimeCancellationError, RuntimeProcessError } from './process-error.ts'
 
 declare const EDEN_BUNDLED_SERVER: boolean
 export interface IsolatedRuntime extends EdenRuntime { dispose(): Promise<void>; completeText(text: string): Promise<string> }
-interface ProcessPolicy { entry?: URL; heartbeatTimeoutMs?: number; startupTimeoutMs?: number; abortTimeoutMs?: number }
 
 /** A failed or stalled model process cannot take the account's socket loop with it. */
 export function createIsolatedRuntime(options: RuntimeOptions, policy: ProcessPolicy = {}): IsolatedRuntime {
   const bundled = typeof EDEN_BUNDLED_SERVER !== 'undefined' && EDEN_BUNDLED_SERVER
+  const limits = resolveProcessPolicy(policy)
   const spawnOptions = {
-    stdio: ['ignore', 'ignore', 'ignore', 'ipc'] as ['ignore', 'ignore', 'ignore', 'ipc'], serialization: 'advanced' as const, windowsHide: true,
-    execArgv: ['--max-old-space-size=512', ...(bundled || policy.entry ? [] : ['--import', import.meta.resolve('tsx')])],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'] as ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced' as const, windowsHide: true,
+    execArgv: [`--max-old-space-size=${limits.maxOldSpaceMb}`, ...(bundled || policy.entry ? [] : ['--import', import.meta.resolve('tsx')])],
   }
   const child = fork(policy.entry ?? new URL(bundled ? './runtime-process.mjs' : './process-entry.ts', import.meta.url), [], spawnOptions)
-  const exited = new Promise<void>(resolve => { child.once('exit', () => resolve()); child.once('error', () => resolve()) })
+  const diagnostics = new ProcessDiagnostics(options.sessionId, child.pid, limits.maxOldSpaceMb, options.callbacks.diagnostic)
+  diagnostics.attach(child.stdout!, child.stderr!)
+  diagnostics.emit('runtime.process.started')
+  const exited = new Promise<void>(resolve => { child.once('close', () => resolve()) })
   const controller = new AbortController()
   let failure: Error | undefined
   let disposed = false
@@ -34,7 +40,10 @@ export function createIsolatedRuntime(options: RuntimeOptions, policy: ProcessPo
   const tools = new ProcessTools(options, controller.signal, healthy, fail)
   const dispatch = async (method: string, args: unknown[]): Promise<unknown> => {
     healthy()
-    if (method === 'executeTool') return tools.execute(args[0] as number, args[1] as string, args[2])
+    if (method === 'executeTool') {
+      diagnostics.tool(tools.name(args[0] as number), args[1] as string)
+      return tools.execute(args[0] as number, args[1] as string, args[2])
+    }
     if (method === 'refreshTools') return tools.describe(await options.refreshTools!())
     try {
       switch (method) {
@@ -56,32 +65,36 @@ export function createIsolatedRuntime(options: RuntimeOptions, policy: ProcessPo
     controller.abort(failure)
     peer.close(failure)
     watchdog.stop()
-    child.kill()
+    child.kill('SIGKILL')
   }
-  const watchdog = new ProcessDeadline(() => initialized ? policy.heartbeatTimeoutMs ?? 15_000 : policy.startupTimeoutMs ?? 60_000,
-    () => stop(new Error('Runtime process stopped responding; this turn was interrupted')), Math.min(1_000, policy.heartbeatTimeoutMs ?? 1_000))
+  const watchdog = new ProcessDeadline(() => initialized ? limits.heartbeatTimeoutMs : limits.startupTimeoutMs,
+    () => stop(new RuntimeProcessError('Runtime process stopped responding; this turn was interrupted', 'unresponsive')), Math.min(1_000, limits.heartbeatTimeoutMs))
   child.on('message', AsyncResource.bind((message: ProcessMessage) => {
     watchdog.touch()
+    diagnostics.activity(message.type === 'heartbeat' ? message.memory : undefined)
     initialized = true
     if (message.type !== 'heartbeat') peer.receive(message)
   }))
-  child.on('error', error => stop(new Error('Runtime process could not start', { cause: error })))
-  child.on('exit', (code, signal) => stop(new Error(`Runtime process exited (${signal ?? code}); this turn was interrupted`)))
+  child.on('error', error => stop(new RuntimeProcessError('Runtime process could not start', 'startup', { cause: error })))
+  child.on('exit', (code, signal) => stop(new RuntimeProcessError(`Runtime process exited (${signal ?? code}); this turn was interrupted`, diagnostics.outOfMemory ? 'out_of_memory' : 'crashed')))
+  child.on('close', (code, signal) => diagnostics.closed(code, signal, failure?.message ?? 'Runtime process closed',
+    failure instanceof RuntimeCancellationError ? 'cancelled' : failure instanceof RuntimeProcessError ? failure.kind : disposed ? 'disposed' : 'crashed'))
   const { callbacks: _callbacks, refreshTools: _refresh, tools: _tools, ...serializable } = options
   const startup = peer.call<void>('initialize', { ...serializable, tools: tools.describe(options.tools), refresh: !!options.refreshTools } satisfies ProcessOptions)
   // Observe startup immediately, including a child failure before the first command.
   void startup.catch(() => undefined)
   const call = async <T>(method: string, ...args: unknown[]): Promise<T> => {
     await startup; healthy()
+    diagnostics.method(method)
     try { return await peer.call<T>(method, ...args) }
     catch (error) { throw failure ?? error }
   }
   const abort = (): Promise<void> => {
     if (stopping) return stopping
-    controller.abort(new Error('Runtime execution cancelled'))
+    controller.abort(new RuntimeCancellationError())
     stopping = new Promise<void>((resolve, reject) => {
-      const timer = new ProcessDeadline(() => policy.abortTimeoutMs ?? 2_000,
-        () => { stop(new Error('Runtime cancellation deadline exceeded')); resolve() }, Math.min(250, policy.abortTimeoutMs ?? 250))
+      const timer = new ProcessDeadline(() => limits.abortTimeoutMs,
+        () => { stop(new RuntimeCancellationError(true)); resolve() }, Math.min(250, limits.abortTimeoutMs))
       void call<void>('abort').then(() => { timer.stop(); resolve() }, error => {
         timer.stop()
         if (disposed) resolve(); else reject(error)

@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./connector": "./src/connector/index.ts"
+    "./connector": "./src/connector/index.ts",
+    "./ui": "./src/ui.ts",
+    "./extension": "./src/extension.ts"
   },
   "dependencies": {
     "@eden/api": "2.0.0-dev.0",

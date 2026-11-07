@@ -16,9 +16,12 @@ export class ProcessTools {
       this.handles.set(handle, tool)
       return { handle, name: tool.name, description: tool.description, revision: tool.revision, parameters: tool.parameters,
         ...(tool.exposure ? { exposure: tool.exposure } : {}),
+        ...(tool.contextHint ? { contextHint: tool.contextHint } : {}),
         ...(tool.executionMode ? { executionMode: tool.executionMode } : {}), ...(tool.promptHint ? { promptHint: tool.promptHint } : {}) }
     })
   }
+
+  name(handle: number): string | undefined { return this.handles.get(handle)?.name }
 
   async execute(handle: number, callId: string, input: unknown): Promise<unknown> {
     this.healthy()

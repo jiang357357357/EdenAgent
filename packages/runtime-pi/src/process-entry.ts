@@ -1,4 +1,5 @@
 import { Type } from 'typebox'
+import { getHeapStatistics } from 'node:v8'
 import { createRuntime } from './harness-runtime.ts'
 import { completeText } from './text-completion.ts'
 import { watchRuntimeParent } from './process-parent-watch.ts'
@@ -69,5 +70,6 @@ const peer: ProcessPeer = new ProcessPeer(send, async (method, args): Promise<un
 })
 process.on('message', message => peer.receive(message as ProcessMessage))
 process.on('disconnect', () => { events.stop(new Error('Runtime host disconnected')); process.exit(0) })
-setInterval(() => send({ type: 'heartbeat' }), 1_000).unref()
-send({ type: 'heartbeat' })
+const heartbeat = () => send({ type: 'heartbeat', memory: { ...process.memoryUsage(), heapLimit: getHeapStatistics().heap_size_limit } })
+setInterval(heartbeat, 1_000).unref()
+heartbeat()

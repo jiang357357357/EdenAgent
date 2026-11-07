@@ -114,7 +114,7 @@ export class McpHttpChannel implements McpChannel {
     if (Object.hasOwn(value, 'error')) {
       const error = value.error
       if (!error || typeof error !== 'object' || Array.isArray(error) || typeof error.code !== 'number' || !Number.isInteger(error.code)) throw new Error('Invalid MCP remote error')
-      throw new McpRemoteError(error.code)
+      throw new McpRemoteError(error.code, error.message)
     }
     if (method === 'initialize') {
       const result = value.result

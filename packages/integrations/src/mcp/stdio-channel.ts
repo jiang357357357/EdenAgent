@@ -1,5 +1,6 @@
 import type { Readable, Writable } from 'node:stream'
-import { jsonValue, type JsonValue } from '@eden/api'
+import type { JsonValue } from '@eden/api'
+import { decodeMcpStdioMessage, McpStdioProtocolError } from './stdio-message.ts'
 
 type Pending = { resolve(value: JsonValue): void; reject(error: Error): void; cleanup(): void }
 export interface McpChannel {
@@ -8,7 +9,9 @@ export interface McpChannel {
   close(): void
 }
 export class McpRemoteError extends Error {
-  constructor(readonly code: number) { super(`MCP request failed (${code})`) }
+  constructor(readonly code: number, detail?: unknown) {
+    super(`MCP request failed (${code})${typeof detail === 'string' && detail.trim() ? `: ${detail.slice(0, 2000)}` : ''}`)
+  }
 
 }
 /** MCP stdio uses newline-delimited JSON, not the native connector length-prefixed protocol. */
@@ -55,14 +58,18 @@ export class McpStdioChannel implements McpChannel {
       let offset = 0
       while (offset < chunk.length) {
         const newline = chunk.indexOf(10, offset), end = newline < 0 ? chunk.length : newline
-        if (this.buffer.length + end - offset > 8 * 1024 * 1024) throw new Error('MCP frame limit exceeded')
+        if (this.buffer.length + end - offset > 8 * 1024 * 1024)
+          throw new McpStdioProtocolError('MCP_FRAME_TOO_LARGE', 'message exceeds the 8 MiB frame limit')
         this.buffer = Buffer.concat([this.buffer, chunk.subarray(offset, end)])
         if (newline < 0) break
         const line = this.buffer; this.buffer = Buffer.alloc(0); offset = newline + 1
-        if (line.length) this.message(jsonValue.parse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(line))))
+        if (line.length) this.message(decodeMcpStdioMessage(line))
         if (this.closed) return
       }
-    } catch { this.fail(new Error('Invalid MCP stdio message')) }
+    } catch (cause) {
+      this.fail(cause instanceof McpStdioProtocolError ? cause
+        : new McpStdioProtocolError('MCP_INVALID_ENVELOPE', 'invalid JSON-RPC structure or response identity', cause))
+    }
   }
   private message(value: JsonValue) {
     if (!value || typeof value !== 'object' || Array.isArray(value) || value.jsonrpc !== '2.0') throw new Error('Invalid MCP envelope')
@@ -75,7 +82,7 @@ export class McpStdioChannel implements McpChannel {
     if (Object.hasOwn(value, 'error')) {
       const error = value.error
       if (!error || typeof error !== 'object' || Array.isArray(error) || typeof error.code !== 'number' || !Number.isInteger(error.code)) throw new Error('Invalid MCP error')
-      this.pending.delete(value.id as number); pending.cleanup(); pending.reject(new McpRemoteError(error.code))
+      this.pending.delete(value.id as number); pending.cleanup(); pending.reject(new McpRemoteError(error.code, error.message))
     } else {
       this.pending.delete(value.id as number); pending.cleanup(); pending.resolve(value.result!)
     }

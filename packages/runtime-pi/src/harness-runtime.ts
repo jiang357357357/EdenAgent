@@ -10,16 +10,29 @@ import { runtimeImages } from './images.ts'
 import { compactConversation } from './compaction.ts'
 import { automaticCompactor } from './automatic-compaction.ts'
 import { TurnContext } from './turn-context.ts'
+import { importHistory } from './history-imports.ts'
 import { defaultModelRetryPolicy, modelRetryDelay, retryableModelFailure, waitForModelRetry } from './model-retry.ts'
+import { appendTrailingSystemMessage, hasTrailingSystemMessage, isTrailingSystemSource } from './trailing-system.ts'
+import { RuntimeContextSnapshots } from './runtime-context-snapshots.ts'
+import { requestMessageSources } from './request-message-sources.ts'
+import { leadingSystemPrompt, isLeadingSystemSource, leadingSystemSources } from './system-prompt.ts'
+import type { AgentMessage } from '@earendil-works/pi-agent-core'
 
 export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adaptTool = adaptTool): EdenRuntime {
   const storage = new DurableSessionStorage(options.sessionId, options.callbacks.checkpoint, options.checkpoint, options.transientInput)
   const turnContext = new TurnContext(options.turnContext)
+  const contextSources = (options.contextSources ?? []).filter(source => !isTrailingSystemSource(source) && !isLeadingSystemSource(source)
+    && !(source && typeof source === 'object' && !Array.isArray(source) && source.placement === 'runtime-context'))
+  const trailingSources = (options.contextSources ?? []).filter(isTrailingSystemSource)
+  const leadingSources = (options.contextSources ?? []).filter(isLeadingSystemSource)
+  const runtimeContext = new RuntimeContextSnapshots(storage, options.runtimeContext)
+  let requestContext: AgentMessage[] = []
   let fatal: unknown
   let requests = 0
   let controller = new AbortController()
   let active: Promise<JsonValue> | undefined
   let presentedTools = modelTools(options.tools)
+  runtimeContext.update(presentedTools)
   let presentedNames = new Set(presentedTools.map(tool => tool.name))
   let retryAttempt = 0
   let toolExecutionStarted = false
@@ -64,7 +77,13 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
       try {
         const value = snapshot as Record<string, JsonValue>
         const definitions = value.tools as Record<string, JsonValue>[]
-        await options.callbacks.request(toJson({ ...value, contextSources: [...(options.contextSources ?? []), ...presentedTools.flatMap(tool => tool.promptHint ? [{ kind: tool.name === 'list_skills' ? 'skills' : 'system', title: tool.name === 'list_skills' ? '技能目录' : `工具指引：${tool.name}`, content: tool.promptHint }] : [])], promptHints: presentedTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []), tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
+        const trailing = hasTrailingSystemMessage(value.payload, options.trailingSystemPrompt) ? trailingSources : []
+        await options.callbacks.request(toJson({ ...value, systemPromptUpdatePolicy: 'leading-only-fallback',
+          messageSources: requestMessageSources(value.payload, requestContext, options.turnContext),
+          contextSources: [...contextSources, ...leadingSystemSources(value.payload, leadingSources), ...runtimeContext.sources(),
+            ...presentedTools.flatMap(tool => tool.promptHint ? [{ kind: 'system', title: `工具指引：${tool.name}`, content: tool.promptHint }] : []), ...trailing],
+          promptHints: presentedTools.flatMap(tool => tool.promptHint ? [{ name: tool.name, text: tool.promptHint }] : []),
+          tools: definitions.map(tool => ({ ...tool, revision: revisions.get(String(tool.name)) })) }))
       } catch (error) { fatal = error; throw error }
     },
   }, options.sessionId)
@@ -76,23 +95,33 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
         const items = await options.refreshTools()
         await harness.setTools(tools(items), items.map(tool => tool.name))
         presentedTools = modelTools(items)
+        runtimeContext.update(presentedTools)
         presentedNames = new Set(presentedTools.map(tool => tool.name))
         revisions = new Map(items.map(tool => [tool.name, tool.revision]))
       }
       return {}
     },
-    systemPrompt: () => [options.systemPrompt, ...presentedTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'),
+    systemPrompt: () => leadingSystemPrompt(options.systemPrompt, presentedTools, options.systemPromptSuffix),
     tools: tools(options.tools), thinkingLevel: options.model.reasoning ?? 'off', streamOptions: { maxRetries: 0 },
     retry: { enabled: false, maxRetries: 0, baseDelayMs: 0 },
   })
+  if (options.trailingSystemPrompt) harness.on('before_provider_payload', event => ({
+    payload: appendTrailingSystemMessage(event.payload, options.trailingSystemPrompt),
+  }))
   harness.on('session_before_compact', async event => ({ compaction: await compactConversation(
     event.branchEntries, provider, options.model, controller.signal, storage, callbacks, event.customInstructions) }))
   const autoCompact = automaticCompactor(storage, provider, options.model, { ...options.callbacks,
     async event(kind, payload) { try { await options.callbacks.event(kind, payload) } catch (error) { fail(error) } },
   }, () => ({
-    system: [options.systemPrompt, ...presentedTools.flatMap(tool => tool.promptHint ? [tool.promptHint] : [])].join('\n\n'), tools: presentedTools, signal: controller.signal, ...(options.turnContext ? { turnContext: options.turnContext } : {}),
+    system: leadingSystemPrompt(options.systemPrompt, presentedTools, options.systemPromptSuffix), tools: presentedTools, signal: controller.signal,
+    ...(options.turnContext ? { turnContext: options.turnContext } : {}),
+    ...(options.trailingSystemPrompt ? { trailingSystemPrompt: options.trailingSystemPrompt } : {}),
   }))
-  harness.on('context', async event => ({ messages: turnContext.apply(storage.transientContext(await autoCompact(event.messages))) }))
+  harness.on('context', async event => {
+    const contextual = await runtimeContext.apply(storage.transientContext(event.messages))
+    requestContext = storage.transientContext(await autoCompact(contextual))
+    return { messages: turnContext.apply(requestContext) }
+  })
   harness.subscribe(async event => {
     healthy()
     try { await callbacks.event(event.type, jsonSnapshot({ ...event, costConfigured: options.model.cost !== undefined })) }
@@ -114,9 +143,12 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
       const copied = runtimeImages(images)
       return run(async () => {
         turnContext.reset()
+        await importHistory(storage, options.history)
+        await runtimeContext.prepare()
         const originalLeaf = await storage.getLeafId()
+        const prompt = options.inputContext ? `${text}\n\n${options.inputContext}` : text
         for (;;) {
-          const result = toJson(await harness.prompt(text, { images: copied }))
+          const result = toJson(await harness.prompt(prompt, { images: copied }))
           const error = retryableModelFailure(result)
           if (!error || toolExecutionStarted || retryAttempt >= retryPolicy.maxRetries) {
             if (retryAttempt > 0) await callbacks.event('retry_finished', { operation: 'model', success: !error, attempt: retryAttempt, error: error ?? null })
@@ -140,6 +172,7 @@ export function createRuntime(options: RuntimeOptions, toolAdapter: typeof adapt
     async replaceTools(items) {
       healthy(); await active; await harness.waitForIdle(); await harness.setTools(tools(items), items.map(tool => tool.name))
       presentedTools = modelTools(items)
+      runtimeContext.update(presentedTools)
       presentedNames = new Set(presentedTools.map(tool => tool.name))
       revisions = new Map(items.map(tool => [tool.name, tool.revision]))
     },

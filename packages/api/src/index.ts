@@ -44,6 +44,8 @@ export { memoryCandidateViewSchema, memoryCandidatesPageSchema } from './memory-
 export type { MemoryCandidateView, MemoryCandidatesPage, MemoryCandidatesList, MemoryCandidatesResume } from './memory-extractions.ts'
 
 export { memoDeliveryPolicySchema, memoIntegerSchema, memoCreateSchema, memoIdSchema, memoListSchema, memoPatchSchema, memoUpdateSchema, memoInfoSchema } from './memos.ts'
+export { memoPageRequestSchema, memoPageResultSchema } from './memos.ts'
+export type { MemoPageRequest } from './memos.ts'
 export type { MemoInput, MemoPatch, MemoInfo } from './memos.ts'
 
 export { jobScheduleSchema, jobInfoSchema, jobListSchema, jobIdSchema } from './jobs.ts'
@@ -195,6 +197,11 @@ export type { PromptMode, PromptModeConfig } from './prompt-mode.ts'
 export type { OperationFailureDetails } from './operation-failure.ts'
 export { QQ_FILE_MAX_BYTES, QQ_FILE_MAX_BASE64_LENGTH, QQ_FILE_MAX_JSON_BYTES,
   QQ_FILE_MAX_ATTACHMENTS, QQ_FILE_MAX_INPUT_BYTES, QQ_FILE_TRANSFER_TIMEOUT_MS } from './qq-files.ts'
+export { QQ_GROUP_CONTEXT_PROTOCOL, QQ_GROUP_CONTEXT_LEGACY_PROTOCOL, QQ_GROUP_CONTEXT_MAX_CHARS, QQ_GROUP_TURN_MAX_JSON_BYTES,
+  qqGroupContextSchema } from './qq-group-context.ts'
+export type { QqGroupContext } from './qq-group-context.ts'
+export { QQ_SHARED_HISTORY_PROTOCOL, qqSharedContextSchema, qqSharedMessageSchema } from './qq-shared-history.ts'
+export type { QqSharedContext, QqSharedMessage } from './qq-shared-history.ts'
 export { credentialHidden, credentialValues, redactCredentialText, redactCredentialJson } from './credential-redaction.ts'
 export { mapJsonText } from './json-text-projection.ts'
 export type { JsonTextProjector } from './json-text-projection.ts'
@@ -207,5 +214,10 @@ export type { DesktopStatus, DesktopControlEvent } from './desktop-control.ts'
 export { videoSourceSchema, inspectVideoSchema, prepareVideoSchema, videoJobSchema, videoTimelineSchema, videoFramesSchema, videoPreviewsSchema } from './video.ts'
 export type { VideoSource } from './video.ts'
 export { cuaToolNames } from './cua-tools.ts'
+export { PLUGIN_UI_API_VERSION, PLUGIN_UI_MODULE_MAX_BYTES, pluginUiSlots, extensionUiSlots, pluginUiDocumentSchema,
+  pluginUiModuleSchema, pluginUiIdentitySchema, pluginUiCallSchema, pluginUiRpcMethods } from './plugin-ui.ts'
+export type { PluginUiDocument, PluginUiModule, PluginUiCall, PluginUiContext, PluginUiReport, PluginUiDiagnostic } from './plugin-ui.ts'
+export { extensionContributionsSchema, extensionStateRequestSchema, extensionStateResultSchema, extensionTreeItemSchema } from './extension-contributions.ts'
+export type { ExtensionContributions, ExtensionWhen, ExtensionTreeItem } from './extension-contributions.ts'
 export { memoryModelStatusSchema } from './memory-model.ts'
 export type { MemoryModelStatus } from './memory-model.ts'

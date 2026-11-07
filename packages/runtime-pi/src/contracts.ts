@@ -21,6 +21,8 @@ export interface RuntimeTool {
   auditInput?(input: Record<string, unknown>): JsonValue
   /** Host-owned discovery instructions included in each model request. */
   promptHint?: string
+  /** Changing discovery data is persisted as a runtime-context snapshot, separately from system rules. */
+  contextHint?: { kind: 'tools' | 'skills'; content: string }
   resultImages?(result: JsonValue, signal: AbortSignal): Promise<readonly RuntimeImage[]>
   execute(input: Record<string, unknown>, context: { callId: string; signal: AbortSignal; assertCurrent?: () => void }): Promise<JsonValue>
 }
@@ -41,6 +43,8 @@ export interface RuntimeModel {
 }
 
 export interface RuntimeCallbacks {
+  /** Host diagnostics only; never sent to the model or through child IPC. */
+  diagnostic?(record: import('./process-diagnostics.ts').RuntimeProcessDiagnostic): void
   /** May return a validated privacy projection to keep the live context consistent with storage. */
   checkpoint(snapshot: RuntimeCheckpoint): Promise<void | RuntimeCheckpoint>
   /** Private IPC hint; already coalesced batches commit before ACK rather than being sampled again. */
@@ -54,8 +58,18 @@ export interface RuntimeCallbacks {
 export interface RuntimeOptions {
   sessionId: string
   systemPrompt: string
+  /** Fixed closing rules appended after all tool hints within the leading system message. */
+  systemPromptSuffix?: string
+  /** One independent system message at the end of every dialogue request; never stored in chat history. */
+  trailingSystemPrompt?: string
+  /** Current operational facts; appended durably only when the retained snapshot differs. */
+  runtimeContext?: string
+  /** References appended to the initiating user input, persisted with that input. */
+  inputContext?: string
   /** Immutable reference material for this turn; never persisted as chat history. */
   turnContext?: string
+  /** Append-only imported public records, keyed independently of the current speaker. */
+  history?: { key: string; text: string; timestamp: string }[]
   contextSources?: JsonValue[]
   model: RuntimeModel
   tools: RuntimeTool[]

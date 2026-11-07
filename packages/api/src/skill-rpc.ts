@@ -10,15 +10,18 @@ export const skillInfoSchema = z.object({
   modelInvocable: z.boolean(), tools: z.array(z.string()), profiles: z.array(z.string()), permissions: z.array(z.string()), defaultPrompt: z.string(),
   codeTools: z.array(codeTool).optional(), files: z.array(z.string()), contentHash: z.string().regex(/^[a-f0-9]{64}$/), totalBytes: z.number().int().nonnegative(),
   enabled: z.boolean(), available: z.boolean(), missingTools: z.array(z.string()), scope: z.string(), workspaceRoot: z.string(), sourceType: z.string(),
+  shadowedSources: z.array(z.object({ scope: z.string(), workspaceRoot: z.string(), source })).optional(),
+  toolConflicts: z.array(z.object({ name: z.string(), identities: z.array(z.string()) })).optional(),
   manifest: z.object({ source, discovered: z.boolean().optional(), workspaceRoot: z.string() }),
 })
 export const skillPreviewInfoSchema = skillInfoSchema.pick({ displayName: true, description: true, version: true, scope: true,
   workspaceRoot: true, tools: true, profiles: true, modelInvocable: true, contentHash: true, totalBytes: true }).extend({
-  previewID: z.string().uuid(), skillName: z.string(), source, fileCount: z.number().int(), expiresAt: z.number().int(),
+  previewID: z.string().uuid(), skillName: z.string(), source, fileCount: z.number().int(), expiresAt: z.number().int(), warnings: z.array(z.string()).optional(),
 })
 export type SkillInfo = z.infer<typeof skillInfoSchema>
 export const skillRpcMethods = {
-  'skill.catalog_status': { params: z.object(workspaceScope).strict(), result: z.object({ error: z.string().nullable(), refreshing: z.boolean(), codeToolsAvailable: z.boolean() }) },
+  'skill.catalog_status': { params: z.object(workspaceScope).strict(), result: z.object({ error: z.string().nullable(), refreshing: z.boolean(), codeToolsAvailable: z.boolean(),
+    pluginIssues: z.array(z.object({ id: z.string(), message: z.string() })).optional() }) },
   'skill.refresh': { params: z.object(workspaceScope).strict(), result: z.object({ refreshed: z.literal(true) }) },
   'skill.list': { params: z.object(workspaceScope).strict(), result: z.array(skillInfoSchema) },
   'skill.read': { params: skillReadSchema.extend(workspaceScope), result: skillInfoSchema },

@@ -23,9 +23,11 @@ export async function launchMcpProcess(files: ReadonlyMap<string, Buffer>, descr
       stdio: ['pipe', 'pipe', 'pipe'], env: hostProcessEnvironment()
     })
     let ended = false, logged = 0
+    let stderrTail = Buffer.alloc(0), terminationRequested = false
     let termination: Promise<void> | undefined
     const kill = () => {
       if (ended || !child.pid) return
+      terminationRequested = true
       if (process.platform === 'win32') {
         termination ??= stopWindowsProcessTree(child.pid).catch(() => {
           child.kill('SIGKILL')
@@ -37,14 +39,21 @@ export async function launchMcpProcess(files: ReadonlyMap<string, Buffer>, descr
     const exited = new Promise<void>(resolve => child.once('close', () => { ended = true; signal.removeEventListener('abort', kill); resolve() }))
       .then(async () => { await termination; await rm(directory, { recursive: true, force: true }) })
     void exited.catch(() => { process.stderr.write('MCP snapshot cleanup failed\n') })
-    child.stderr.on('data', (chunk: Buffer) => { logged += chunk.length; if (logged > 1024 * 1024) kill() })
+    child.stderr.on('data', (chunk: Buffer) => {
+      logged += chunk.length
+      stderrTail = Buffer.concat([stderrTail, chunk.subarray(-16384)]).subarray(-16384)
+      if (logged > 1024 * 1024) kill()
+    })
     child.stdin.on('error', kill)
     signal.addEventListener('abort', kill, { once: true })
     try {
       await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(new Error('MCP host process launch failed'))) })
       signal.throwIfAborted()
     } catch (error) { kill(); await exited; throw error }
-    return { input: child.stdin, output: child.stdout, terminate: kill, exited, async close() { kill(); await exited } }
+    return { input: child.stdin, output: child.stdout, terminate: kill, exited,
+      diagnostics: () => ({ stderr: stderrTail.toString('utf8'), stderrTruncated: logged > stderrTail.length,
+        stderrLimitExceeded: logged > 1024 * 1024, exitCode: child.exitCode, exitSignal: child.signalCode, terminationRequested }),
+      async close() { kill(); await exited } }
   } catch (error) { await rm(directory, { recursive: true, force: true }); throw error }
 }
 function mcpInvocationPaths(descriptor: { command: string; args: string[]; cwd: string }, directory: string) {

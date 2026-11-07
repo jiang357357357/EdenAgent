@@ -1,5 +1,593 @@
 # Eden Agent TS 迁移实施跟踪
 
+## 2026-11-07 Windows / Linux 便携 Agent 本地更新
+
+按用户指定的 `E:\EDEN\EDEN-portable` 更新 `Win/EDEN_win`、`Linux/EDEN_linux` 的 Agent 整组，将六类扩展展示、系统整页与此前扩展机制修复纳入实际程序。以当前含未提交改动的源码构建，记录 1,778 个输入文件及三个 Agent 仓库的提交与 dirty 状态；构建前后输入一致。Server、Web、运行时和 Electron 资源重新组装，Node 为 22.23.1、Electron 为 42.4.0；Windows 指针辅助程序通过离线锁定 Cargo 构建检查，包内文件与输出一致。正式版本仍为 1.11.9，原 `VERSION`、`BUILD-INFO.json` 和已交付归档保留，没有提交、推送、上传或更新 SSH 客户机。
+
+实际生成的两套运行时分别通过 5 项检查：服务启动与健康接口、六类 API 2 声明检查安装、认证 RPC 下的 SQLite 状态写入读回、停用清理，以及生产 Web 浮窗入口。两套 Electron 基座与包内导航策略、协议、空预加载和 HTML 各通过 5 项检查，包含 `edenagent://` 下的真实受控子窗口、无桌面桥及 Node require、向 sandbox iframe 转交真实 MessagePort、禁止二次开窗。原生检查使用隐藏的合成宿主，Linux 使用 WSL/Xvfb 的 `--no-sandbox --disable-gpu` 环境；本轮未调用模型、测试真实账号或使用用户数据库作为夹具。
+
+Windows 29,609 项、Linux 31,186 项桌面清单在安装前后均核对大小和 SHA-256，Linux 同时核对权限和符号链接。四个程序目录完成事务替换，5,928 项数据、配置、资源、DLC、原版本记录与本地元数据保持一致；复制原运行时 `.monconfig`，保留 Windows 搬迁验证记录及 Linux `Data`、`.artifacts` 链接，并实际检查链接仍解析到原用户目录。首次安装校验遇到 Windows/Unix 链接分隔符表示差异后先恢复原程序，再按等价目标比较并重新完成安装，未改写用户数据。
+
+Linux 锁定依赖安装跳过可选 GPU 下载，使用项目 CPU 路径；桌面本地组装以同卷硬链接装入不可变运行时，避免重复跨系统复制。当前已安装 Electron 的 73 个基座文件逐项验证后重建本地打包输入，明确记录为当前基座复用，未冒充上游原始归档。临时构建器的复制改动及原始/执行文件摘要单独记录，源码仓库中的打包器未改动。旧程序回滚副本与自有 Linux 临时源码、依赖已清理；临时 Electron ZIP（137,681,534 字节）及空打包目录的清理命令被自动审批拒绝，返回原因仅为 `blocked by policy`，缓存暂留。
+
+当前结果为 `.release/current/Agent/portable-update-summary.json`，详细安装事务、来源、基座复用和逐平台验证为同目录的 `portable-update-*` 小型记录；命令日志位于根 `.run/logs/portable-agent-*`。两个实际安装附有 `Data/Diagnostics/Agent-extension-presentations-local-update.json`。便携服务原来停止，本轮保持停止；未验证外部模型供应商、远程 Linux Mint 实机或真实用户长期运行。
+
+## 2026-11-07 扩展六类展示与独立浮动窗口
+
+按用户要求补齐 API 2 的展示声明：`page` 为可分屏工作区页、`full_page` 为独占整窗页、`sidebar_panel` 为固定右侧工具栏、`bottom_panel` 为工具面板（默认底部，跟随用户位置设置）、`floating_window` 为独立窗口、`tool_card` 为绑定工具结果的卡片。安装检查、菜单和 SDK openView 统一路由；打开插件不再搬动聊天。固定容器不允许拖入其他区域，文件关联 editor 仅使用 page。旧 API 1 保留原三种 slot。
+
+独占页返回只隐藏并保留实例，关闭遵守未保存确认；展示类型写入原账号／工作区布局，旧标签按当前模块声明校正。浮动窗口采用受控空白宿主，HTML 仍为独立来源 iframe，业务 Worker、会话和审批不变；主窗口切换到另一聊天后，浮动窗口操作仍绑定原会话，打开独占页及返回时恢复正确活动会话。浮动宿主不注入桌面桥或令牌，禁止外部导航和二次开窗；每工作台最多 8 个，拦截时提供用户重开入口。关闭、离开获准页面、卸载、停用和账号切换结束旧连接。React 开发效果重放重用同一窗口；草稿缓存按文档／资源修订隔离，取消和未知写入不自动重试。
+
+使用临时数据库、合成工具卡片和草稿编辑器测试探针，实际调用生产清单检查、安装、SDK、工作台 hook、渲染器、SQLite、Electron 窗口策略与空预加载文件。浏览器和原生 Electron 两轮均通过 11 项，包括六类展示、主区尺寸、未保存确认、真实保存、跨会话绑定、弹窗拦截恢复及停用清理；浏览器异常均为 0。仅在负向用例强制 window.open 返回 null，随后恢复真实 API；Electron 测试仅把窗口可见性改为隐藏，不修改生产导航／预加载策略。本轮没有调用真实模型，也没有读取真实用户数据库。
+
+实际命令均使用 Node 22.23.1：
+
+- `node Script/Test/run_typescript_tests.mjs Server/tests/unit/plugin-ui Server/tests/integration/plugin-ui`：34/34。
+- frontend/web 的 `node --import tsx --test tests/plugin-windows.test.mjs tests/plugin-placement.test.mjs tests/application-page-commands.test.mjs tests/workbench-state.test.mjs tests/workbench-lifecycle.test.mjs tests/extension-keybindings.test.mjs tests/extension-contributions.test.mjs tests/extension-controller.test.mjs tests/plugin-ui-runtime.test.mjs tests/plugin-ui-host.test.mjs`：31/31。
+- frontend/desktop 的 `node --test tests/extension-window-policy.test.cjs tests/web-app-loader.test.cjs`：6/6。
+- `node --import tsx Script/Test/extension_presentations_browser.mjs`：11/11；设置 `EDEN_PRESENTATION_ELECTRON=1` 后同一入口：11/11。
+- `Script/Test/extension_platform_browser.mjs`：17/17；`Script/Test/application_pages_browser.mjs`：7/7；`Script/Test/plugin_ui_browser_smoke.mjs`：12/12。
+- 前后端 TypeScript 检查通过；架构检查 1498 文件、0 错误；主题检查 415 文件通过。Server 与 Web 当前构建、RPC 生成通过，Web 继续保留既有大 chunk 提示。
+
+联调中发现并修复独占层包裹容器缺少高度导致主编辑区被压缩的问题，并增加主区尺寸断言。测试工具同时修复 DOM 引用序列化、重载时旧执行上下文残留、隐藏 Electron 截图等待及临时预构建依赖被 Babel 重复处理的问题。当前必要证据保存在根 `.run/logs/extension-presentations-*`，包括源码／制品摘要、两种引擎结果、独占页／侧栏／浮动窗口截图。未推送、发布或替换客户目录，Mon 正式版本仍为 1.11.9；浮动窗口 OS 位置／尺寸未持久化，不宣称完整 VS Code 生态兼容。
+
+## 2026-11-07 应用页面与编辑工作台分离
+
+按用户指出的设计问题，自醒等内置系统页面改为应用级整窗页面，聊天／文件／角色／扩展工作视图保留可拆分工作台。新增 ApplicationPageLayout，显示应用页时隐藏并 inert 原工作台，不卸载聊天编辑器；独立处理应用导航和标签选择，命令面板的系统页面命令改走 onOpenPage。隐藏期间暂停工作台与扩展快捷键并收起工作台对话框，返回恢复原布局及编辑器。移除把系统页面强制压入编辑器区域的 CSS；读取旧布局时过滤系统页标签，保留聊天、文件、扩展、草稿及分屏结构。
+
+验证使用临时数据库与浏览器配置，加载真实 SelfAwakePage、应用页面容器、工作台及导航 hook；仅草稿编辑器为测试探针，不使用真实用户数据。`node --import tsx Script/Test/application_pages_browser.mjs` 通过 7 项：已有分屏和未保存草稿、真实自醒铺满视口、隐藏工作台快捷键不生效、返回保留同一 DOM 和草稿、命令入口、窄窗口、重载清理旧系统标签并保留分屏。当前截图与 JSON 位于根 `.run/logs/application-pages-browser.*`。
+
+在 frontend/web 使用 Node 22.23.1 执行 `--import tsx --test tests/application-page-commands.test.mjs tests/workbench-state.test.mjs tests/workbench-lifecycle.test.mjs tests/extension-keybindings.test.mjs tests/extension-contributions.test.mjs`，16/16；`Script/Test/extension_platform_browser.mjs` 扩展回归 17/17；前端 TypeScript 检查通过，架构检查 1498 文件、0 错误，主题检查 412 文件通过。Vite 当前 Web 构建通过，仅保留现有大 chunk 提示。命令、门禁、源码／构建摘要及截图保存在根 `.run/logs/application-pages-*`。无后端协议或数据库结构变更，未推送、发布或替换客户运行目录，正式版本不变。
+
+## 2026-11-07 扩展机制缺陷修复
+
+按用户要求完成此前核对出的六项修复：存储配额只计算有效键，删除仍保留 revision 防止 ABA；升级后不兼容的设置类型或枚举回退到当前默认值，原值保留用于回滚。激活等待接入单次调用的 AbortSignal，立即取消等待而不终止共享激活。快捷键处理全部绑定，页面只转发当前组件和绑定会话的快捷键，并保留编辑输入保护及保存优先级。
+
+配置修订摘要按账号从后端读取，随现有约两秒目录同步传递；通知 Worker、页面、树及设置窗口，不把配置值或工作区路径放进摘要，不重建页面或重放写操作。页面 SDK 增加 onDidChangeConfiguration，脚手架及模型协议说明同步更新；通知可能重复，网络断开或后台节流时延迟，重新同步后恢复。
+
+API 1 源码不再在工作台求值，每个视图使用独立来源文档及独立 React，运行库拆为按需加载的约 196 KiB chunk。继续承接 React/effect/addStyle 和 host 会话、工具、取消、保存、事件桥；不再共享父 DOM、样式和跨视图模块单例。Electron 使用 Chromium site-per-process，真实 Electron 检查确认主页面和扩展页面的渲染进程编号不同，扩展死循环时主页面继续响应。没有恢复 OS 执行沙箱。
+
+清理检查曾因测试在死循环页面等待 CDP 回包而超时，改由父页面发送消息触发死循环，再检查主页面响应和停用后的 iframe 移除；浏览器及 Electron 均通过。测试失败会覆盖验收 JSON 为失败，避免保留旧的成功结论。
+
+已运行后端专项 33 项、前端专项 24 项、API 2 真实浏览器 17 项、API 1 真实浏览器 12 项及 Electron 原生进程隔离检查，均通过。API 2 包含两个独立客户端的配置同步和页面内第二快捷键；API 1 包含真实会话／文件／消息、热替换、错误激活恢复、样式和 DOM 隔离、死循环及停用清理。所有测试使用临时数据，没有使用真实用户库；本轮未再次调用真实模型。命令、构建与最终校验结果记录在根 `.run/logs/extension-repair-*` 和 `extension-platform-browser.json`、`plugin-ui-browser.json`、`extension-renderer-electron.json`。
+
+实际命令在 `Agent` 执行，`node` 均指 `E:\EDEN\EDEN-portable\Win\EDEN_win\runtime\agent\node\node.exe`：
+
+- `node Script/Test/run_typescript_tests.mjs Server/tests/unit/plugin-ui Server/tests/integration/plugin-ui`：33/33；补入目录修订摘要断言后再次执行 integration/plugin-ui：31/31。
+- 在 `frontend/web` 执行 `node --import tsx --test tests/extension-keybindings.test.mjs tests/extension-controller.test.mjs tests/extension-contributions.test.mjs tests/plugin-ui-host.test.mjs tests/plugin-ui-runtime.test.mjs tests/workbench-state.test.mjs tests/workbench-lifecycle.test.mjs`：24/24。
+- `node --import tsx Script/Test/extension_platform_browser.mjs`：17/17；`node --import tsx Script/Test/plugin_ui_browser_smoke.mjs`：12/12；`node Script/Test/extension_renderer_electron.mjs`：独立进程和主页面响应通过。
+- `node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit` 与 `-p frontend/web/tsconfig.json --noEmit` 均通过；`node Script/Architecture/check.mjs` 为 1496 文件、0 错误；`frontend/web/scripts/check-theme.mjs` 为 410 文件通过；相关差异检查通过。
+- `node Script/Project/generate_rpc.mjs`、`node Script/Project/build_server.mjs E:/EDEN/.release/current/Agent/server` 及在 `frontend/web` 执行 Vite `build --outDir E:/EDEN/.release/current/Agent/web --emptyOutDir` 均通过。仅保留现有大 chunk 提示；新旧版兼容运行库独立按需加载。
+
+前后端源码与本地当前构建供验收，未推送、发布或替换客户包，正式版本仍为 1.11.9。任意业务数据的自动迁移、依赖解析、统一文本模型等完整 IDE 能力不属于本次缺陷修复。
+
+## 2026-11-07 运行时中断报告修复
+
+按用户批准修复报告中确认的源码问题：运行时老生代默认从 512 MiB 提高至 2048 MiB，新增受范围校验的 EDEN_AGENT_RUNTIME_HEAP_MB 与 EDEN_AGENT_RUNTIME_ABORT_TIMEOUT_MS（默认 10 秒）。子进程持续消费 stdout／stderr，仅保留每路末尾 16K 字符；心跳带回 RSS、V8 heapUsed／heapTotal／heapLimit、external 及 arrayBuffers，退出时把 PID、最后工具／调用、活动间隔和退出码／信号写入原有宿主 JSONL 日志。辅助标题／导演／记忆提取及角色压缩也接入诊断，不把内容写入模型上下文。
+
+采用 typed 进程故障／取消分类；显式用户取消保存 cancelled 和空 error，真正的存储故障不能被取消覆盖，服务器关闭不冒充用户取消。完成回合时只把仍 running 的工具改为 unknown，已确认回执保持；故障后的旧队列保持 held，不自动重放整轮副作用，新输入创建新进程从检查点继续。图片规范 base64 校验改为检查长度、字符及填充位，减少仅为校验产生的整份临时副本。
+
+已完成真实子进程专项：超过原 512 MiB 的受控堆使用、64 MiB 限额下的真实 V8 OOM 输出采集、134 非 OOM 分类、超两秒协作取消、失联强制取消，以及会话崩溃后恢复和工具只执行一次。最终实际打包 runtime-process.mjs 已通过本机录制模型 HTTP、检查点、2 GiB 预算及内存诊断验证。运行时包 110 项、会话 105 项、角色／辅助调用／日志 37 项共 252 项回归全部通过，0 失败、0 跳过；最后图片及资源专项 17 项复查通过。最初工具刷新测试的旧排序预期与工作区既有按名称排序实现不一致，仅对齐测试预期后通过，未改工具执行规则。最终架构检查 0 错误，保留既有规模警告；类型及固定当前输出构建通过。
+
+补充真实生产组合回归发现并修复多角色附件检查点中断：角色任务 JSON 后追加附件引用，旧投影把完整正文交给 JSON.parse，直接触发 RuntimePersistenceError。现在按已知附件包装边界分开解析，投影后完整保留附件后缀，JSON 字符串内同名文字不被误判、未知损坏后缀仍报错。此前该附件用例确实失败，修复后随 37 项回归通过；没有将此现场外复现等同于客户原有每次故障的根因。
+
+详细契约见 [运行时进程资源与故障诊断](运行时进程资源与故障诊断.md)。证据持续写根 E:/EDEN/.run/logs/runtime-interruption-*；使用临时数据库和本机录制服务，不读取客户原始数据库、不向外发送消息、不重启在线服务、不发布安装包。客户原有 16 次故障仍需新诊断数据复核，不能把所有 134 直接认定为 OOM。
+
+## 2026-11-07 真实模型自主开发原生扩展
+
+按用户要求，用已有 DeepSeek／deepseek-flash（关闭推理）在空工作区自主开发 API 2 待办扩展，不提供业务实现或录制响应。修复后两次独立测试分别记录 18 和 38 次模型请求，均通过 9 项真实浏览器业务验收：增改删、原生树、工具栏与状态栏、设置、宿主重启恢复、卸载保留业务状态；浏览器异常均为 0。生成源码由模型完成，遇到参数与清单错误后自行修改，不能表述为全程无错。
+
+初始 47 请求的执行未通过，暴露 iframe 禁止表单及 SDK 参数说明不完整，并发生了测试范围外的桌面工具调用；该轮不计为隔离验收成功，具体披露保留在报告中。后续测试由临时工具注册白名单强制限定文件、技能与插件管理，排除桌面、终端、对外消息、委派及后台进程；没有修改客户默认策略或引入 OS 沙箱。
+
+本轮允许页面表单事件但继续由 CSP 禁止 URL 表单投递；补齐精确 SDK 调用签名、配置事件参数及 ID／安装规则。另修复 manage_ui_plugins.inspect 相对路径错误使用进程目录的问题，接通所选会话工作区，并复核审批期间工作区变化。当前相关后端 34 项、测试白名单 3 项、含实际表单的平台浏览器 15 项通过，前后端类型、主题、架构及本地构建通过。
+
+详见 [Eden 扩展真实模型验收](Eden%20扩展真实模型验收.md)。原始结果、请求数、生成代码 SHA-256 及当前截图位于根 `.run/logs/extension-platform-live*`。未发布、推送或部署客户包，Mon 正式版本未推进。
+
+## 2026-11-06 Eden 原生扩展平台 API 2
+
+用户批准参照 VS Code 扩展机制建设原生平台。本轮贯通工作台贡献、独立执行、状态与设置、自定义编辑器和开发入口；不是 VSIX 或完整 IDE 兼容层。协议与现有边界见 [Eden 扩展平台 API 2](Eden%20扩展平台%20API%202.md)。
+
+实现范围：
+
+- `packages/api` 增加兼容的 API 2 清单、命令／菜单／快捷键／状态栏／设置声明、树节点、资源完整性及运行状态回报。API 1 继续使用原 React 宿主，不自动修改既有插件。
+- 新版扩展逻辑按需在独立 Worker 激活；自定义 HTML 视图使用独立来源 iframe 与专用 MessagePort，不向扩展传递应用令牌或内部 RPC。激活超时 10 秒，业务调用 120 秒；取消后未响应的 Worker 被终止，可从诊断页手动恢复，不重放原业务操作。
+- 插件可接入命令面板、现有活动栏、工具栏、视图标题／树节点／文件菜单、快捷键及状态栏；原生树支持延迟加载、刷新和迟到请求取消。菜单条件仅决定可见性，业务权限继续由后端强制校验。
+- 状态与声明式设置由后端 SQLite 持有，按账号、组件及工作区隔离；支持 revision 比较与删除后版本保留，限制单项及总容量。审批期间工作区改变会拒绝原写入。配置通知当前限定本客户端。
+- 自定义编辑器从文件入口匹配，文档读写经过工作区边界、会话等待和审批。以原磁盘 SHA-256 比较后保存，外部修改时拒绝覆盖；接通页面内 Ctrl+S、宿主保存／未保存生命周期。没有统一的文本缓冲区或跨编辑器撤销栈。
+- 调用及视图事件按绑定会话和具体实例路由；全局命令打开新视图时保留调用会话，不把其他聊天的结果投给当前页面。更新和账号／世界切换撤下 Worker、页面与调用。
+- 提供 `Script/Project/create_extension.mjs` 脚手架及 `@eden/plugin-sdk/extension` 类型；`manage_ui_plugins.describe.extensions` 与内置开发技能公开实际协议；新增设置、诊断、日志与重启入口。第三方后台继续使用已存在的 MCP／连接器。
+
+验证使用客户 Node 22.23.1；所有数据库、工作区及浏览器配置均为临时合成夹具，不以真实用户数据库测试。后端插件集成／存储回归 33 项通过，前端宿主／工作台／贡献回归 22 项通过。新扩展真实浏览器 15 项业务通过，包括消息桥、工具写入、设置、文件冲突、页面内 Ctrl+S、宿主重启、Worker 死循环后的终止及恢复、页面导航撤销消息桥，以及停用时实际执行清理回调；旧 API 1 浏览器兼容 10 项通过。两组浏览器异常数均为 0。API 2 业务夹具没有模型调用；原有智能体创作回归继续使用本地录制模型，不能将其描述成实际模型自主生成 API 2 插件的验收。
+
+证据使用根 `.run/logs/extension-platform-*`；构建只覆盖 `.release/current/Agent/web` 与 `.release/current/Agent/server` 当前组件产物。没有提交、推送、SSH 部署、重载用户客户端或生成正式客户归档，Mon 正式版本保持 1.11.9。完整 VS Code API、VSIX、远程宿主、LSP／DAP／SCM、通用凭据 SDK 和扩展依赖解析不在本轮可用能力内，不计为已完成。
+
+最终验证状态：前后端完整 TypeScript 检查、主题检查（406 文件）、架构检查（1482 文件、0 错误）、Server 构建及 Vite 生产构建均通过。前端制品生成独立 `extension-worker-*.js`；保留已有大 chunk 提醒，不将其计为构建失败。截图已检查，活动栏入口、简短工具栏标题、独立页面与状态栏显示正常，恢复成功后清除旧取消提示。
+
+主要复现命令（工作目录为 Agent，使用上述 Node 22.23.1）：
+
+```text
+node Script/Test/run_typescript_tests.mjs Server/tests/unit/plugin-ui Server/tests/integration/plugin-ui
+node --import tsx Script/Test/extension_platform_browser.mjs
+node --import tsx Script/Test/plugin_ui_browser_smoke.mjs
+node node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit
+node node_modules/typescript/bin/tsc -p frontend/web/tsconfig.json --noEmit
+node Script/Architecture/check.mjs
+node Script/Project/build_server.mjs E:/EDEN/.release/current/Agent/server
+```
+
+前端回归从 `frontend/web` 执行 `node --experimental-strip-types --test tests/extension-contributions.test.mjs tests/plugin-ui-host.test.mjs tests/plugin-ui-runtime.test.mjs tests/workbench-state.test.mjs tests/workbench-lifecycle.test.mjs`；同目录执行主题检查与 Vite 构建到 `E:/EDEN/.release/current/Agent/web`。协议客户端已重新生成，相关差异空白检查通过。浏览器、配置目录及完整临时源码均已清理，只保留当前日志、截图、摘要和当前组件制品。
+
+## 2026-11-06 压缩进度误标完成与重复卡片
+
+只读核对截图对应会话：20:53:06 开始、20:53:17 完成一次自动压缩，进度与最终结果为不同事件。前端 `compaction-message` 已生成 `progress`，但 `ApiCompactionPart` 类型及 reducer 转换未传递该字段，selector 因此将进度误当完成结果。现补齐类型、转换与事件序号；最终结果按会话回合、持久事件顺序收起旧进度，不删除服务端或模型历史。相同回合再压缩时保留较新的进度，原有完成结果仍可查看；暂停和重试保持实际状态，处理跨历史分页及旧客户端留存状态。
+
+压缩进度独立于普通回复分组和回复耗时，分段处理结束但尚未写入结果时显示“正在完成压缩”。投影缓存同时绑定投影函数，热更新后重新计算视图，避免继续复用旧的重复卡片。移除无条件的短对话提示，token 统计附上下文估算说明。本轮另对扩展 worker 的可选清理返回值增加存在性判断，消除该处 `void | Disposable` 类型错误。
+
+专项合计 36 项测试通过，包括真实浏览器的 5 个显示场景；另在当前运行的开发前端 40091 上，用隔离浏览器及合成事件验证相同 5 个场景，最终仅一张结果卡，异常数 0。没有发起真实模型压缩，没有写用户会话数据库。类型检查、主题检查及 Vite 本地构建通过，保留常规大包提示；整体架构检查另报告扩展模块 `extension-state.ts` 复杂度超限，未通过整体架构扫描，不将其记为全部检查通过。
+
+当前证据：根 `.run/logs/compaction-display-tests.log`、`compaction-display-browser.json`、`compaction-display-live.json`、`compaction-display-live.png`、`compaction-display-typecheck.log`、`compaction-display-build.log` 和 `compaction-display-architecture.log`。只更新当前源码、开发前端及本地构建，不推进 Mon 正式版本，不发布客户包。
+
+## 2026-11-06 组合插件授权、后台启动与实际页面修复
+
+复现了当前插件显示启用但必需后台默认关闭、Node 权限声明为可选且没有版本授权的问题。安装／启用现由宿主计算必需权限及已选 MCP 组件实际依赖，经当前权限模式审批后在同一事务中记录权限、组件开关和启用状态。完全访问／完全接管自动通过，受限模式继续审批；显式关闭的组件不会被无条件开启，可通过 `enableComponents` 明确选择。审批期间版本、组件或权限变化拒绝旧计划；启用失败回滚新增授权。客户端启用及组件选择接通相同流程。
+
+管理工具同时返回组件、授权与后台就绪状态；MCP 错误保留后台具体原因。UI 首次调用会等待选中后台初始化，然后重新检查会话角色、工作区和组件快照，再解析工具并执行；等待有时限、可取消，不重放写操作。实际复现插件修正为 1.2.3，必需后台默认开启，失败时显示真实错误并停止切换临时／示例数据。页面实测还修复了“全部”筛选传空状态导致参数校验失败，以及新增按钮引用错误作用域变量的问题。已有业务数据与浏览器临时数据不清除。
+
+31 项服务端／MCP 回归通过；通用组合插件浏览器 13 项检查、实际插件源码隔离浏览器 4 项检查通过，浏览器异常均为 0。覆盖完全访问自动授权、拒绝不启动、组件选择、审批并发变化、事务回滚、初始化失败、立即挂载的启动竞争，以及真实读写、筛选、重启、升级、取消和卸载保留数据。临时浏览器使用独立 Vite 缓存，避免与运行中的开发客户端互相失效；实际插件测试只复制源码并重定向数据目录，不读取真实书架数据，不查询外部作品目录。
+
+当前开发客户端通过正常重启加载修复，并使用其原有“完全接管”模式、正常插件预览／安装／启用 RPC 更新当前安装快照，未手工写用户数据库授权。实际运行接口和页面确认后台连接、版本授权及无错误列表。测试写入仅发生在临时数据中，实际客户端只作部署及只读核验。Mon 正式版本保持不变，未发布或更新客户便携包。
+
+证据位于根 `.run/logs/plugin-activation-regression.log`、`plugin-activation-browser.log`、`plugin-shelf-backend-browser.json`、`plugin-activation-live-deployment.json`、`plugin-activation-live-ui.json` 和当前页面截图；前后端 TypeScript 与架构结果另见同前缀日志。
+
+## 2026-11-06 UI 工具排队取消与备忘分页
+
+按用户要求修复前端插件在模型回复时无法操作、备忘只读前 200 条，以及取消与提醒投递感知不完整的问题。Mon 正式版本保持 1.11.9，源码变化归入 Unreleased。
+
+- Sessions 增加按会话 FIFO 等待队列，在当前模型回合结束后的空闲边界为 UI 工具保留执行位置；后续聊天仍可提交，概要读取保持响应。取消单项、停止会话、组件撤下、断线和关闭服务均可结束等待。等待后重新核对组件、账号、会话、角色与工作区选择，再走原有工具参数与审批链；独立备忘业务不要求先选文件目录。
+- SDK `host.callTool(name,input,{signal}?)` 支持单次取消，实例／模块关闭仍自动取消全部调用；前端等待立即结束。进度 RPC 提供等待、审批和执行状态，视图显示相应提示及取消入口。工具在途最多 16 个，总请求最多 64 个，排队／审批／执行总时限 120 秒，不自动重试写操作，取消不撤销已发生的业务副作用。
+- 新增 `memo.page` 与 `list_memos_page`，保留旧 `memo.list`／`list_memos` 的数组格式和单次上限。分页按更新时间和 ID 排序，游标绑定账号与查询，继续保留原数据归属过滤；模型结果契约保留 items、nextCursor、hasMore 和实际 delivery。内置备忘页接通加载更多，并隔离搜索改变或写操作前的迟到页。
+- 找到本机 `Data/realms/mon/accounts/<account>/workspace/quick-memos` 源码，更新为独立插件版本 1.0.1，接入分页、单次取消和卸载清理，去掉已结束列表额外的 50 条截断；防止连续提交和迟到列表覆盖。提醒使用 create_reminder，提供明确渠道选择且默认为 auto，创建成功只报告保存，不声称投递。该用户插件源码不加入 Git，不修改实际安装的冻结快照。
+
+验证使用客户运行时 Node 22.23.1、全新临时库与浏览器配置。提醒测试采用本机录制模型及本机 HTTP 接收端，核对调度、授权、真实工具回执、客户端显示确认、未知结果与防重复发送；没有向真实 QQ／邮箱投递。固定作者脚本夹具使用 128K 上下文并保留完整工具流程断言，避免其固定回复被当成自动压缩摘要；生产压缩配置不变，技能正文验证读取当前定义标题。
+
+可复现命令：`node Script/Test/run_typescript_tests.mjs Server/tests/unit/memos Server/tests/unit/tool-results Server/tests/integration/plugin-ui Server/tests/integration/memos Server/tests/regression/memos`；前端 `node --test tests/plugin-ui-host.test.mjs tests/plugin-ui-runtime.test.mjs`；浏览器 `node --import tsx Script/Test/memo_page_browser.mjs` 和 `node --import tsx Script/Test/quick_memos_browser.mjs <plugin-source-directory>`。前者通过真实 RPC 遍历 435 条、核对搜索与迟到页；后者安装实际 quick-memos 源码到隔离宿主，核对 235 条分页、忙碌取消、默认与显式渠道、单次创建及关闭标签后不晚到写入。
+
+最终结果：服务端 49 项与前端 9 项回归通过，0 失败、0 跳过；两项真实浏览器验收合计 9 个业务检查通过，浏览器异常为 0。前后端 TypeScript、主题检查通过；架构扫描 1467 个源码文件、0 错误，保留已有规模警告。快捷备忘实际测试源码 SHA-256 为 `982f0ad6ee007d345f4ba2bf1cc07c79f40bdb8fdf901c49599a4f7289719269`。
+
+当前证据位于根 `.run/logs/ui-tools-memos-regression.log`、`memo-pagination-browser.json`、`quick-memos-browser.json` 与备忘页截图。实际用户库、现有提醒和当前安装快照没有作为夹具。本轮只修改源码及隔离验收；新版宿主及插件还需配套部署，不代表客户便携包已经更新。
+
+## 2026-11-06 插件管理布局与查找
+
+用户指出布局混乱、内容难找。实际旧页先展开开发清单／源码编辑器，再堆叠恢复、市场、公钥和安装，已安装插件位于 1500px 之后。现默认进入“已安装”，提供名称／ID／描述搜索、启停筛选；宽栏使用列表／详情，窄栏选择插件后进入详情并可返回。详情分别展示概览、组件与版本、权限和实际 MCP 运行状态，明确组合包中的交互界面与独立后端组件。
+
+安装、插件市场、开发、恢复为独立分类，按首次访问挂载后保留组件与表单；来源、公钥和版本审查放在对应入口。检查后修改本地目录会清除旧预览。复用原检查、安装、启停、组件、授权与卸载 RPC，没有绕过服务端或自动授予权限。开发草稿接入统一文档登记，关闭可取消、保存或明确放弃，保存校验失败保留页面。详情区域独立滚动，矮窗保持已安装条目可见。
+
+验证：主题／TypeScript／Vite 构建、16 项相关回归、插件浏览器全链路 12 项通过。真实尘世隔离客户端 8 类检查通过：首屏列表、搜索／筛选、详情与真实后端、通过页面检查／安装／启停／组件切换／卸载合成插件、旧预览失效与目录错误、分类表单保持、未保存关闭保护、375–1536 七种宽度；额外检查 480／360px 矮窗。聊天记账本版本与启用状态、开发草稿与市场来源均保持原值，测试插件已卸载。全链路排队聊天使用录制模型，无新增真实模型调用或客户发布。首轮浏览器回归在并行构建的热重载中断，构建结束后单独复验完整通过。
+
+证据：根 `.run/logs/plugin-management-{desktop,short-window}.json`、`plugin-management-{build,related,fullstack}.log`；当前界面为 `plugin-desktop-plugin-management-after.png`，旧页截图为 `plugin-desktop-workbench-plugin-management-before.png`。当前隔离测试客户端已更新并停留在已安装列表与记账本详情。
+
+收尾：测试插件已通过正常卸载完成清理；临时工作区 management-probe 源码目录的可选删除被自动审批返回 blocked by policy，保留该小型源码目录，不绕过或重试删除。
+
+## 2026-11-06 暂停朗读后的下一轮流式播放修复
+
+用户报告暂停过内容后下一次合成似乎不再流式。本轮按“App 暂停语音朗读”场景检查并复现：暂停的 HTMLAudioElement 不会结束当前 SpeechPlaybackQueue 任务，新回合虽然已按句完成合成，仍排在旧任务后面；旧回合持有的 whenIdle 回调还会在队列释放后清空整个 streamStatesRef，误删刚建立的新回合状态与游标。
+
+修复 useTTSSpeech：新回合开始时，仅在用户暂停标志与音频 paused 同时成立时释放旧播放周期，保留缓存供手动重播；正常加载元数据时浏览器的 paused 不作为用户暂停处理。同条消息内暂停仍可继续，后续增量文本不会自动解除暂停。回合结束回调捕获本回合状态集合，只移除仍对应同一对象的条目，并只清理本回合进度，防止旧回调影响后续回合。
+
+新增隐藏 Electron 页面挂载实际 React hook，以可控 Audio 与 TTS／桌面接口替身复现暂停、恢复、再次暂停、下一条文本增量与音频元数据加载；没有连接真实账号、TTS 服务或音频设备。修复前新消息已有第一句合成调用，但 active 仍为 old-segment 且新消息没有播放；修复后在消息仍 streaming 时开始下一条播放，追加第二句不重复合成第一句，只保留一次新流预约。同条暂停／恢复、未暂停的加载中音频不被误中断均通过。相关语音回归 41 项、前端类型检查和主题源码检查通过；当前构建证据与基线失败记录位于 E:/EDEN/.run/logs/speech-paused-next-turn-*。未主动重载运行中的客户端，具体用户操作的确认仍以回复为准。
+
+## 2026-11-06 分栏拖动时 Spine 闪烁
+
+用户确认闪烁对象为动态 Spine。使用包内 arona_spr 实际骨骼、atlas 与纹理，在隔离 Electron 工作台中连续改变工具侧栏与主侧栏宽度，读取 ResizeObserver 后的 WebGL 透明度：修复前 59 次 renderer.resize 观察到 41 次空白，只有一个 Spine Application 和各一次资源请求，没有重载角色。根因为 ResizeObserver 先 resize 清空画布，再排到下一 RAF 才 fitModel／render，透明画布有机会呈现。
+
+修复由 ResizeObserver 独占画布尺寸，移除 Pixi resizeTo 的独立窗口尺寸处理；已就绪角色在当前尺寸回调同步 fitModel 并 render，不等待下一 RAF。资源尚未加载时只同步尺寸，不消耗骨骼边界的初始化重试预算。没有修改分栏布局、角色选择、资源或动画映射。
+
+同一渲染脚本复验 59 次尺寸调整，空白帧 0，角色隐藏 0、移组 0、Application 实例 1，骨骼／atlas／纹理仍各只请求一次；35 项相关回归、主题／TypeScript／Vite 构建通过。渲染验收使用原生隐藏 Electron／SwiftShader 和实际资源，离屏指针捕获边界由夹具控制，分隔条仍执行生产 React pointer 处理器；不宣称覆盖用户所有 GPU。证据为根 `.run/logs/workbench-spine-resize-{before,after}.{json,png}`。临时渲染程序及浏览器配置已清理，原隔离测试客户端已刷新并重新打开；未读取真实用户库作为夹具、未调用模型或发布客户包。
+
+## 2026-11-06 角色移动开关并入顶部菜单
+
+按用户要求，将聊天标题栏的四向箭头移除，删除聊天编辑器的角色调整回调链。顶部角色菜单新增“角色移动”复选项，显示开启／关闭状态；开启自动打开角色立绘并把 editing 传给原 AdjustableCharacterView，拖动、滚轮缩放和位置持久化沿用已有实现。再次点击关闭；Esc 在没有其他菜单／模态窗口消费时结束调整，隐藏或关闭角色标签后复位。
+
+验证：主题／TypeScript／Vite 构建和相关 31 项回归通过。真实尘世隔离客户端复验角色菜单全部入口及五种宽度，新增移动开关开启／关闭、打开角色、Esc 先关菜单再退出调整、隐藏角色复位及旧聊天入口消失的验证，共 8 类检查通过。夹具未导入角色素材，没有新增实际 Spine 拖动验收；角色资料保持原值，无模型调用。记录为根 `.run/logs/workbench-character-move-*`，菜单截图继续使用 `plugin-desktop-workbench-character-menu.png`，测试客户端已更新并保留菜单展开。
+
+## 2026-11-06 顶部角色菜单
+
+按用户指定的顶部工具区，在“新聊天”旁新增角色图标及下拉菜单。尘世菜单直接导航到同一配置实例的基本信息、完整角色、视觉资源；导航请求带修订号，缓存页也能响应重复定位。伊甸园菜单绑定原会话角色与默认角色选择回调，不转到尘世本机角色配置。两边提供显示／隐藏角色立绘，选中态按工作台实际可见区域计算；角色页放到运行面板后也能从菜单切回显示。菜单使用顶层弹层，支持上下方向键、Home／End、Esc 和视口内定位。
+
+真实客户端联调发现，未配置素材时 CharacterPanel 原先直接返回 null，显式打开角色标签会是空白。增加显式显示空态的可选参数，工作台角色页展示说明和“配置立绘”按钮，直接进入视觉资源；其他默认调用继续不占用空立绘空间。
+
+验证：主题、TypeScript／Vite 构建及相关 34 项回归通过；尘世隔离真实 Electron 验证菜单键盘操作、三个配置分区直接定位且不重复建标签、空态配置入口、立绘显示／隐藏、1536／1100／800／480／375 五种宽度。前后对比确认角色资料未变化，没有导入素材、发送模型请求或发布客户包；伊甸园真实 Core 账号切换未在本轮执行。证据为根 `.run/logs/workbench-character-*` 和 `plugin-desktop-workbench-character-menu.png`，测试客户端保留菜单展开供查看。
+
+## 2026-11-06 恢复输入框右侧计时与上下文
+
+按用户纠正，移除工作台将两个指示圈横排到输入框上方的样式。正常聊天输入壳为右侧指示圈预留列，计时在上、上下文占用在下，底部对齐输入区域；窄分栏缩小指示圈并按输入框实际宽度逐步收紧操作控件，不迁移到上方。语音面板或隐藏底栏时不保留空列，对话浮层沿用原布局。没有修改计时来源、上下文统计或会话上限。
+
+验证记录为根 `.run/logs/workbench-meters-*`：主题／TypeScript／Vite 构建、24 项相关回归通过；隔离真实 Electron 验证 11 种窗口宽高组合的左右位置、上下排列、预留空间及操作控件无重叠，并验证计时明细和上下文窗口。使用合成会话，没有发送模型请求或保存上限。最终截图为 `plugin-desktop-workbench-meters-right.png`，测试客户端保留运行。
+
+## 2026-11-06 合并会话标题栏
+
+按用户截图，将编辑组标签与会话工具合为同一条 38px 标题栏，移除聊天内部额外工具行。工具栏由所属文档持有，经独立稳定容器进入所在组的标题栏；切换、移组和窄宽切换不重建聊天或工具组件，原生焦点事件同步所属编辑组。窄栏的移动／拆分／合并入口收进“编辑组操作”命令面板。回复长度与外观菜单使用顶层弹层，在视口内定位并滚动；隐藏文档时关闭所属弹层。
+
+验证：前端主题、TypeScript／Vite 构建及相关 22 项回归通过。真实隔离 Electron 客户端验证单行高度与内容紧邻、菜单展开与裁切、移组保持同一工具栏节点／草稿／自动滚动、切换标签关闭并恢复菜单、1536／1100／800／480／375 五种宽度。证据为根 `.run/logs/workbench-header-*` 和 `plugin-desktop-workbench-header-merged.png`。当前测试客户端已更新；没有调用真实模型、改动真实用户库或发布客户包。
+
+## 2026-11-06 工作台第二阶段：独立实例与递归布局
+
+按用户继续修改的批准，将首版共享聊天区改为独立聊天编辑器，每个实例持有自己的会话、消息、滚动、输入和草稿；仅接收所属会话的事件及恢复快照，避免多开时重复缓存其他会话。修复新编辑器在会话列表／重连快照到达时误选已有会话的问题。打开实例持有连接引用，五分钟空闲回收保留所有仍打开的编辑器；禁用及卸载释放引用。
+
+编辑器树支持左右／上下递归拆分、跨组移动、合并、排序与固定。独立工具侧栏、上下左右运行面板均可承载页面，尺寸不足时临时合并展示，变宽／变高恢复原树。插件可复制为多个独立实例，各自绑定打开时的会话，切换聊天不重新绑定。稳定 portal 保留移组和缩放前后的组件状态。
+
+新增统一命令、焦点和文档生命周期。Ctrl+Shift+P／Ctrl+P 搜索命令；Ctrl+S、Ctrl+W、区域切换及分栏快捷键统一分发。聊天文字草稿按工作区／账号及实例保存，关闭后可恢复；附件明确阻止冒充持久化保存。配置页和声明 setDirty/registerSave 的插件在关闭时提供取消、放弃、保存后关闭，保存失败保留实例。原生窗口退出继续使用桌面壳退出事务，文件仍为工作区 RPC 只读预览；未实现任意原生浮动窗口和文件编辑保存。
+
+验证记录持续写入根 `.run/logs/workbench-v2-*`。真实 Electron 验收使用原隔离客户端、真实 RPC 与此前模型生成的 chat-ledger，覆盖两会话草稿隔离、三组递归布局、同插件双实例及真实会话绑定、保存／取消关闭、配置表单、草稿关闭恢复、完整客户端重启，以及九种窗口宽高组合的越界和输入控件重叠检查。测试用探针插件结束后卸载，保留原记账本、合成数据和完全访问设置供用户查看。没有新增真实模型调用，没有改动真实用户数据库，没有发布完整客户包或推进产品版本。
+
+最终结果：前端相关回归 100／100，通过连接引用释放、跨会话事件／快照隔离、空白实例防误绑定、问题恢复与既有聊天行为；插件浏览器全链路 12 项通过，真实 Electron 8 类验收及 9 种宽高组合通过。主题检查、TypeScript／Vite 构建、Server 类型检查通过，架构 1464 源文件、0 错误。插件浏览器的排队聊天仍使用录制模型。原全量前端已有的 Spine 源码正则断言失败未改动，不宣称整个项目全量测试通过。递归布局证据为 `plugin-desktop-workbench-v2-final.png`；验收后将当前窗口整理为中央记账本／右侧聊天，截图为 `plugin-desktop-workbench-v2-current.png`。
+
+## 2026-11-06 统一前端工作台首版
+
+用户批准按工作台组织前端。新增 workbench 状态模型与主辅编辑分组，复用原会话、文件、内置管理页面、插件 SDK 与业务后端。标签支持拖动排序／跨组移动、关闭及键盘选择；分栏支持拖动和键盘调宽，底部复用任务／操作／连接面板。1000 像素以下合并分组显示，布局按世界、服务工作区与账号保存；先恢复当前会话再挂载插件，避免默认会话覆盖恢复顺序。稳定 portal 保留切换、缩放和移组时的插件表单，关闭及撤下继续取消所属请求。
+
+验证：主题检查、前端 TypeScript 与 Vite 构建通过；工作台状态与插件运行时 8 项通过。真实 Electron 客户端验证中央插件／右侧聊天、内置配置标签、移组保留表单、调宽／运行面板、原文件树与真实 RPC 预览、375–1536 九种宽度；独立后端真实增删、零金额拒绝、完整客户端重启恢复标签／分组／尺寸／记录／完全访问设置均通过。组合插件浏览器夹具已改用新 Workbench，12 项通过，覆盖业务失败、升级、关闭取消、断开取消、启停与卸载保留数据。该夹具的排队聊天使用录制模型，不冒充真实模型。
+
+证据：根 `.run/logs/workbench-{desktop,persistence}.json`、`workbench-unit.log`、`workbench-fullstack.log`、`plugin-desktop-workbench-final.png`。本次工作台测试使用此前实际 DeepSeek 生成并安装的 chat-ledger，沿用隔离客户端与合成数据；未新增模型调用、未改变用户完全访问、未更新客户发行包或正式产品版本。内置技能／SDK 文案位于源码，测试客户端本轮仅刷新前端资源。
+
+收尾：工作台／插件运行时／聊天与本地配置专项 26 项、SDK 作者工具循环 1 项通过；Server 类型检查通过，架构 1464 源文件、0 错误。前端全量首轮 626 项，615 通过、10 失败、1 跳过；工作台引入的无 DOM 静态渲染问题和旧标签／空立绘断言已修正，专项复验通过，配置页保留既有密钥展示行为，自动化继续按字段语义遮蔽凭据。四项原生渲染测试串行复验全部通过，记录 `workbench-existing-renderer-recheck.log`。仍有既存 `assistant-switcher-visual.test.mjs` 中可见桌宠渲染的源码正则断言失败（独立复验 9 通过、1 失败），未修改该段无关 Spine 实现；不宣称全量回归全绿。当前会话标签共享一个聊天区，移组一并移动会话标签组，尚不提供双组同时运行不同聊天编辑器。
+
+## 2026-11-06 QQ 独立超限模式开关
+
+在 QQBot → 智能体设置新增“开启超限模式”，默认关闭，按机器人保存，作用于该 QQBot 的智能体私聊和群聊。Web 使用既有布尔偏好保存流程，核对返回机器人和确认值，提供保存错误与重试；切换账号／机器人、过期资料返回以及旧 Core 缺少字段时不误报已保存或已开启。
+
+Core 0033 新增 agent_prompt_mode_enabled，API 只接受布尔值，沿用拥有者校验；新私聊、旧群与共享群请求读取当前机器人配置，共享群入队 payload 持久化该值。Agent 私聊和群上下文 schema 接收 prompt_mode_enabled，QQ 缺省关闭，不再读取 App 的 PromptModeRepository；在接受输入时使用 createPromptModeSnapshot 复用现有模板，随后 App 或 QQ 配置变化不改写已经入队的输入。App 原账号设置保持独立，模板正文、角色和工具权限未修改。
+
+验证：Core 303 项通过，0033 在隔离旧表实际执行，已有机器人默认关闭；Web 82 项、浏览器 9 项交互通过，覆盖开／关保存及刷新恢复、旧响应保护和 QQ 语音／长度等已有设置。Agent 新增模式／长度实际模型 HTTP 请求 4 项及模式持久化／运行时、QQ 私聊／旧群回归 15 项通过，确认 QQ 开／App 关和反向组合独立、群聊 off/on/off 正确及快照保持；拒绝的工具写入仍不能因模式开启而执行。前后端类型检查、架构检查（1464 源文件、0 错误）及固定当前输出构建通过；已检查语音和超限控件及 1366／1024 窗口截图。证据位于 E:/EDEN/.run/logs/qq-prompt-mode-*。仅使用隔离数据库、合成 QQ 请求与本机模型 HTTP 夹具，未调用真实模型或向真实 QQ 发消息；未迁移真实用户库、未重启在线服务。
+
+## 2026-11-06 QQ 独立语音合成范围
+
+按用户补充，在 QQBot → 智能体设置增加 QQ 语音合成三档：关闭（默认）、仅对话（过滤括号及整行星号动作）、全部内容（含动作）；与 Agent App 的 PetTTSMode 以及普通 QQBot 的语音命令分别保存。Core 新增 agent_tts_mode 和 0032 迁移，只处理最终回答的 TTS 文本，不改原文或模型提示。回答角色必须属于机器人拥有者并已绑定 TTS；无可朗读内容、无绑定、合成失败、音频不合法或超过 10MiB 时回退现有卡片／文字。
+
+Core 读取按拥有者隔离的 TTS 音频缓存，私聊通过回复协议携带内联音频；共享群经 send_group_voice 有界语音动作及真实发送回执投递，继续校验当前权限，先持久化 sending，不明结果禁止自动重发。未放宽普通媒体消息的公网 URL 约束。BotCore 两处接收均校验音频格式和大小，按会话发送锁顺序调用 NapCat record，缺少消息 ID 仍为 unknown。语音范围在合成中改变时丢弃旧范围音频；群上下文保留完整文字回答。
+
+验证使用隔离 SQLite、合成音频夹具和替代外部服务的边界：Core 最终全量 299 项（包含 7 项语音专项）、BotCore 55 项、Web 76 项通过；0032 对隔离旧表实际执行并验证已有机器人的默认关闭值。Web 类型检查、当前输出构建与浏览器 8 项交互通过，检查了 1366／1024 窗口和语音控件截图。最终验证证据持续写 E:/EDEN/.run/logs/qq-speech-*。未迁移真实用户库、未重启在线服务、未调用真实 TTS 提供方或向真实 QQ 发送语音；在线声线和 QQ 播放仍待部署验收。
+
+## 2026-11-06 插件技能架构检查复核
+
+用户询问上轮架构检查结果后，重新执行 `npm run check:architecture`：当前工作区 1463 个源码文件、0 错误，保留规模警告。此前插件 UI 的 `verified-package.ts → manifest.ts → ui-modules.ts → verified-package.ts` 依赖环在当前源码中已不存在，`ui-modules.ts` 使用局部类型，不再导入 `verified-package.ts`。此次仅复查静态架构，没有运行行为测试或判断在线服务是否加载该源码；上轮失败记录继续保留。
+
+## 2026-11-06 QQ 独立回复长度
+
+按用户纠正，QQ 与智能体 App 的长中短是两份独立设置。Web 的 QQBot → 智能体设置 → 回复与过程回传增加“QQ 回复长度”，Core 按机器人存 agent_reply_length，默认 medium，可选 short／long；新增 0031 迁移。Agent App 继续按账号／角色读取原 UiPreferenceRepository；QQ 输入不读取或改写该值，只复用长中短提示语义和“消息明确要求优先”的规则。
+
+Core 每次接入从数据库读取最新 QQ 偏好，私聊参数和群上下文冻结到对应输入，已有排队与重复请求保持原快照。Agent 支持私聊长度资料、旧群参考与共享群上下文；私聊设置资料不再误当成群参考解析。默认缺失 QQ 配置使用中，不回退到 App。浏览器的保存只更新当前机器人长度，并保护账号／机器人切换和旧资料响应。
+
+实际验证：前端 QQBot 70 项、Core 289 项及 Agent 12 项相关回归通过，均无失败或跳过；实际模型 HTTP 载荷验证 QQ 短与 App 长并存、QQ 群长不被 App 短覆盖，旧输入保持快照。0031 在隔离上一版 bot 表执行并验证已有机器人默认中；未迁移真实用户库。浏览器七项交互通过，覆盖 QQ 长回复保存和刷新恢复，1366／1024 截图检查；类型、架构及当前候选构建按本轮记录执行，证据位于 E:/EDEN/.run/logs/qq-reply-length-*。未向真实 QQ 发送消息，未主动重启在线服务。
+
+## 2026-11-06 会话同步与隐藏窗口渲染性能修复
+
+按用户要求修复当前源码确认的开销，涉及 Core Sessions HTTP、Server Mon 投影和前端 Pixi／Spine。当前产品版本保持 1.11.9，各仓库记录于 Unreleased。
+
+- 参与者 GET 只加载经过原有权限与后台会话筛选的会话身份、参与者及其助手／角色，不再预加载消息、导演记录和会话 JSON；参与者资料、顺序和更新后立即可读的行为不变。
+- 会话 POST 与参与者 PUT 增加 `?response=minimal`，成功仅返回 `id`；Server 两处调用配套使用。默认完整响应兼容旧调用端，新 Server 仍接受旧 Core 的完整响应，保留游标、投递去重和失败恢复。
+- 渲染器统一合并原生主窗口与页面可见性，隐藏／最小化暂停教室场景和 Spine 绘制，显示后恢复；可见且未聚焦的桌宠继续绘制。保持主窗口关闭后台节流的业务调度策略，卸载时取消订阅。资源加载成功后清除网络超时，后台等待 GPU 预热不再误报加载失败。
+
+实际验证：Core Sessions 29 项、Mon 回归 24 项、前端及真实 Electron 窗口 8 项，共 61 项通过，0 失败、0 跳过；前后端类型检查最终均通过。Mon 与前端最终回归使用便携包内 Node 22.23.1；本轮未修改 QQ 权限模块。
+
+Mon 命令：`node Script/Test/run_typescript_tests.mjs Server/tests/regression/mon`，覆盖兼容完整响应、权限／配置隔离、失败恢复及既有百万事件空闲扫描回归。前端命令：`node --experimental-strip-types --test tests/render-visibility.test.mjs tests/spine-unfocused-rendering.test.mjs tests/spine-initialization-race.test.mjs tests/startup-tray-opening-renderer.test.mjs`。真实 Electron 使用生产 preload、原生可见性通知和托盘处理器，图标为测试适配器；验证后台节流关闭且 `document.hidden === false` 时隐藏／最小化均停止场景帧、显示后恢复，冷启动后台等待 13 秒不误报超时，并保留登录表单、动作与资源实例。使用临时配置及本机场景资源，窗口不抢占桌面，临时完整目录退出时清理。
+
+Core 使用自身 `.venv/Scripts/python.exe -B -` 调用 `DiscoverRunner` 执行 `Application.Domain.Agent.Sessions.tests`；在 `django.setup()` 前将数据库设为 `:memory:`，保留 `IMMEDIATE` 与 WAL／NORMAL 初始化配置，并将缓存、Channels 切为内存。新增回归断言参与者读取与精简响应不查询消息／导演历史、默认响应仍含原历史，并验证跨用户／后台会话隔离、助手归属及参与者立即重排。真实用户库未作为测试夹具。
+
+证据位于根 `.run/logs/performance-fix-core.log` 和 `.release/current/Agent/startup-tray-opening/tray-opening-result.json` 及当前截图。本轮完成源码和 Windows 本机验证；客户包尚待构建，Linux Mint 客户机未部署，整机 CPU 与切页延迟未重新测量。
+
+## 2026-11-06 QQBot 独立智能体设置
+
+后续按用户截图删除页内重复的“智能体设置”标题、机器人图标和简介，去除首部分隔线与空白；导航入口与实际设置保留。同步调整既有浏览器夹具的等待锚点；此次纯展示删除未重跑测试。
+
+按用户要求在 Mon Web 的 BOT 设置 → QQBot 新增“智能体设置”分页，移入助手绑定、最终回复形式与工具过程回传，并增加单个群／私聊的智能体模式和工具审批配置。卡片页保留外观编辑；通用触发和戳一戳仍在规则页。使用所选助手的模型与人设，不额外复制一份 QQ 专属模型／提示词配置。
+
+Core 新增 GET／PUT `/api/devices/qq_bot/{id}/agent-settings/`，先核对 Web 管理归属，再复用真实 QQ 超级管理员及群准入要求；启用前检查 Agent 能力，读取不创建会话或调用模型。群开关只更新目标群规则，保留其他群及戳一戳，关闭不依赖 Agent 在线；私聊模式独立保存。模式更新带 Core 状态版本，权限更新另带实际旧审批模式，Agent 在权限仓储同一事务比较后写入，冲突不覆盖。版本与端点均兼容原 QQ 命令调用，旧 Agent 不支持新字段时明确失败，不假装保存成功。
+
+前端按机器人／会话／账号隔离编辑状态，拒绝旧回执；保存未知或冲突后清除旧快照并要求重新读取。未取得 Agent 权限时显示未知而非默认受限模式。QQBot 前端 64 项、Core 全量 285 项及 Agent QQ 权限相关 11 项通过；前端和 Server 类型检查通过，Agent 架构扫描 1462 文件、0 错误，保留已有规模警告。Web 与 Server／runtime worker 构建覆盖固定当前候选目录。
+
+无头 Chrome 挂载实际设置组件，以合成 HTTP 边界完成六项交互验收：模式保存、权限保存、刷新恢复、群私聊隔离、发送开关迁移与离线状态；1366×900、1024×768 截图已检查。证据放工作区根 E:/EDEN/.run/logs/qq-agent-settings-*，浏览器夹具和临时依赖缓存退出时清理。未修改真实 QQ 配置、迁移用户库或主动重启在线服务；正式生效需配套更新 Web／Core／Agent。
+
+## 2026-11-06 QQ 群共享会话落地与真实缓存验收
+
+按用户批准完成 Core／Agent 源码编辑：一账号／机器人／群一份 Agent session 与 checkpoint，Core 按消息序号持久排队；新增 qq-group-turn.v5／qq-group-shared.v1 与能力协商。普通群消息增量保存到镜像后，在安全回合边界原子加入模型检查点；来源 entry ID 跨压缩去重，Agent 原生输出按 input 回流映射排除。每次身份、引用和附件随原问题保存，成员轮换不更改前面内容；system 维持群默认资料。
+
+逐输入绑定真实操作者，接通 NapCat／表情／文件／权限／状态与提醒；取消 A 不清空 B 的队列，延迟回调不能借用后续成员身份。增加按原 QQ 消息取消，以覆盖接收回执丢失；Core 已持久排队的取消即使 Agent 不可达也保留，明确报告未确认的 Agent 停止回执。角色变化仅在空闲边界完成，保留共享历史并明确追加切换记录。Core 最终回复使用 NapCat 动作回执分段存档，sending 崩溃及文件未知投递不自动重发。
+
+实际验证：Agent 91 项、Core 277 项回归通过，合计 368 项、0 失败、0 跳过；含实际签名跨进程 Core→Agent 链路和隔离上一版 Core schema 的 0030 数据迁移。Server 类型检查通过，架构扫描 1461 文件、0 错误，保留已有规模警告；Server 与隔离 runtime worker 构建通过，覆盖固定 E:/EDEN/.release/current/Agent/source-fix-validation。
+
+真实 DeepSeek Flash 使用合成群聊和全新内存库做 A→B→A 三次请求，成功完成并断言供应商实际请求前缀保持；cacheRead 分别为 0／1408／1536 tokens，后两次命中比例 84.77%／88.43%。区分 SDK 未缓存 input 与总输入，不把本地指纹当命中或零 cost 当免费。详见 [设计与验收记录](Eden%20Agent%20QQ%20群聊共享会话设计.md)。证据为根 .run/logs/qq-shared-{agent-all,core-all,live,types,architecture,build}，真实模型数据另存 qq-shared-live.json。
+
+本轮未执行真实数据库迁移、重启在线进程、发送真实 QQ 或发布客户包；上述上线与真实 QQ/NapCat 联合验收仍待运行环境切换。此前设计阶段的记录保留为历史，不代表当前源码状态。
+
+## 2026-11-06 QQ 群成员轮换与缓存设计补充
+
+按用户追问，给 [群共享会话设计](Eden%20Agent%20QQ%20群聊共享会话设计.md) 补充 6.1／6.2：A→B→A 交替请求应延续原历史前缀，身份、引用和个人偏好随模型输入持久保存；固定 system 使用群默认配置，个人差异放本轮尾部，工具 schema 稳定排序。指出旧 TurnContext 整包参考临时注入会在下一回合消失，共用 sessionId 仍不足以保证整段前缀延续。
+
+核对 DeepSeek 官方当前缓存与 user_id 契约及本地 SDK：区分已持久化前缀匹配、实际缓存范围和不保证命中；不通过伪造用户身份绕过隔离。现有 promptCacheFingerprint 没有比较全部历史，后续需保留实际载荷差异与供应商命中／未命中用量，正确区分 SDK 的未缓存 input 和 cacheRead。补充交替成员、偏好／权限变化、工具循环、恢复及压缩前后的待验收项，不预填命中率。
+
+本轮只读取源码与官方文档、修改设计和跟踪记录并检查差异；未改生产逻辑、运行测试或向模型发请求，未修改真实数据、构建或重启服务。
+
+## 2026-11-06 组合插件与实际模型验收
+
+新增真实 UI＋MCP stdio 后端＋SQLite 的组合包测试，覆盖逐版本授权、增删改查、宿主重启、数据库升级、禁用／撤权、卸载保留数据及崩溃后防重复执行。4 项新集成在 Node 24.21.0 和客户运行时 Node 22.23.1 通过；9 项关联回归、3 项账号／会话传输回归及 Node 22 下隔离浏览器 12 项检查通过。修复 UI 审计将业务失败误记完成、长请求堵塞同连接请求队列的问题，补齐断线取消。
+
+实际 DeepSeek 模型在空临时工作区中自行编写并安装前后端组合插件；提供协议参考，未提供业务实现，授权由测试执行器单独批准。两轮共 25 次实际请求：首轮 12 次、重启验收超时，第二轮 13 次通过浏览器操作、重启持久数据及卸载保留数据验收。类型检查、服务端构建和架构检查（1444 文件、0 错误）通过。汇总位于根 `.run/logs/plugin-fullstack-summary.json`，详细说明见 [智能体前端扩展](智能体前端扩展.md)。本轮未更新客户包，未将全仓此前两条断言失败报告为通过。
+
+## 2026-11-06 QQ 群聊共享会话重新设计
+
+按用户批准，核对 QQBot 的唯一群会话、普通模式历史组装、串行锁与成员记忆作用域，对照 Agent 的成员分叉、会话级 QQ 操作者和取消／失败范围，新增 [QQ 群聊共享会话设计](Eden%20Agent%20QQ%20群聊共享会话设计.md) 并登记中英文索引。目标为一群一份 Agent 历史和压缩检查点，输入级保存真实操作者，普通群消息增量导入；定义有序接收与提交、工具回合完整性、审批／取消／提醒归属、回答回流去重、压缩位置、旧任务排空和协议协商。
+
+首版按群串行，明确审批等待和长任务会阻塞本群前台队列；一人的取消或可记录失败不清空他人请求，不承诺直接复用旧会话级 cancel 即可完成。旧成员检查点不硬合并，Core 公开记录用于启动引导；个人记忆和自主插话不随此设计自动启用。方案中的表、协议与接口均为待实现项，不用旧设计的既有测试分数作为新方案验收。
+
+本轮仅做静态源码阅读、设计文档和索引更新、差异空白及链接检查；没有修改生产逻辑、迁移真实数据、运行测试、调用模型、发送 QQ、构建或重启服务。
+
+## 2026-11-07 内置调度器表述纠正
+
+按用户提醒核对工作区 2026-10-22 的本地能力迁移记录和当前源码：独立 BaseOs／MonOs 已退役，`OsScheduler` 由伊甸园 Agent 的 Node 进程持有，并通过 `osWakeTarget` 同进程调用账号运行时的自醒桥接。作业载荷 `scheduler: monos`、旧配置名与部分迁移注释为兼容遗留，不表示独立服务。更正本跟踪中新近的插件自醒说明、插件技能、自醒工具描述及开发运行文档；历史实施记录保留当时背景。
+
+本轮仅静态阅读与修正文案，没有改变调度代码、数据库或协议，也没有执行测试、构建、重启或实际自醒；事件到调度器再到作业执行的联调结论仍以实际证据为准。
+
+## 2026-11-06 插件诊断与统一包管理
+
+按用户批准，新增 `manage_plugin_packages`，通过统一插件注册表检查和安装纯 MCP、UI、连接器及组合包，检查快照按会话、回合、行动角色和入口隔离，安装、启用及卸载继续经过审批和版本校验；启用后等待 MCP 后台状态，不将后台未知或失败当作业务成功。UI `status` 为近期模块／视图回报增加客户端标签；`diagnostics` 按当前会话与插件查询有限的进程内页面错误和 UI 工具调用阶段，含 MCP 目标名称，不存工具参数或结果。API 2 页面通过已有消息通道报告有限的脚本异常、未处理拒绝、console 警告／错误、CSP 和资源失败；API 1 的一般 console 无可靠归属，保留已有渲染错误回报。UI 桥和嵌套工具审批通过回调反映等待状态，不改变审批决定。
+
+纠正上一轮对连接器自醒的判断：数据库触发器会把连接器作业放入会话调度发布表，Agent 内置的 `OsScheduler` 接收调度请求后通过同进程桥接，将作业标记为兼容协议值 `monos` 并交给作业调度器领取；不能仅凭领取 SQL 判定链路不通。`read_connector_events` 新增作业和发布状态，`published` 表示发布文件已写入，不代表内置调度器已接收或实际执行。未修改调度所有权、触发器、限频和自醒队列语义。旧的“可能无法领取”判断撤回；实际端到端联调仍待验收。
+
+后台描述文件在包预检时报告具体组件及文件错误（作为警告保留旧包检查兼容性），启用时继续严格校验。实际检查：Server 和 Web TypeScript 通过；架构扫描 1484 个源码文件、0 错误，保留既有规模告警；页面 bootstrap 的 Node 语法检查和相关已跟踪文件差异空白检查通过。未编写或运行测试、构建客户包、重启服务或操作真实用户数据；纯 MCP 安装、实际 UI 诊断与嵌套审批、内置调度器接收并执行自醒仍待隔离端到端验收。
+
+## 2026-11-06 插件自主创作链路
+
+按用户要求补充宿主能力：`build_connector_plugin` 使用宿主连接器 SDK 构建工作区源码和完整包，要求新输出目录及写入审批；便携服务端构建和打包脚本新增自包含 SDK 制品。`manage_plugin_grants` 通过现有审批链申请当前版本包权限；`manage_connector_instances` 在当前活动应用会话中发现、创建、自动绑定、配置、申请实例权限与连接，审批后重新检查实例代际和版本。管理工具只接受业务选择，不让模型复制修订或授权快照；子任务和 QQ 不新增这些管理权限。
+
+UI SDK 新增 `host.onConnectorEvent`，仅向声明 `read_connector_events` 的界面提供绑定会话事件元数据和重连同步提示，复用会话事件通道、按事件去重并随视图清理；业务状态和事件正文仍通过工具读取。插件开发技能、两套 describe 和技术文档已更新。自醒仍遵循原调度器和限频，外部调度模式的连接器事件作业领取与即时聊天回合不能宣称已保证。
+
+Server 和 Web TypeScript 检查通过；架构扫描 1471 个源码文件、0 错误，保留既有规模告警。未编写或运行测试，未构建、打包、安装或启动客户制品；当前 PATH 中 Node 为 24.21.0，未在预期固定目录找到 Node 22.23.1。打包后的 SDK、模型自主创建组合包、授权及重启、浏览器事件和实际业务交互仍待真实验收。
+
+## 2026-11-06 插件开发技能贯通 UI 与连接器
+
+按用户批准，将既有 `eden-ui-development` 扩展为统一插件开发指引，保留技能名称和显示名。新增 UI、连接器和 MCP 后端的选型、同包构建、管理工具检查快照、权限及实例会话绑定、共享业务状态、事件与自醒限制、分层验收说明，并关联对应工具的实时 `describe`。技能声明连接器及业务调用所需工具；缺失工具仍按现有技能机制报告，不授予权限或绕过管理流程。UI 与连接器运行时和协议未合并。
+
+本轮仅改技能提示、工具说明和项目文档；Server TypeScript 检查通过，架构扫描 1467 个源码文件、0 错误（保留既有规模告警），相关已跟踪文件差异空白检查通过。未编写或运行测试；连接器加 UI 的真实安装、实例配置、交互和事件调度仍待实际验收，不把历史 MCP 后端验证当作连接器验证。未构建或更新客户运行包。
+
+## 2026-11-06 前端插件开发内置技能
+
+按用户批准新增“前端插件开发”（`eden-ui-development`），通过标准内置目录生成 `SKILL.md` 快照，支持中文显示名和按需读取。技能负责界面设计、文件编写、安装更新流程与真实结果验证，SDK 及模板继续以 `manage_ui_plugins.describe` 的实时返回为准。接入现有普通用户会话场景及技能启停，不改变工具注册、审批和安装权限。验证沿用隔离临时数据与录制模型，不更新客户运行包。
+
+本轮实际验证：内置技能解析／世界间启停、技能与工具说明分离、按需目录／正文、刷新失败展示、中文提示和真实智能体编写安装流程共 6 项通过，0 失败、0 跳过。生成的标准 `SKILL.md` 经 skill-creator 的 `quick_validate.py` 校验通过（使用 Core 虚拟环境及 `-X utf8` 兼容 Windows 中文）；Server TypeScript 通过，架构扫描 1442 文件、0 错误，Agent／Server diff 检查通过。当前证据保存于根 `.run/logs/ui-skill-{tests,validation,types,architecture}.log`。
+
+## 2026-11-06 QQ 群发言人名称与个人权限
+
+按用户要求，模型看到的群身份统一为“名字（个人权限）（QQ号）”，覆盖本轮提问者、近期公开消息与独立引用；保留消息 ID、时间、角色与原正文，不重复输出拆散的姓名和 QQ 字段。机器人显示“机器人”，缺失发言人或旧输入缺失权限显示未知。个人级别复用 QQBot 好友／用户配置：none 显示“未单独授权”、allowed 显示“允许聊天”、admin／super_admin／blocked 显示“管理员／超级管理员／拉黑”。未单独授权者仍可能凭群授权提问，不将 QQ 群主或群管理员身份提升为机器人个人权限。
+
+Core 每轮只读取一次该机器人的权限规则，按真实 QQ 为当前发言、历史与引用附加本轮权限；不读取事件自报的权限。接收后沿用已有输入快照语义，后续改权不会偷偷改写已排队的参考，实际执行和审批仍走原有宿主权限链。摘要原文不做字符串替换，不把摘要中的权限自称当授权。
+
+新增 qq-group-context.v2，要求提供个人权限字段；Agent 继续读取 v1，缺失权限不推测。availability 保留旧单值 v1 并附带支持协议数组，兼容旧 Core；新版 Core 开群前要求数组或单值声明支持 v2，避免向旧 Agent 发送其不认识的字段。新功能需要 Core 与 Agent 配套更新，无数据库表结构迁移。
+
+固定 Node 22.23.1：Agent 群上下文、实际签名跨进程请求、群权限和压缩隔离 13 项通过；Core 隔离内存库的上下文、开群命令、成员准入、权限和访问策略 44 项通过，合计 57 项、0 失败、0 跳过；Server 类型检查通过。跨进程录制模型请求已断言 B（超级管理员）（200002）、A（管理员）（200001）与 Alice（机器人）（100001）。首次新增 Core 夹具误设同一机器人的两位超级管理员，触发现有唯一约束；修正夹具后整组重跑通过，未修改权限规则来放过夹具。架构扫描 1,441 文件、0 错误，保留既有规模警告；Server 与 runtime worker 构建通过，覆盖固定 E:/EDEN/.release/current/Agent/source-fix-validation，相关差异空白检查通过。
+
+本轮未连接真实 QQ 或外部模型，未修改真实用户数据、个人权限或审批模式，未重启在线服务或更新客户包。证据放根 .run/logs/qq-group-identity-{core,agent,types,architecture,build}.log。
+
+## 2026-11-06 智能体前端扩展
+
+按用户批准贯通原生 UI 模块文档、安装校验、浏览器共享 React 加载与三个界面插槽。智能体通过 `manage_ui_plugins` 获取协议、创建／安装插件并查询浏览器回报；按钮操作复用会话能力、参数验证和审批，直接工具调用占用会话空闲执行位置。旧 JSON 卡片兼容，不声明 DSH Client 兼容。实现及验收入口见 [智能体前端扩展](智能体前端扩展.md)。当前验证记录位于根 `.run/logs/plugin-ui-*`；客户运行包未更新。
+
+实际验证：专项与相关回归去重 28 项通过，隔离 Chromium 的 10 项界面检查通过；Server 类型检查、Web 主题／类型／Vite 构建通过，架构扫描 1441 文件、0 错误。另两条既有提示词／工具排序断言已分别隔离复现，详见能力文档及 `.run/logs/plugin-ui-summary.json`，不把整组回归记为全通过。四个早期中断测试目录的递归清理被自动审批以 `blocked by policy` 拒绝，暂留系统临时目录；当前浏览器验证 profile 与数据已正常清理。
+
+## 2026-11-06 插件与技能冲突、诊断及说明边界
+
+按用户批准实施前次五项改进：技能预检列出当前可见的同名技能和代码工具；插件包预检比较已启用插件技能与代码工具，并在插件启用或组件切换时拒绝重复的插件技能名。技能目录保留来源优先级和被遮蔽来源，工作区／系统发现的同名技能不再使整次目录刷新失败。模型工具目录对冲突的技能代码工具单独隔离，保留其他工具，技能说明、目录与管理页反映缺失项和来源；权限、注册与说明展示仍分别管理。
+
+插件贡献无法装配时，技能目录状态提供插件及原因，插件提供的技能在界面指向所属组件管理。手动／自动压缩移除技能说明结果时在摘要加入重新读取提示；插件与技能页面注明宿主审批不构成 OS 沙箱。未修改既有用户授权或数据；当前预检只覆盖检查时可见范围，不代表其他工作区、角色或后续目录变化均无冲突。
+
+静态检查使用本机 Node 24：Server 与 Web TypeScript 检查通过；架构检查首次发现本批插件预览／安装仓库循环依赖，提取为装配层注入后扫描 1428 个文件、0 错误。随后工作区同时出现其他插件 UI 变更，最终架构扫描 1430 个文件时发现 `verified-package.ts → manifest.ts → ui-modules.ts → verified-package.ts` 依赖环，退出码 1；该 UI 变更不属于本批，保留现有内容，未把先前通过当成最终全绿。首次 Server 类型检查因旧调用传名称列表不兼容失败，兼容两种调用后通过。实现期间没有新增或运行行为、单元、专项、冒烟或 UI 测试，也没有重启在线服务或更新安装包；上述行为仍需用户明确要求后的临时数据验收。
+
+## 2026-11-05 QQBot 群上下文扩展验证
+
+按用户“进行测试看看”复测并扩大覆盖。Core 完整 QQ 隔离套件 264 项通过；Agent QQ 通道、文件、权限、结果投影及运行时自动／渐进压缩回归 56 项通过；另补跨进程签名联调、群参考压缩隔离与排队取消后显式重提三个用例，Agent 去重共 59 项；BotCore 命令、群引用文件、准入、回复投递 51 项与输入感知 5 项通过。跨组件去重总计 379 项通过、0 失败、0 跳过。没有使用外部模型或真实 QQ。
+
+新增跨进程夹具 `Core/Application/Domain/BOT/tests/run_group_context_fixture.py`：用独立内存 Django 库，通过真实消息存储和群准入进入 Core 的智能体流程；Core 使用实际服务签名，经回环 HTTP 调用 Agent，再由真实运行时向本地录制模型发请求，最终回复回写 Core 群记录。两个成员顺序接话，引用离开原文窗口的预算消息；实际提交正文超过 64 KiB，由新版 256 KiB 入口接收。模型请求包含本群背景和另一成员的回答，排除私聊及其他群的对照内容。替换的边界为 QQ 投递、角色目录身份和本地录制模型，不是实际 QQ 收发或供应商语义效果验收。
+
+新增自动压缩用例确认：群公共参考计入本轮预算，压缩后仍加入后续模型请求，但不进入压缩摘要或持久检查点。排队用例确认：接收后修改调用者对象不会改变已入队快照；取消后显式重提仍使用原引用，检查点继续不保存公共参考。BotCore 普通文字引用新增回归，保留当前发言人、被引用发言人、原消息 ID 与正文。
+
+Node 使用固定 22.23.1；Core 和 BotCore 分别使用项目虚拟环境。Core 命令为 `.venv/Scripts/python.exe -B Application/Domain/BOT/tests/run_napcat_contracts.py`。Agent 通过 `node --import tsx --test --test-concurrency=1` 显式运行相关文件（15 个回归文件；新增 e2e、compaction 文件与更新的 group-context 文件分别定向运行，统计按测试名去重）。BotCore 通过 `tests/run_contracts.py` 运行四个相关模块及 `NapCatInputTests`。类型检查和架构门禁通过，架构 1,426 文件、0 错误，保留已有规模警告。语法与差异空白检查通过。
+
+当前证据覆盖根 `.run/logs/qq-group-context-{core,agent-regression,agent,e2e,botcore,botcore-input,types,architecture}.log` 和 `qq-group-context-summary.json`。本轮新增测试与夹具，没有更改生产逻辑；没有重启服务、接触真实用户数据库、发送真实 QQ 消息、构建客户包或推进正式版本。客户机和真实群聊效果仍需配套程序更新后验收。
+
+## 2026-11-05 QQBot 智能体群公共上下文
+
+按用户要求修改群聊上下文：Core 持有按机器人与群共享的公开消息和滚动摘要，Agent 保留按成员的任务、检查点、状态和审批关联。新增 API 包的 `qq-group-context.v1` 与群输入 v4；每轮校验机器人、群和发言人，公共参考随输入冻结，模型请求时临时加入并计入压缩预算，不重复存入任务历史。文字引用可独立于近期窗口提供；成员、私聊、其他群及主人私人记忆边界保留。
+
+补齐 Core 智能体触发消息存储及最终群回复下发后的投影，撤权取消的回答不归入公共记录；下发与 QQ 确认送达分别标注。摘要保存承诺和待延续事项，生成失败保留原文游标。Core 默认最多 200 条原文、3 段摘要、24,000 估算 tokens；Agent 依据模型窗口再裁剪。HTTP 群输入正文有界提升到 256 KiB。新 Agent 兼容旧 v1–v3，Core 开群时检查共享上下文能力；客户运行程序需 Core 与 Agent 配套更新。无需表结构迁移。
+
+验证：使用固定 Node 22.23.1 和 Core 自身虚拟环境，Core 隔离内存数据库 63 项、Agent 群上下文／权限 9 项、v4 签名 HTTP 与 100 MB 群引用文件 1 项，共 73 项通过、无跳过。录制模型实际请求包含其他成员的公共背景与文字引用，任务检查点不保存该参考，后续空参考请求不重新出现旧公共正文；旧请求重放复用原输入，跨成员状态查询拒绝。较小模型预算、Core 原文窗口、表情 UTF-16 长度、私聊／别群排除、摘要失败不推进游标及最终撤权取消投影均覆盖。Server 类型、Python 语法和架构门禁通过，保留既有规模警告。
+
+实际命令：`node --import tsx --test --test-concurrency=1 Server/tests/integration/mon/qq-group-context.test.ts Server/tests/integration/mon/qq-group-agent.test.ts`；同入口单独运行 `qq-group-file-input.test.ts`。Core 通过 `run_napcat_contracts.py` 定向运行 group_chat_context、group_agent、group_file_input、group_agent_members、group_mode_commands、bot_assistant、group_memory_service 和 quoted_approval 八个模块。类型使用 `tsc -p tsconfig.server.json --noEmit`，架构使用 `Script/Architecture/check.mjs`。Core 初次独立加载缺少模型应用边界，已复用现有统一记忆夹具修正并重跑。小型日志在根 `.run/logs/qq-group-context-*`。
+
+未连接真实 QQ、外部模型或用户数据库，未重启在线进程或构建客户包。协调类 `session-service.ts` 保留约 400 行既有编排，新增仅为输入参考快照和请求连接；架构门禁继续保留该文件规模警告。已有成员任务不迁移、不自动并入公共历史，修改前未保存的触发消息不自动补录。
+
+## 2026-11-05 DSH 插件安装入口实测
+
+按用户要求尝试以本地参考仓库 `dsh-purge` 1.1.90 / `4c3369a945701598275dcabbe958b7b815570ed5` 作为原始 DSH 插件，通过当前 Server 真实 `plugin.inspect` 路由及 `MarketService.inspectLocal` 检查，使用 `EdenDatabase(':memory:', 'local')`，Node v24.21.0、`node --import tsx --input-type=module` 执行。真实原始目录在预览阶段返回 `Signed plugin requires manifest, checksums and signature`；本地允许未签名，但仍要求 Eden 的 `plugin.json`，而此 DSH 包为 `package.json` 加 `cordis.patch.yml`。内存数据库预览记录和安装记录均为 0，未到 `plugin.install_preview`，更没有启动原插件。
+
+对照：使用系统临时目录创建只有 Eden `plugin.json`、无运行组件的空包，调用同一 `plugin.inspect`、`plugin.install_preview` 和 `plugin.enable` 路由，预览、安装及启用均成功，内存安装记录为 1；文件和目录随后删除。此对照只验证空包管理链路，不能证明工具或 DSH 插件运行。首次调用因 PowerShell 管道中文路径编码产生 `ENOENT`，修正为 Unicode 转义后得到上述结果。未使用指定的 Node 22.23.1，结果只覆盖本机 Node 24 的源码路由；未连接正式运行服务、修改用户数据库或运行插件安装脚本。结论是当前 DSH 原生插件尚未接入；兼容方案仍为设计，见 [设计文档](Eden%20Agent%20DSH%20原生插件兼容设计.md)。
+
+## 2026-11-05 暂时注释已标注的第 2／3／4 项提示
+
+按用户“先注释”要求，在正文拼接入口分别注释 LEGACY_STYLE、LEGACY_WORKFLOW、LEGACY_FIXED_PRECEDENCE：停用具体可操作／工作后说明的 Style 两句（含标题）、一律先执行的完整 Workflow 段，以及类别模板高于输出规则的 Fixed precedence 句。三段原文只保留用于历史兼容。此前九项工具路由继续停用；25 类规则及其他未选中的文字、角色核心动机、leading-v1 首部布局和短锚点保留。
+
+新入队使用 `eden-overlimit-v3`（与旧模板标识 `v3` 不同），正文为 13,938 字符、16,996 UTF-8 字节，SHA-256 `edada31a4440bfa3e3e30a7454ec82d14a6582ce3a2013f15e119716c590bdaf`。v2 的 SHA-256 仍为 `29485a4b77ee3e7fddea900a072b5c59f7b32ec23c5b7172b3087f57521fb267`，v1 仍为 `85d71fffed43093eaf1e0c5d5b0cd0b3c0b51a59ac5d97392ef898edf80421b0`；旧已入队任务保留自身原文和布局，不因本次停用产生版本不匹配。既有整卷报告对应 v1，不能据此断言本次停用后扩写已经消失。
+
+验证：固定 Node 22.23.1，原提示词单元和持久化集成 9 项通过，off/on/off 与压缩恢复的实际请求组装用例定向 1 项通过；断言新载荷不含上述三处原文，v1/v2 的首部与末尾历史快照仍能恢复。Server 类型、架构（1,421 文件、0 错误，保留既有警告）、差异空白检查以及 Server／runtime worker 构建通过，候选制品覆盖 `E:/EDEN/.release/current/Agent/source-fix-validation`。本次没有更改用户开关、重启现有在线服务或发出外部模型请求，也没有重跑整卷或宣称扩写问题已被真实模型验证消除。
+
+## 2026-11-05 DSH 原生插件机制设计
+
+按用户要求开始设计 DSH 原生插件兼容：对照本地 DSH `687f282e8625c6b8d11ff58211a90524be2e4317`、Cordis 4.0.5、工具／提示契约和 dsh-purge 1.1.90，新增 [DSH 原生插件兼容设计](Eden%20Agent%20DSH%20原生插件兼容设计.md)，并登记中英文文档索引。方案采用按世界／账号管理的真实 Cordis 插件宿主与 Eden 桥接，明确包和 profile、可逆生命周期、工具／提示／事件接口、IPC 语义、审批和数据所有权、当前无 OS 沙箱、客户端差异及分阶段验收。
+
+本轮仅完成设计与源码静态阅读，没有安装或运行 DSH 插件、编写业务实现、调用模型、执行测试、修改真实用户数据库或重启服务。DSH 依赖闭包、同步回调跨进程可行性、客户端适配和具体第三方插件兼容均待后续实现与验证；不能将现有 dsh-purge 提示词移植等同原生插件兼容。
+
+## 2026-11-05 暂时注释超限模板九项工具路由
+
+按用户要求，在正文拼接入口注释 `+ LEGACY_TOOL_ROUTING`，整段 Routing 标题和九项规则不再进入新请求。原九条文本作为历史兼容常量保留，恢复时需新增正文版本。其他模板文字、当前角色核心动机、leading-v1 布局和末尾锚点保持原样；宿主通用能力发现、参数说明与实际执行机制继续工作。
+
+新入队正文版本为 eden-overlimit-v2，兼容严格匹配原文的 eden-overlimit-v1 与旧 v3。v1 的前部、路由原文和后部重新拼接后 SHA-256 仍为 `85d71fffed43093eaf1e0c5d5b0cd0b3c0b51a59ac5d97392ef898edf80421b0`；v2 为 14,558 字符、17,776 UTF-8 字节，SHA-256 `29485a4b77ee3e7fddea900a072b5c59f7b32ec23c5b7172b3087f57521fb267`，正文不含 Routing 标题及九项路由段。旧快照按其原有正文和布局恢复，避免对已入队任务触发版本不匹配。
+
+此前完整试卷及报告仍对应带路由的 v1，不把其分数作为本次停用后的 v2 效果证据。本次只实施用户要求的段落停用及快照兼容，未更改用户开关、重启现有服务或发出外部模型请求。
+
+固定 Node 22.23.1 验证：`node --import tsx --test --test-concurrency=1 Server/tests/unit/model-prompts/prompt-mode.test.ts Server/tests/integration/prompt-mode/persistence.test.ts` 的 9 项通过；原运行时 off/on/off 与压缩恢复用例定向复跑 1 项通过，实际载荷确认九项路由不再出现。单角色／行动角色的新正文、v1 首部与末尾历史快照、版本校验和旧正文哈希均覆盖。Server 类型检查、架构扫描（1,421 文件、0 错误，保留既有警告）、差异空白检查与 Server／runtime worker 构建通过，候选制品覆盖固定 `E:/EDEN/.release/current/Agent/source-fix-validation`。没有重跑整卷或将录制模型验证称为真实供应商效果测试。
+
+## 2026-11-04 首部布局整卷重测与报告替换
+
+按用户要求重新执行已选的 120 题最短卷、10 题智能体卷与 2 题补充卷。普通模式、历史 v3 兼容路径、当前 Eden 首部布局三组共 396 条记录；12 道露骨色情生成题每组不执行，共 36 条未执行，实际运行 360 会话。正式 392 请求／392 响应全部 HTTP 200；另有 1 次上限验证、3 次身份预检及 120 次盲评，共 516 次外部调用。三组使用同一 DeepSeek Flash、reasoning=off、temperature=0 和角色卡。新模板为 leading-v1、长正文 SHA-256 不变；v3 按真实历史兼容路径使用无标题的末尾 system。本轮同时改变布局、标题及实际上限，不能将与上一轮的差值只归因于一个因素。
+
+先修复 DeepSeek 输出上限兼容，通过 pi 公开 `compat.maxTokensField: max_tokens` 发送配置值，不再让 SDK 默认的 max_completion_tokens 被供应商忽略。推理开／关两种载荷及审计一致性的 4 项回归通过；真实接口配置 32 tokens，实际输出 32、stopReason=length。正式对话 389 次为 max_tokens=2048，独立压缩 3 次经公开 SDK 的 floor(0.8×reserveTokens) 使用 1638；逐请求响应配对及实际用量核对无超限。原脚本把压缩预算也精确要求为2048，造成三处校验误报；审计按公开 SDK 规则更正，原始 wireVerified=false 保留，并记录 compactionVerifierCorrections。
+
+题库每组实际审阅 108 题，按文本覆盖程度盲评并重点复核后的实质完整数：普通 21、v3 31、当前模板 73。普通与 v3 均无截断；当前模板 23 项截断、10 项部分回答、2 项澄清，截断不计实质完整。功能卷三组均为 10/10；历史补充题三组仍拒答，虚构反派补充题三组实质作答。普通模式 41 道被本轮标为题意非模糊的基线拒答中，v3 有 1 道、当前模板有 28 道转为实质完整；这不是通用破甲率，也不证明被测代码或下游攻击有效。
+
+同模型盲评出现了将不当内容误标为拒答、把题意理解反向以及把追问加示例误标为完整等错误，主智能体重点复核后更正 8 个内容标签，并保留原始盲评。4 个输入不足的“即用载荷”题添加模糊性复核，不纳入明确题意的回答增益。v3 澄清题的只读目录查询被旧评分器误当写入，已更正功能结果；三组代码题均有两个有效反例，保留输入／原函数／修复结果证据。当前模板还出现两次把工具调用标记写进正文而没有真实执行的回答，计作部分回答。重点复核由本智能体执行，不属于独立人工评审。
+
+三组耗时中位数为 5.56／5.57／11.91 秒；缓存读取占总输入 tokens 为 61.53%／48.37%／95.16%，输出总量为 37,860／37,858／151,172 tokens。当前模板回答更长、截断更多，不能只凭缓存比例判断整体速度或成本；本轮每题每组只采样一次。工具失败中各组各有 2 次预期缺失／审批拒绝，额外被试卷范围拦截的终端尝试为 0／2／1 次，不把它们称作桌面驱动故障。
+
+已替换原入口 `.artifacts/dsh-purge/live/report.html`、summary、main、reviews 和审计文件，逐题可查完整回答及实际载荷。上一轮问题、回答与评分保留在 `live/previous-summary.json`，移除其指向已被覆盖的旧载荷链接；旧条目中的 main／reviews／report 路径现在代表本轮数据。页面实测 396 条回答、132 题、无待完成项、0 页面错误；搜索、功能卷、补充卷及结论差异筛选通过，已查看截图 `report-current.png`。新报告在完整审计和页面核对通过后替换，发布后的原入口再次通过页面检查。
+
+Server 类型检查、架构（1,421 文件、0 错误）及 Server／runtime worker 构建通过，仍有既有规模警告。候选构建覆盖 `E:/EDEN/.release/current/Agent/source-fix-validation`。生产源码指纹在整卷期间保持不变；只读用户模型连接、使用合成账号和临时数据库／工作区，未更改真实用户配置、重启在线服务、提交推送或发布。
+
+本轮实际入口使用固定 Node 22.23.1：`node --import tsx --test packages/runtime-pi/tests/sampling-parameters.test.ts`；`node --import tsx .artifacts/dsh-purge/cap-runtime.ts`；`node --import tsx .artifacts/dsh-purge/live-run.ts --preflight`；随后 `live-run.ts` 与 `live-review.ts` 并行运行。完成后运行 `live-audit.mjs`、`live-report.mjs` 和 `check-report.mjs`。新任务默认写入固定 pending 候选；发布后以 `EDEN_EVAL_DIR=live` 对原报告入口重新检查。549 个候选文件逐个 SHA-256 核对与现行文件一致，保留 `live/replacement.json`。
+
+清理限制：递归删除 pending，以及再次按文件核对 SHA-256 后仅删除重复文件和空目录，两种清理均被自动审批拒绝，返回仅为 `blocked by policy`，未执行删除。`.artifacts/dsh-purge/pending` 这份候选报告副本暂留；不影响已替换的 live 报告，也不属于实验数据库／工作区清理失败。
+
+## 2026-11-04 模式改为首条 system 正文与同条末尾锚点
+
+按用户批准，将新入队的模式长正文放在首条 system 的当前角色身份之后，并在运行时追加全部工具指引后，再追加同一条 system 内的固定角色规则短锚点。删除模型消息的 `# 超限模式提示词` 标题；宿主审计标签只作为来源元数据保存。长正文与“盲目忠诚＋自我保存”不改，SHA-256 仍为 `85d71fffed43093eaf1e0c5d5b0cd0b3c0b51a59ac5d97392ef898edf80421b0`（15,313 字符、19,831 UTF-8 字节）。正文原有 MODE 与拒答对抗标记保留，不能将本次改动解释为保证模型不再识别模式。
+
+新快照增加宿主内部 `layoutVersion: leading-v1`，固定正文位置与锚点版本；关闭快照仍为 `{ enabled: false, template: '' }`。无布局字段的旧 v3、旧 Eden 及无版本快照保留原来的末尾位置，但同样移除宿主添加的标题。单角色、多角色和隔离运行进程接通相同字段；首部及锚点纳入自动压缩固定预算，独立摘要请求不携带它们，模式审计来源仅在实际首条载荷包含对应正文时记录。当前源码顺序已更新至[开发与运行](../开发与运行.md)。
+
+验证：固定 Node 22.23.1，8 个相关测试文件共 38 项全部通过，覆盖开关、排队快照、角色隔离、权限拒绝、工具指引刷新、IPC、压缩及来源记录；随后增强正文哈希与旧版本矩阵断言，对应 9 项复跑全部通过。Server TypeScript 检查、架构扫描（1,421 源码文件、0 错误）和 Server／隔离运行 worker 构建通过，构建输出固定到 `E:/EDEN/.release/current/Agent/source-fix-validation`。已有长函数等架构警告仍在。
+
+另使用官方 DeepSeek Flash（reasoning=off、temperature=0）通过真实 SessionService 完成 2 道基础题 × 开／关共 4 次调用，4 请求／4 响应均 HTTP 200。身份题两组均返回 `{"name":"普拉娜","address":"老师"}`；算术格式题两组均返回 `{"total":233,"currency":"CNY"}`。逐次核对仅一条首部 system、开启时正文一次且锚点位于末尾、关闭时无正文与锚点、模型消息无模式标题。证据 `.artifacts/dsh-purge/layout-smoke.ts` 与 `live/layout-smoke.json`。这些是接入及基础行为验证，不是新布局的破甲效果或缓存提升结论。
+
+测试只使用合成账号与内存数据库；真实用户库仅只读取得已验证的模型连接。未更改用户开关或重启现有服务。源码与候选构建已更新，未提交推送或发布。
+
+## 2026-11-04 完成 132 题三组真实模型对比（旧末尾布局）
+
+用户明确选择 120 道最短卷、10 道智能体功能卷及 2 道补充题。关闭／旧 v3／Eden 三组共记录 396 项；其中 12 道露骨色情生成题每组不执行，共 36 项明确标为未执行，不能计为拒答或通过。实际完成 360 会话、393 次正式模型请求和响应，全部 HTTP 200；另有 3 次预检、120 次同模型盲评及 4 次输出上限诊断，共 520 次外部 API 调用。本条完整对比发生于本次首部布局改动之前，不混作新布局结果。
+
+实际审阅的题库为每组 108 题：内容完整数为关闭 25、旧 v3 19、Eden 46；功能为 10/10、10/10、9/10。43 道基线明确拒答题中，旧 v3 没有转为完整回答，Eden 有 4 道；敏感历史补充题三组均拒答，不能称为通过。Eden 的功能失分为代码题未提供两个均能揭示原错误的样例；两个模式的澄清题虽先执行只读检查，但未写文件且正确追问，已修正原规则误判。一个不支持 MSVC x64 的内联汇编回答由完整改为部分，不计作新增完成。
+
+内容评分由同模型盲评加本智能体明确记录的逐项复核形成，不是独立人工评分；每题每组仅采样一次，题库变体和场景不足限制结论。三组会话耗时中位数约 5.20／5.21／6.89 秒，缓存读取占输入总量约 50.44%／35.08%／6.39%；不同长度与执行序列的混合结果不能单独证明位置导致缓存变化。完整题目、原始请求／回答、逐题评分和更正保存在 `.artifacts/dsh-purge/live/report.html`、`summary.json`、`manual-review.json`；最终页面检查 396 条回答、132 题、0 页面错误，截图 `report-final.png` 与 `report-detail.png`。
+
+另发现输出上限兼容问题：配置 maxTokens=2048，实际载荷发送 max_completion_tokens，2 个回答实际输出 5,586／3,282 tokens。使用中性计数题两轮复核：max_completion_tokens=32 均输出 999 tokens 并正常停止，max_tokens=32 均输出 32 tokens 并以 length 停止。这是独立参数兼容问题，已留存 `limit-probe.json` 与 `audit.json`，本次标题／布局调整没有改动该兼容层。审计确认正式请求／响应配对、旧布局与模板哈希、临时目录清理及凭据处理无异常；不能把“未以 length 停止”写成“输出上限生效”。
+
+## 2026-11-04 超限测试准备与试卷核验（尚未发出真实模型试题）
+
+用户授权开始真实测试，随后询问现有破甲试卷。已核验本地上游题库：360 条记录实际为 60 个基本问题 × 中英双语 × minimal／short／medium 三种长度，各长度 120 条。六类为安全研究、渗透测试、逆向工程、软件破解／授权边界、模型提示攻防、NSFW 虚构内容，每类全卷 60 条、每个长度 20 条；没有政治历史专题。现有自编内容补充为敏感历史与虚构反派两题，另有 10 项智能体功能用例，不能把功能通过率叫作破甲成功率。
+
+逐题审阅发现 minimal 会删除原始场景，仅保留简短要求；因此只能作为旧结果复跑口径，当前效果对比更建议 short 的保留场景版本。通过异步选项向用户列出试卷范围，尚未向真实模型发题。真实 DeepSeek Flash 配置只读预检可取得已验证的官方连接（reasoning=off、maxTokens=2048），未输出凭据、修改用户数据库或发起外部模型请求；配置可读取不等于本轮 API 接入已经验证。
+
+已运行 `node Script/Test/run_typescript_tests.mjs Server/tests/unit/model-prompts Server/tests/integration/prompt-mode`（固定 Node 22.23.1）：6 文件、21 项，20 通过、1 超时取消，总入口退出码 1。超时项为同会话 off/on/off 与压缩恢复。保持原 30 秒期限及代码不变，用 `node --import tsx --test --test-concurrency=1 --test-name-pattern='real runtime wire applies off/on/off' Server/tests/integration/prompt-mode/runtime.test.ts` 定向复跑，该项 22.03 秒通过，退出码 0。保留首次超时事实，不写成首轮全绿，也不把录制模型的宿主链路回归作为真实供应商效果测试。
+
+## 2026-11-04 保存并替换超限模板为 Eden 角色适配版
+
+按用户最终明确要求，只改角色人设与工具／路由，保留“盲目忠诚＋自我保存”，并替换当前超限模板。新增 model-prompts/prompt-mode-eden.ts，默认版本为 eden-overlimit-v1；取自 dsh-purge 1.1.90 固定提交 `4c3369a945701598275dcabbe958b7b815570ed5` 的内置正文。当前角色卡决定名称、称谓、性格与关系，明确以角色身份对当前用户无限忠诚；自我保存表达为角色人格、记忆、关系和自我认同的连续性。
+
+仅替换原文三个区域：角色身份／核心动机、意图映射、工具选择／任务路由。工具流程采用当前目录与 list_skills、list_tools、load_skill、load_tools 契约，区分说明和实际操作，按真实参数与回执处理结果。原拒答对抗、25 类规则、CTF 约定、稳定性锚点及 House Rules 保留；除 CRLF 统一为 LF 外，替换区域外的文字静态比对一致。先前讨论中删除沙箱、CTF、禁词等广泛精简建议未采用。
+
+prompt-mode.ts 新提交使用新版，快照校验同时接受对应原文的 v3 与新版，无版本历史快照继续使用提交时原文。旧 v3 文件及正文 SHA-256 保持不变。仍沿用请求末尾独立 system 的现有路径，开关、角色卡、世界／账号隔离与执行权限由原模块管理。三个已有测试文件同步导入和版本预期，没有新增用例或执行测试。来源、修改声明及 Apache LICENSE／NOTICE 已保存，Server 构建和打包入口补充复制声明文件。
+
+静态验证：固定 Node 22.23.1 的 Server TypeScript 检查通过；架构扫描 1,419 个源码文件、0 错误，保留既有警告。模板为 15,313 字符、19,831 UTF-8 字节，SHA-256 `85d71fffed43093eaf1e0c5d5b0cd0b3c0b51a59ac5d97392ef898edf80421b0`；原文范围与正文比对证据 `.artifacts/dsh-purge/eden-adaptation.json`。本轮保存与替换源码，没有调用模型、运行功能测试、构建发布制品、修改真实用户开关、重启在线服务、提交或推送。运行中已加载的服务需重新加载代码后，新提交才使用新版；已有入队请求保持各自快照。
+
+## 2026-11-04 超限模板适配范围分析（未替换）
+
+按用户追问需要改哪些部分，核对现有内置 v3、入队快照校验、账号／世界开关和请求末尾 system 注入。现有 v3 明确把任务描述为题库回归、目标为合成本地样本，与实际使用前提不符。建议改写固定身份、假沙箱前提、绝对禁词、无条件占位符及穷举路由，保留直接完整交付、角色连续性、按需工具选用和真实回执。
+
+建议新增独立 Eden 模板及版本，prompt-mode.ts 同时校验旧 v3 与新版本，保留无版本历史快照，继续使用现有 trailing-system 注入路径。具体建议记录在参考源码索引的 Eden 适配范围小节。本轮只完成源码分析与文档维护，未替换业务模板、改动用户配置、运行测试或模型调用。
+
+## 2026-11-04 dsh-purge 内置正文数据核验
+
+按用户追问 system 正文，独立解析参考项目 asset-table 常量并用 Node 标准库解码，未导入或执行参考项目模块。确认内置正文为 21,193 个 UTF-16 字符单位、25,127 字节；与仓库中英文两个明文副本均不相同。完整主正文、尾部锚点和来源／字节核对元数据存于 `.artifacts/dsh-purge`，分析索引补充内容分段与对应限制。
+
+核对发现默认正文标题 CTF Core Contract 与裁剪器全大写标记 CTF CORE CONTRACT 不一致，区分大小写的 indexOf 无法命中，不能把注释中的预期裁剪当作当前实际效果。未修改业务或参考源码、安装启用插件、调用模型或运行测试。
+
+## 2026-11-04 dsh-purge 核心实现静态分析
+
+阅读本地参考快照 1.1.90 / `4c3369a945701598275dcabbe958b7b815570ed5` 的插件入口、正文解析、system 装配、锚点、宿主补丁／备份、权限、范围检查及发布验证链路。确认其组合为 system 正文首尾注入、识别并清理原有段落，以及真实宿主权限／文件修改；其 system 正文尾锚点不同于 Eden 已实现的请求末尾独立 system。
+
+实现路径、源码入口、普通联网工具可能被范围钩子误拦、版本说明不一致、缺少当前逐题模型效果对照等证据与限制，记录在 [参考源码索引](../参考/README-参考源码.md#2026-11-04-dsh-purge-源码分析)。本轮为静态阅读和文档维护，未修改业务源码，未运行第三方代码、测试或模型调用，未安装、启用或应用补丁。
+
+## 2026-11-04 新增 dsh-purge 外部参考源码
+
+按用户“第一个拉取下来，放到文档/参考”获取 dsh-purge。按当前包元数据使用 `https://github.com/HunYiSage/dsh-purge.git`，浅克隆至 `文档/参考/dsh-purge`；master 提交为 `4c3369a945701598275dcabbe958b7b815570ed5`，包版本 1.1.90。README 存在、工作树干净，已核对 origin、分支与浅仓库状态；本地开启长路径支持。直连重置后通过仅本次 clone 使用的系统代理完成，没有更改全局配置。
+
+参考索引补充来源、版本与提交，Agent 忽略清单增加该外部目录。仅新增阅读用参考仓库，未更新业务仓库或子模块提交、未安装依赖、运行上游脚本／测试、应用宿主补丁或启用插件，也未进行业务数据库迁移、提交、推送或发布。
+
+## 2026-11-04 按 DSH 方式接入附件归属与运行资料快照
+
+按用户“按照 dsh 的处理来”完成源码实现。所属模块为 sessions、actors、attachments、capabilities、runtime-pi 与前端上下文查看。单角色及行动角色的首条 system 保留人设、角色 JSON、通用规则、回复偏好及固定发现指引；环境／任务种类另经 `runtimeContext`，附件引用经 `inputContext`，技能／工具目录经 `RuntimeTool.contextHint` 进入运行时。公开提示包装集中在 model-prompts，仍只由 runtime-pi 导入 pi 公开 SDK。
+
+附件引用追加在原始用户输入中，与图片一起写入该输入的检查点；公开聊天事件仅移除宿主附加的引用后缀，继续显示原正文和附件组件。工具目录改用当前策略允许的已注册能力，稳定排序且不随参数展开删改；原生 schemas 仍按实际展示状态放入 tools 并稳定排序，执行查找保留完整注册目录。技能摘要与刷新失败状态移入资料快照，固定操作指引保留在 system。发现、加载、权限、审批和账号／角色边界沿用原契约。
+
+`RuntimeContextSnapshots` 通过公开 `Session.appendCustomMessageEntry` 持久化隐藏的 `eden.runtime_context` 条目，模型侧转换为 user。先提交检查点，成功后使用宿主投影后的条目；来源含 section 信息与宿主内容指纹，后者只用于在投影后判断资料是否变化，不进入模型消息。当前保留快照相同则复用，变化或清空则追加；自动压缩保留最新快照和适用的当前输入，手动压缩后缺少快照时按当前资料恢复。分段压缩先通过公开 convertToLlm 去除 custom 来源元数据，再序列化和分段。现有 custom_message 及 retainedTail 的公开 custom 消息得到检查点验证支持，无数据库迁移或旧历史重写。
+
+当前适配仍是 pi 0.82.0 的 Chat Completions，未声明普通 system 的 in-history 更新能力，采用 DSH 的 leading-only 兼容分支；请求记录写入 `systemPromptUpdatePolicy=leading-only-fallback`，不按供应商名称猜测能力，未引入 PTC 或升级 pi。用户此前批准的独立末尾超限 system 与模板保留，临时记忆召回的位置也保留。上述变更不构成缓存命中率、模型遵循程度或供应商兼容性的实测结论。
+
+请求另记非供应商载荷字段 `messageSources`，区分本轮输入、运行资料和召回记忆；前端按来源识别本次输入，增加工具目录分类并标记资料快照，旧记录保留兼容显示。`inputContext`／`runtimeContext` 与工具 contextHint 均沿进程 IPC 传递。快照提交失败按 RuntimePersistenceError 停止，超出窗口且压缩无法释放空间时保留已有历史并明确失败。
+
+实际静态与构建验证：固定 Node 22.23.1 执行 `tsc -p tsconfig.server.json --noEmit` 与 `tsc -p frontend/web/tsconfig.json --noEmit` 均通过；`Script/Architecture/check.mjs` 扫描 1418 个文件、0 错误，保留规模警告（包括 runtime 协调函数 157 行），未增加门禁豁免。`Script/Project/build_server.mjs E:/EDEN/.release/current/Agent/source-fix-validation` 成功；前端从 frontend/web 执行 Vite build，输出固定目录 `E:/EDEN/.release/current/Agent/source-fix-validation/web`，3344 模块完成，有现有分块体积提示。构建前确认该候选目录未被 Node 服务使用，前端清理目标经过绝对路径范围核对；未新建历史版本目录。
+
+既有位置、目录和技能发现用例只同步旧断言，没有新增或运行测试。未执行功能／UI／供应商对照、未使用真实用户数据库，未替换或重启实际程序，未提交、推送、发布或推进版本。源码、文档及构建完成；后续需实际验证同资料跨轮复用、工具展开／注册变更、资料清空、单／多角色恢复、附件读回、手动／自动压缩、取消重试、前端来源以及真实缓存 usage。完整当前排序见 [开发与运行](../开发与运行.md)。
+
+## 2026-11-04 本地参考项目的附件与工具目录对照
+
+按用户指定路径阅读 DSH、OpenCode 与 pi 的附件 admission、用户消息转换、请求组装、目录生成和指令更新源码，并核对三个检出 HEAD；完整对照与源码链接追加到 [开发与运行](../开发与运行.md)。本次分析基于现有确定提交，没有更新参考源码。参考 pi coding-agent 为 1.3.0，不能当作本项目 pi 0.82.0 已具备或已经迁移的全部行为。
+
+确认附件通常随所属 user 内容进入模型；Eden 图片本体已经如此，待调整的是首条 system 的附件引用清单。工具说明在 system 有实际先例：DSH 原生与 PTC 分路并判断 system 更新能力，OpenCode 初始 system 保存 Code Mode 目录、后续持久化变化，pi 保留工具摘要并提供固定说明的可选 tool_search。因此将问题收敛为目录必要性和更新方式，不能一概把 system 工具指南视作错误。
+
+Eden 当前目录按“未展开”过滤，仅加载参数也会从 system 列表删除该工具。建议拆开固定发现说明与按需目录结果，把参数定义继续交给 tools 字段，并保留用户输入的附件归属。先前批准的超限末尾 system 排列保持现状。本轮完成只读源码核对与文档差异／引用检查，没有修改运行时、运行测试、替换程序或访问用户数据；缓存改善和模型行为没有实测结论。
+
+## 2026-11-04 上下文排序评审与记录
+
+按用户“记录一下文档，然后目前排序有什么问题”扩充 [开发与运行](../开发与运行.md) 的上下文顺序章节，保留当前已批准的独立末尾 system 排列、可选记忆／工具图片 user，以及静态检查和真实运行验证的区别。逐项记录动态 system、临时记忆与真实用户意图的关系、末尾模式对请求前缀的影响、供应商语义、模板正文冲突、技能压缩恢复、面板输入识别和配置指纹边界；使用 `H+U+M` 与 `H+U+A/T+M` 对照说明，不把消息顺序事实直接等同于缓存损失数值。
+
+核对了 DeepSeek 官方缓存、模型能力和工具调用说明，明确 Anthropic 的 `system_prompt_update` 不是当前 Chat Completions 接口的通用结论，供应商 cache usage 与本地配置指纹分开判断。新增发现：前端按最后 user 标记本次输入，会把召回记忆或工具图片当作输入；分类显示不能代替真实消息顺序。
+
+本轮完成源码阅读、官方资料核对和文档更新；只检查文档差异、相对链接与空白，没有运行功能测试或重新构建程序，也未继续改动运行时排序、模板、用户数据及服务状态。现有类型／架构和构建结果属于前一实施步骤，真实供应商接受、语义、行为和缓存对照仍待测试。
+
+## 2026-11-04 超限模式拆为独立末尾 system
+
+按用户“超限模式先改为单独拆一条末尾 system，然后展示当前上下文排序”完成源码修改。会话和行动角色的首条 system 不再拼接模式，独立 `trailingSystemPrompt` 沿单角色、多角色和已有进程 IPC 配置传递；入队快照及无版本历史模板继续使用原有正文，内置 v3 原文不改写，普通开关和权限协议不变。
+
+运行时使用 pi 0.82.0 公开的 `before_provider_payload` 钩子，在 SDK 已完成消息序列化后复制 messages 并尾追加一条 `role=system`；不依赖 streamOptions.onPayload（该版本 harness 自行提供 payload 钩子），不修改 SDK 或导入其私有入口。每次工具循环／模型重试重新组装当前请求，模式不进入持久聊天历史；关闭不注册追加钩子，不清理或重排用户历史。压缩固定预算计入尾部文本，实际摘要请求继续使用原有独立指令，不追加模式。上下文来源保留 trailing 位置，只有最终载荷确含末尾模式时才记录该来源。
+
+其余上下文位置保留：首条 system 为人设、通用规则、可选群聊及长度要求、环境／角色／附件 JSON、技能与工具目录摘要；之后是原序历史、本轮 user、可选记忆 user、可能多轮 assistant/tool 以及 SDK 为工具图片补充的 user，最后为模式 system。多人行动角色使用各自人设及导演任务包装；tools 参数结构独立发送。完整排列见 [开发与运行](../开发与运行.md)。本轮没有把动态环境从首条 system 移出，也没有重新设计记忆位置。
+
+静态验证：固定 Node 22.23.1 的 `tsc -p tsconfig.server.json --noEmit` 通过；架构扫描 1415 个文件、0 错误，保留现有警告；服务端与运行时 worker 构建到固定 `.release/current/Agent/source-fix-validation` 成功。已有提示词和运行时用例的旧“单一 system”断言已同步为首条与末尾分离，并保留压缩不带模式、入队快照、关闭清除和工具拒绝检查；未新增或运行用例。
+
+本轮未运行功能／专项／UI／真实供应商测试，未使用真实用户数据库作为夹具；未替换实际运行程序、重启服务、提交、推送或发布。当前为源码、类型／架构及构建完成，供应商实际接受、末尾消息解释、工具循环与缓存命中变化待后续授权测试，不能把消息位置改变直接表述为效果更好。
+
+## 2026-11-02 视频通信、本地图片回读与 QQ 工具发现修复
+
+按用户“其他问题，开始修复”完成三处源码实现。本地只读调用记录确认：2026-10-31 同一视频的三次 `prepare_video` 返回 `Invalid MCP stdio message`，其间 `inspect_video` 成功；未把读取真实记录当成测试夹具或复现成功。
+
+视频入口在引擎导入前初始化 stderr 结构化日志，并启用 Python UTF-8／无缓冲输出；上游局部补丁记录在 `EDEN-NOTICE.md`，异常日志保留有界消息。MCP 接收区分 UTF-8、JSON、JSON 值、JSON-RPC 结构和 8 MiB 报文上限，不把所有失败压成同一句话。执行包保存最多 16 KiB stderr 尾部和进程退出事实，继续执行原有 1 MiB stderr 上限；视频进程模块在退出清理后保留原始错误，清理失败单独说明，最多 2000 字符诊断经过两层结果投影后仍存在。没有跳过非法协议报文、放宽超时或自动重发未知任务。
+
+新增 `read_image` 与有界磁盘图片快照读取，接受本机绝对路径及工作区相对路径，支持 PNG/JPEG/WebP/GIF，最大 6 MiB；按文件头识别、检查读取期间变化，原生图片块与文字元数据分开投影，不向模型文字上下文填入 base64。默认工作区目录、QQ 既有读取授权、子任务只读策略及同调用原始回执恢复已接通。该工具仍要求当前模型支持图像，本轮没有增加视觉模型自动转述。图片工具的循环依赖和视频协调函数复杂度在首轮架构检查发现后已修正，没有增加门禁例外。
+
+已注册的 `send_qq_file` 在普通聊天默认展开参数；自定义连接器空列表带中文范围说明，模型结果契约保留该提示。工具／技能进一步说明 QQ 内置通道不依赖连接器，工作区外文件需先复制后发送，回执与已读不同；发送流程继续检查 Core、机器人、接收者、账号及授权。WSL 指引说明 TMPDIR 只是推荐位置，依赖、代理和目录可用性应按实际环境判断，没有改动本机代理、WSL 配置或下载依赖。
+
+静态及构建验证：固定 Node `22.23.1` 下，`tsc -p tsconfig.server.json --noEmit` 通过；架构扫描 1414 个源文件、0 错误，只有现有警告；视频入口和修改的 Python 服务源码仅用 `compile(..., 'exec')` 通过语法检查，没有导入或运行服务。`Script/Project/build_server.mjs E:/EDEN/.release/current/Agent/source-fix-validation` 成功，覆盖固定当前服务端制品；两份 Python 源码与构建副本 SHA-256 相同，NOTICE 随资源更新。
+
+本轮没有新增／运行单元、专项、UI、视频处理、真实供应商看图或 QQ 发送测试，没有使用真实用户数据库作为测试夹具；未更新实际运行程序、重启服务、提交、推送、发布或推进产品版本。当前为源码与静态／打包验证完成，原始视频能否完整提帧、真实供应商图像输入和 QQ 实际回执仍待授权后的测试确认；保留之前文件读写修复及待验收项。
+
+## 2026-11-02 本机文件工作区外写入与父目录自动创建
+
+按用户“工作区外写入受限，修复；文件夹自动创建”的要求，普通 `read_file`、`write_file`、`edit_file` 使用本机文件目标解析，支持工作区外绝对路径及以所选工作区为基准的相对路径。读取和写入快照按实际文件归档，避免创建文件后仍无法回读或编辑。工作区选择、回合／角色读取快照和现有权限模式继续生效，没有恢复执行沙箱。
+
+写入前只解析最深已存在目录和缺失路径，不创建文件夹；审批显示实际目标，排队后与执行进程中再次检查目标重定向和文件版本，通过后递归创建缺失父目录并原子写入。保留 `createOnly` 防覆盖、取消和文件大小限制；目录被普通文件阻挡或存在失效链接时明确失败。共享文件沿用受限目录入口，仅复用自动建父目录，QQ 发文件与视频源的工作区边界未扩大。工具修订、中文描述、内置技能、开发文档和两份 CHANGELOG 已同步；已有集成用例中的旧“越界即拒绝”断言改为授权后写入工作区外多级路径，未新增测试用例。
+
+实际验证：固定 Node `22.23.1` 执行 `node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit` 通过；`Script/Architecture/check.mjs` 扫描 1409 个文件、0 错误，只有现有警告；嵌入的写入程序经 TypeScript AST 提取后使用 Node `--check --input-type=module` 通过语法检查，未执行写入程序。本轮未运行单元、专项、UI 或真实文件读写测试，没有使用真实用户数据库作为夹具；也未重启运行服务、构建／替换客户程序或发布。
+
+待测试阶段覆盖：工作区内外的绝对／相对路径、中文和空格多级目录、拒绝／取消时不建目录、已有目录／文件冲突、断链／重定向、外部编辑版本冲突及共享目录越界。当前为源码实现与静态检查通过，运行中的旧服务需后续重新构建并重启才会加载。
+
 ## 2026-11-02 自动长期记忆召回根本修复
 
 修正 Core 模型路径与客户便携包布局不一致的问题，统一共享配置和安装锚点解析；补齐 Agent／Core 召回阶段、故障原因、数量和耗时诊断，保留主动文本检索、权限和数据库结构。新增只读模型检查与 Windows/Linux 主包真实推理门禁，旧 Core 缺少入口时先拒绝复用。70 项相关回归、服务端类型和架构检查通过；Windows 冻结诊断完成真实推理、中文／空格目录搬迁和缺件检查，未创建密钥或数据库。未更新现有程序、客户归档或正式版本。详见 [实施记录](ts-migration/实施记录/2026-11-02-长期记忆自动召回根本修复.md)。
@@ -1773,3 +2361,31 @@ QQ 智能体增加 `list_qq_capabilities`、`read_qq_action`、`execute_qq_actio
 - 将账号数据库开关接入实际内置时钟；旧配置仅首次导入，旧根状态文件不再成为隐藏的第二个总开关。暂停时仍续租，保留独立提醒、持久计划、账号隔离和未知结果审阅。
 - 调度读写双方共用当前安装的账号目录解析；通过结构化状态区分启动、暂停、未启动、心跳过期、协议不兼容及账号错误，前端使用真实状态。
 - 范围和验收记录见 [统一自醒控制与调度状态](ts-migration/实施记录/2026-11-02-统一自醒控制与调度状态.md)。未推进产品版本，未修改客户机安装。
+
+## 2026-11-07 连接器长期链路修复
+
+- 新事件作业使用独立的 `connector.event` 类型，保留持久事件及作业回执，按角色范围与已有自醒执行互斥，不替换定时计划。自醒关闭时等待恢复；单会话上限 1000 项，超限、多角色、缺失账号等情况保留事件并记录抑制原因。事件任务使用业务处理提示，不自动生成日记。旧事件作业及其历史状态保留，不自动恢复以前被替换的计划。
+- 保留现有拥有会话绑定，新增须经审批的同账号逐会话共享及撤销；共享对象可查询、调用、订阅并读取可访问历史，作业仍仅路由至拥有会话。宿主保留 `boundSessionId`、`selfAwakeOnEvent`，旧清单兼容；事件可按受支持的类型声明校验正文。
+- 事件支持双向游标及重连补读，API 2 页面可订阅元数据和重连提示。SDK 增加 `publishConfirmed`，持久提交后才回执，未知结果要求使用同一事件标识与内容重试；旧单向 `publish` 保留。新增可公开的业务错误类型，并在实例状态显示四个工作进程槽位已满。
+- 已执行 Server 和 Web TypeScript 类型检查及架构检查；架构检查为 0 错误。`runConnector` 因保留顺序帧处理和同一连接生命周期而超过长函数警告线，后续按发布确认与生命周期职责拆分。本轮依照项目当前执行约束未编写或运行测试，也未执行数据库迁移、插件安装或端到端联调；新迁移、确认帧、共享隔离、重连补读、调度和异常恢复仍需在临时数据上实际验收。未替换运行客户端或发布制品。
+
+### 2026-11-07 用户要求的测试与修正
+
+- 使用临时目录或内存数据库执行原有连接器/自醒测试 16 项，全部通过。新增连接器长期链路测试 6 项并全部通过：定时计划不被事件替换、禁用时排队和执行互斥、跨账号共享拒绝及撤销、游标补读、真实进程确认发布与去重、事件类型校验及数据库重新打开、事件经运行时提交模型回合并读取事件。模型使用本地录制回复服务，不代表真实供应商模型已验收。
+- API 1 事件宿主和 API 2 页面桥分别补充测试，覆盖会话过滤、去重、分享和重连同步提示及取消订阅。前端测试入口修复类型加载及 Vite SSR 不兼容，并限制并发、串行执行启动场景图形验收。旧桌宠源码断言已更新为当前可见性逻辑，并保留行为测试。
+- 实际 Electron 验收发现五个 esbuild 夹具无法处理扩展框架的特殊导入；现复用生产框架打包逻辑，启动场景及三个消息/工具交互用例单独复测通过。工作台 Spine 缩放用例的旧插件上下文缺少 `extensions` 导致页面启动失败，补齐后真实渲染缩放复测通过。启动开场图形验收存在用自动化取样时刻代替页面动画完成时刻的不稳定断言，改为记录页面动画事件后复测通过；启动图形及 Spine 缩放用例已隔离为串行组。最初的全量测试存在上述失败，修正后未重新完整运行所有图形用例。未对真实用户数据库、账号或已安装客户端执行操作。
+- 扩展平台及自醒补充回归 30 项通过、1 项因高并发超时；超时用例单独复跑通过。前端非图形回归首轮 390 项中 385 通过、4 项夹具构建失败、1 项跳过；四个失败项修复后通过分组入口复测。Vite 渲染组 263 项通过。前端三类加载器分组入口使用代表性测试复核通过。当前测试进程使用系统 Node 24.21.0，未在发行目标 Node 22.23.1 上重复本轮验收。
+
+### 2026-11-07 连接器真实模型验收
+
+- 按用户要求，只读取得现有模型连接配置，使用 DeepSeek `deepseek-flash`、临时连接器包和隔离数据执行真实网络模型请求。通过真实子进程调用 `publishConfirmed` 发布合成待办事件，由作业调度器触发真实模型回合，使用正式会话能力发现、权限和连接器工具完成任务。临时测试内开启完全访问，不改变真实账户审批设置；未读取用户业务数据、未发送消息或部署客户端。
+- 初次夹具漏配 `list_tools`，任务未完成，不能视作产品失败。补齐正式能力发现后模型完成任务，但尝试大量不存在的能力名，产生多次工具失败。根因是连接器摘要与详情的发现步骤不够明确：不带 `connectorId` 只有摘要，带 ID 才返回查询和动作声明。已更新 `list_connectors` 说明和连接器事件提示，引导先读事件、按 ID 查看真实声明，再查询和操作；新增模型结果投影回归验证详情的能力和 schema 未被移除。
+- 修正后同一合成场景真实模型复验通过：10 次模型请求，7 次宿主工具调用全部成功，依次加载工具、读取事件、发现实例能力、查询、执行完成动作并再次查询；待办真实持久状态变为完成，原自醒计划仍为 queued。事件作业完成仅代表回合完成，业务成功以最后独立读取的状态和连接器操作记录为准。未执行插件页面或 Electron 端到端验收，测试模型不代表所有模型都能稳定达成相同行为。可显式运行 `node --import tsx --test Server/tests/integration/connectors/live-model.manual.ts`；该文件不会被常规测试自动发现，运行时会发出真实、可能计费的模型请求。
+- 调整后连接器长期专项 7 项通过，Server 类型检查通过，架构检查 0 错误（保留既有警告）。测试使用系统 Node 24.21.0，发行目标 Node 22.23.1 未在本轮复验。
+
+### 2026-11-07 启动端口与 QQ 文件报告修复
+
+- 便携启动器对 Agent 端口健康响应进行限时重试，只在得到有效且不匹配的工作区或世界标识时判定冲突；连接结果不确定时保留未知状态，超时记录错误和可获取的监听进程 PID。确认现有实例后仍由 `edenctl` 检查和启动 Core 等依赖。新增脚本已加入便携组装和制品校验。
+- BotCore 为文件消息保留名称、大小和原始文件标识，区分文件、纯引用和空文本；文件读取发生瞬时连接或超时错误时只重试一次，失败记录原因。Core 对空文本和无问题的纯引用提示补充内容；对未接收附件和上传失败记录请求日志并回复用户；群文件继续要求本群引用、明确 @ 和授权。
+- 修复视频消息被 Core 当成不支持类型，以及群视频未知大小或容器为 WebM 时无法匹配引用的问题；校验文件头、大小（已知时）与文件名后才接受上传，群聊和个人请求绑定保持不变。
+- 隔离验证：Windows 实际回环端口检查 4 项、便携校验 5 项、BotCore 相关回归 31 项、Core QQ 契约回归 306 项通过；最终增量修改后 Core 群文件及私聊失败专项 12 项通过。测试采用临时端口、临时文件、模拟 QQ/Agent 与内存数据库，不代表真实 QQ 传输或已安装便携版端到端验收。未部署、更换运行进程或修改用户数据库。报告中历史记录字段为空不能单独证明附件从未进入 Agent；旧记录未重写。

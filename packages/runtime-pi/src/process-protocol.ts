@@ -1,12 +1,12 @@
 import type { RuntimeOptions, RuntimeTool } from './contracts.ts'
 import { isRuntimePersistenceFailure } from './persistence-error.ts'
 
-export type ToolDescription = Pick<RuntimeTool, 'name' | 'description' | 'revision' | 'parameters' | 'executionMode' | 'promptHint' | 'exposure'> & { handle: number }
+export type ToolDescription = Pick<RuntimeTool, 'name' | 'description' | 'revision' | 'parameters' | 'executionMode' | 'promptHint' | 'contextHint' | 'exposure'> & { handle: number }
 export type ProcessOptions = Omit<RuntimeOptions, 'tools' | 'callbacks' | 'refreshTools'> & { tools: ToolDescription[]; refresh: boolean }
 export type ProcessMessage =
   | { type: 'call'; id: number; method: string; args: unknown[] }
   | { type: 'reply'; id: number; value?: unknown; error?: { message: string; name: string; fatal: boolean; code?: string } }
-  | { type: 'heartbeat' }
+  | { type: 'heartbeat'; memory?: import('./process-diagnostics.ts').RuntimeMemory }
 
 /** One peer per child. Replies are acknowledged before the runtime advances. */
 export class ProcessPeer {

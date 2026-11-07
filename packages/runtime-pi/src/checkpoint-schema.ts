@@ -20,6 +20,8 @@ const message = z.discriminatedUnion('role', [
   z.object({ role: z.literal('assistant'), content, timestamp: z.number(), api: z.string(), provider: z.string(), model: z.string(),
     stopReason: z.enum(['stop', 'length', 'toolUse', 'error', 'aborted']), usage }).passthrough(),
   z.object({ role: z.literal('toolResult'), content, timestamp: z.number(), toolCallId: z.string(), toolName: z.string(), isError: z.boolean() }).passthrough(),
+  z.object({ role: z.literal('custom'), customType: z.string(), content: z.union([z.string(), content]),
+    display: z.boolean(), timestamp: z.number() }).passthrough(),
 ])
 const base = { id: z.string().min(1), parentId: z.string().nullable(), timestamp: z.string() }
 const entry = z.discriminatedUnion('type', [

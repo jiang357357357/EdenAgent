@@ -24,12 +24,16 @@ export async function buildServer(root = fileURLToPath(new URL('../../', import.
   await copyVideoSources(root, directory)
   await buildDesktopObserver(root, directory)
   await copyFile(path.join(root, 'Server/src/modules/desktop/cua-driver.LICENSE'), path.join(directory, 'cua-driver.LICENSE'))
+  await Promise.all(['LICENSE', 'NOTICE'].map(name => copyFile(
+    path.join(root, 'Server/src/model-prompts', `dsh-purge.${name}`), path.join(directory, `dsh-purge.${name}`),
+  )))
   // Workers are created per turn; bundle the public SDK graph to avoid resolving many separate modules again.
   await Promise.all([
     build({ ...common, entryPoints: { main: 'Server/src/main.ts',
       'workspace-search-worker': 'Server/src/modules/workspace/workspace-search-worker.ts',
       'desktop-broker': 'Server/src/modules/desktop/broker-entry.ts', 'cua-worker': 'Server/src/modules/desktop/cua-worker.ts' },
       external: ['@earendil-works/*', '@trycua/*', 'koffi', 'ajv', 'ws', 'zod', 'typebox', 'esbuild', 'playwright-core', 'onnxruntime-node', 'onnx-proto', '@huggingface/tokenizers', 'ssh2'] }),
+    build({ ...common, entryPoints: { 'connector-sdk': 'packages/plugin-sdk/src/connector/index.ts' } }),
     buildRuntimeWorker(root, directory),
     buildSharedWorkspaceHost(root, path.join(directory, 'shared-workspace-host.mjs')),
   ])

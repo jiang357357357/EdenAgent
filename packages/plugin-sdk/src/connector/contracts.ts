@@ -6,6 +6,8 @@ export type ConnectorHealth = z.infer<typeof connectorWorkerHealthSchema>
 export interface ConnectorContext extends ConnectorInitialize {
   signal: AbortSignal
   publish(eventType: string, externalId: string, payload: JsonValue): void
+  /** Resolves only after host persistence; retry an unknown outcome with the same externalId and payload. */
+  publishConfirmed(eventType: string, externalId: string, payload: JsonValue): Promise<{ id: string; jobId: string | null; duplicate: boolean }>
   status(state: ConnectorHealth['state']): void
 }
 export interface ConnectorCall {

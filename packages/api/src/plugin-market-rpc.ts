@@ -13,7 +13,7 @@ export const marketReleaseInfoSchema = z.object({ sourceID: z.string(), pluginID
   version: z.string(), revision: z.string(), revoked: z.boolean(), revocationReason: z.string().nullable() })
 export const pluginPreviewInfoSchema = managedPluginInfoSchema.pick({ id: true, name: true, description: true, version: true,
   revision: true, sourceType: true, sourceUri: true, components: true, permissions: true }).extend({
-  previewID: z.string().uuid(), verified: z.boolean(), expiresAt: z.number().int(),
+  previewID: z.string().uuid(), verified: z.boolean(), expiresAt: z.number().int(), warnings: z.array(z.string()).optional(),
 })
 export type MarketSourceInfo = z.infer<typeof marketSourceInfoSchema>
 export type MarketReleaseInfo = z.infer<typeof marketReleaseInfoSchema>

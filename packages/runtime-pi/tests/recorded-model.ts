@@ -12,6 +12,7 @@ export async function recordedModel(replies: RecordedReply[]) {
   const headers: import('node:http').IncomingHttpHeaders[] = []
   const active = new Set<ServerResponse>()
   const server = createServer(async (request, response) => {
+    request.setEncoding('utf8')
     let body = ''
     for await (const chunk of request) body += chunk.toString()
     requests.push(JSON.parse(body))
@@ -49,6 +50,10 @@ export async function recordedModel(replies: RecordedReply[]) {
   const port = (server.address() as AddressInfo).port
   return {
     requests, headers,
+    releaseWaiting(text = 'Recorded response completed') {
+      for (const response of active) response.end(`data: ${JSON.stringify({ id: 'released-recording', object: 'chat.completion.chunk',
+        created: 1, model: 'recorded', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
+    },
     config: { provider: 'recorded', id: 'recorded', baseUrl: `http://127.0.0.1:${port}/v1`, contextWindow: 32000, maxTokens: 1024 },
     async close() {
       for (const response of active) response.destroy()

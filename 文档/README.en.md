@@ -28,6 +28,7 @@ Design decisions, operations, extension protocols, and acceptance material
 | [TypeScript host and pi implementation plan](技术/Eden Agent%20TypeScript%20宿主与%20pi%20实现方案.md) | Proposed migration: TS host, pi adapter, agent-authored plugins, data recovery, and phased acceptance; implementation in progress | Chinese |
 | [TypeScript engineering rules](技术/Eden%20Agent%20TypeScript%20工程约束.md) | Approved directory boundaries, file-size limits, and CI checks | Chinese |
 | [TS migration tracker](技术/Eden%20Agent%20TS%20迁移实施跟踪.md) | Long-term milestones, verification evidence, and remaining work | Chinese |
+| [Shared QQ group session design](技术/Eden%20Agent%20QQ%20群聊共享会话设计.md) | One Agent history per group, per-input execution identity, incremental messages, approvals, and legacy transition; not implemented | Chinese |
 | [All-Rust migration record](技术/Eden Agent%20全%20Rust%20迁移执行清单.md) | Historical switch from the Python host/sidecar to Rust | Chinese |
 | [Complete capability migration plan](技术/Eden Agent%20全%20Rust%20完整功能迁移计划.md) | Product-capability migration status and external prerequisites | Chinese |
 | [`eden-agent-app` module boundary](技术/Eden Agent%20eden-agent-app%20运行时模块边界.md) | Session runtime and application orchestration responsibilities | Chinese |
@@ -39,6 +40,7 @@ Design decisions, operations, extension protocols, and acceptance material
 | Document | Purpose | Language |
 | --- | --- | --- |
 | [Unified plugin system](技术/Eden Agent%20统一插件系统.md) | Unified model for plugins, skills, workers, MCP, and permissions | Chinese |
+| [DSH native plugin compatibility design](技术/Eden%20Agent%20DSH%20原生插件兼容设计.md) | Cordis plugin loading, bridges, permission boundaries, and phased acceptance; not yet implemented | Chinese |
 | [Installable connector protocol and package format](技术/Eden Agent%20可安装连接器协议与包格式.md) | Connector packages, worker protocol, and trust model | Chinese |
 | [Hearts of Iron IV observer connector](技术/Eden Agent%20Hearts%20of%20Iron%20IV%20观察连接器.md) | Read-only HOI4 log-observation path | Chinese |
 | [Victoria 3 observer mode](技术/Eden Agent%20Victoria%203%20观察模式.md) | Victoria 3 snapshots, probes, and permission boundaries | Chinese |

@@ -19,7 +19,7 @@ test('a running tool loop replaces removed tools and skill hints before its next
     assert.equal(calls, 1)
     assert.equal(model.requests.length, 3)
     const names = (index: number) => (model.requests[index]!.tools as { function: { name: string } }[]).map(tool => tool.function.name)
-    assert.deepEqual(names(0), ['refresh_catalog', 'old_skill'])
+    assert.deepEqual(names(0), ['old_skill', 'refresh_catalog'])
     assert.deepEqual(names(1), ['new_skill'])
     assert.match(JSON.stringify(model.requests[1]!.messages), /CATALOG_AFTER/)
     assert.doesNotMatch(JSON.stringify(model.requests[1]!.messages), /CATALOG_BEFORE/)

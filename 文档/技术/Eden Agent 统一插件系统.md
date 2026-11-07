@@ -4,6 +4,12 @@
 
 # Eden Agent 统一插件系统
 
+## 组合插件启用流程修复（2026-11-06）
+
+智能体安装 UI 包默认完成授权及启用，`enabled:false` 仅保存安装快照；UI 与连接器管理工具的启用流程根据清单、当前组件开关和后台描述计算所需权限，并交给现有审批服务。完全访问／完全接管按原模式自动通过，不额外要求用户勾选 Node；受限模式仍等待审批。版本、组件或权限在审批期间变化时拒绝旧计划，新增授权与组件启用在同一事务中提交。显式关闭的组件不自动开启，可用 `enableComponents` 指定选择。低层包仓库的直接 `enable` 继续严格要求已存在的授权，原签名、完整性、版本与实例资源校验保持有效。
+
+受信任客户端的启用和组件开关在当前世界完全访问模式下使用相同计划；模式不扩展到其他世界或 QQ 渠道。模型回执包含后台实际就绪状态，UI 工具在启动阶段等待选中 MCP 后台就绪后再解析和执行；超时、取消、后台报错保留真实状态，不自动重试写操作。安装、后台连接和业务成功分别验证。
+
 状态：2026-09-10 连接器统一重构。当前事实来源是 TS 源码和 [连接器实施计划](ts-migration/连接器统一实施计划.md)。原 Rust Server/Native 设计只保留在归档及 Git 历史中，不是活动架构。
 
 ## 安装和运行的所有者
@@ -47,7 +53,13 @@ SDK 公开入口为 `@eden/plugin-sdk/connector`。插件定义 `ConnectorDefini
 - HTTP 声明设置字段和默认 URL；支持 HTTPS 或显式 loopback HTTP。TCP 声明 loopback 主机/端口字段，可从批准的注册文件发现；受管注册文件绑定进程启动身份并检查变更。桥接固定目的地址，插件不能自行切换地址。当前网络权限是端点级权限，未实现 HTTP 路径级授权。
 - 身份凭据来自当前世界私有数据库，只有批准 `environment.read connector.identityCredential` 的实例获得注入。没有宿主环境变量回退，没有凭据读取 RPC 或模型工具。
 - Linux 使用 bubblewrap、prlimit、只读包快照、私有 `/data`、受限内存和独立进程组；网络命名空间不共享。缺少沙箱则拒绝运行。Node 迁移没有取消 OS 隔离。
-- MCP 保留自己的传输协议，仍由统一包拥有组件与版本。UI 和 Hook 是声明式数据；不在前端任意执行插件脚本。
+- MCP 保留自己的传输协议，仍由统一包拥有组件与版本。UI 支持既有声明卡片及 Eden UI API 1 模块，模块通过宿主共享 React 和受控接口注册视图；Hook 使用声明式数据。
+
+独立本地业务后端可与 UI 放在同一包中，以 `mcp_stdio` 运行纯 JavaScript。当前包声明、运行时描述、逐行 JSON-RPC、持久目录、前端工具桥及授权要求，以 `manage_ui_plugins.describe` 或 `manage_connector_plugins.describe` 返回的 `backends` 为准；这些说明不包含具体业务实现。客户便携包的 MCP 路径不依赖源码构建脚本。连接器可使用宿主 `build_connector_plugin` 工具构建；源码开发环境仍可使用 `package_connector.mjs`。旧客户包未更新时不保证存在新工具，不应扫描其他安装或个人目录寻找构建依赖。
+
+内置技能 `eden-ui-development` 统一说明 UI、连接器和 MCP 后端的选择与组合，保留既有名称。UI 与连接器可在同一 `plugin.json` 分别声明 `components.ui` 和 `components.runtimes`；构建时将 UI 文件放入连接器源码的 `package` 目录。业务设置严格按 `settingsSchema.properties` 校验，`boundSessionId` 和 `selfAwakeOnEvent` 为宿主保留字段，无须清单声明。检查和安装须使用同一管理入口的当前回合快照。安装后通过 `manage_plugin_grants` 发起包权限审批，启用后通过 `manage_connector_instances` 创建并自动绑定当前会话、申请实例资源并连接。拥有会话可经审批分享给同账号指定活动应用会话；共享会话可调用能力和读取历史事件，事件唤醒只面向拥有会话。API 1 和 API 2 页面均可订阅事件提示；使用游标补读，不能替代端到端验收。
+
+`manage_plugin_packages` 是组件无关的模型管理入口，可检查和安装纯 MCP、纯 UI、连接器或组合包，并沿用快照、审批、版本校验和激活计划。`read_connector_events` 支持 `before` 反向和 `after` 正向游标以及 `limit`，用 `after:0` 从最早事件补读；`wake` 显示事件触发状态，新事件的持久作业独立于角色定时计划，且仍受自醒开关和每会话 1000 个待处理任务上限约束。超过上限时事件本身保留并显示抑制原因。旧版事件的 `published` 只代表调度文件已写入。Worker 原有 `publish` 是单向通知；新 `publishConfirmed` 在初始化完成后可等待持久化回执，超时或断连时须使用相同 externalId 和内容重试，回执也不代表模型已处理。
 
 ## 官方与智能体生成的插件
 

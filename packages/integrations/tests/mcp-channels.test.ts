@@ -34,7 +34,7 @@ test('stdio handles server ping, notifications, successful and rejected requests
     assert.equal(notifications.length, 1)
     const rejected = channel.request('tools/call', {}, new AbortController().signal)
     output.write(JSON.stringify({ jsonrpc: '2.0', id: 2, error: { code: -32001, message: 'denied' } }) + '\n')
-    await assert.rejects(rejected, error => error instanceof McpRemoteError && error.code === -32001)
+    await assert.rejects(rejected, error => error instanceof McpRemoteError && error.code === -32001 && error.message.includes('denied'))
   } finally { channel.close(); input.destroy(); output.destroy() }
 })
 

@@ -21,11 +21,14 @@ export const memoCreateSchema = z.object({
 export const memoPatchSchema = z.object(fields).partial().strict()
 export const memoUpdateSchema = memoIdSchema.extend({ patch: memoPatchSchema })
 export const memoListSchema = z.object({ limit: z.number().int().min(1).max(200).default(80), query: z.string().max(1000).nullish() }).strict()
+export const memoPageRequestSchema = memoListSchema.extend({ cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).optional() })
 export const memoInfoSchema = memoCreateSchema.extend({
   source: z.string().default('monagent'), id: memoIntegerSchema, lastTriggeredAt: memoIntegerSchema.nullable(), completedAt: memoIntegerSchema.nullable(),
   createdAt: memoIntegerSchema, updatedAt: memoIntegerSchema,
 })
 export type MemoInput = z.infer<typeof memoCreateSchema>
+export const memoPageResultSchema = z.object({ items: z.array(memoInfoSchema), nextCursor: z.string().nullable(), hasMore: z.boolean() })
+export type MemoPageRequest = z.input<typeof memoPageRequestSchema>
 export type MemoPatch = z.infer<typeof memoPatchSchema>
 export type MemoInfo = z.infer<typeof memoInfoSchema>
 export const memoNotificationSchema = z.object({

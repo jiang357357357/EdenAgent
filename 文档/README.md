@@ -22,11 +22,14 @@
 
 ## 架构与边界
 
+当前智能体创建交互界面的入口见 [智能体前端扩展](技术/智能体前端扩展.md)，使用 Eden UI API 1。
+
 | 文档 | 用途 |
 | --- | --- |
 | [TypeScript 宿主与 pi 实现方案](技术/Eden Agent%20TypeScript%20宿主与%20pi%20实现方案.md) | 当前迁移设计：TS 宿主、pi 适配、自编写插件、数据恢复和分阶段验收；实施中 |
 | [TypeScript 工程约束](技术/Eden%20Agent%20TypeScript%20工程约束.md) | 批准的目录、依赖、文件规模与 CI 门禁 |
 | [TS 迁移实施跟踪](技术/Eden%20Agent%20TS%20迁移实施跟踪.md) | 长期计划、实际验证证据、未完成项和下一批工作 |
+| [QQ 群聊共享会话设计](技术/Eden%20Agent%20QQ%20群聊共享会话设计.md) | 复用 QQBot 群历史，设计一群一会话、每轮操作者、增量导入、审批与旧数据衔接；尚未实现 |
 | [全 Rust 服务端长期架构方案](技术/Eden Agent%20全%20Rust%20服务端长期架构方案.md) | 单进程 Rust Server 的长期结构与依赖方向 |
 | [全 Rust 迁移执行记录](技术/Eden Agent%20全%20Rust%20迁移执行清单.md) | 从 Python host/sidecar 切换到 Rust 的历史记录 |
 | [完整功能迁移计划](技术/Eden Agent%20全%20Rust%20完整功能迁移计划.md) | 产品能力迁移状态与外部条件 |
@@ -39,6 +42,7 @@
 | 文档 | 用途 |
 | --- | --- |
 | [统一插件系统](技术/Eden Agent%20统一插件系统.md) | Plugin、Skill、Worker、MCP 和权限的统一模型 |
+| [DSH 原生插件兼容设计](技术/Eden%20Agent%20DSH%20原生插件兼容设计.md) | 基于 Cordis 的插件加载、桥接、权限边界与分阶段验收；尚未实现 |
 | [可安装连接器协议与包格式](技术/Eden Agent%20可安装连接器协议与包格式.md) | Connector Package、Worker Protocol 与信任模型 |
 | [Hearts of Iron IV 观察连接器](技术/Eden Agent%20Hearts%20of%20Iron%20IV%20观察连接器.md) | HOI4 只读日志观察链路 |
 | [Victoria 3 观察模式](技术/Eden Agent%20Victoria%203%20观察模式.md) | Victoria 3 快照、探针和权限边界 |

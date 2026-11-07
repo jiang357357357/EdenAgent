@@ -13,6 +13,7 @@ import { selfAwakeRpcMethods } from './self-awake-rpc.ts'
 import { skillRpcMethods } from './skill-rpc.ts'
 import { pluginMarketRpcMethods } from './plugin-market-rpc.ts'
 import { pluginManagementRpcMethods } from './plugin-management.ts'
+import { pluginUiRpcMethods } from './plugin-ui.ts'
 import { pluginDevelopmentRpcMethods } from './plugin-development.ts'
 import { z } from 'zod'
 import { connectorRpcMethods } from './connector-rpc.ts'
@@ -44,6 +45,7 @@ export const rpcMethods = {
   ...skillRpcMethods,
   ...pluginMarketRpcMethods,
   ...pluginManagementRpcMethods,
+  ...pluginUiRpcMethods,
   ...pluginDevelopmentRpcMethods,
   ...connectorRpcMethods,
   ...memoRpcMethods,
