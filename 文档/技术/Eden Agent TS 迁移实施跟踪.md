@@ -1,5 +1,13 @@
 # Eden Agent TS 迁移实施跟踪
 
+## 2026-11-07 正式完整交付：1.11.10
+
+Agent 整组以已提交并推送的 Agent `00bb20fb85d1e23067162704dc6239d7b93cdfc0`、Server `07bbb518d1d7728eda407ed29b793633b59b2033`、Frontend `e537b7912f8acc08049bb97b458f0cdcf3754d5c` 构建 Windows / Linux 1.11.10 正式主包，采用 Node 22.23.1 与 Electron 42.4.0。六类扩展展示、独占整页、生命周期及工具排队修复已进入正式交付；本节取代下方仅本地构建的当前状态，历史记录保留。
+
+源码有效回归、两平台候选及最终归档全新解压后的真实 Core／Agent／共享宿主／Electron 流程通过，托盘重开与迁址检查通过。三项旧 Server 测试预期在构建后对齐既有生产契约并定向复验，未修改生产代码，不重标本次构建提交。两套实际安装完成，两个 Windows Agent 数据库迁移及全部 9 个数据库原有行保护核验通过；两平台安装内只读 BGE 推理通过。用户数据未用作测试夹具，服务保持原停止状态。
+
+六个完整归档已上传并全部回下载核对 SHA-256，原三个网盘分享入口和 `down/` 说明更新。版本来源、复用、摘要及外部模型／QQ／实体 Mint 等验证边界见 [正式发行记录](../../../文档/发布/releases/1.11.10.md)；完整小型验证记录位于根 `.release/current/Release/`。GitHub 使用 `socks5://127.0.0.1:10808`，未同步 GitCode 或部署 SSH 客户机。
+
 ## 2026-11-07 Windows / Linux 便携 Agent 本地更新
 
 按用户指定的 `E:\EDEN\EDEN-portable` 更新 `Win/EDEN_win`、`Linux/EDEN_linux` 的 Agent 整组，将六类扩展展示、系统整页与此前扩展机制修复纳入实际程序。以当前含未提交改动的源码构建，记录 1,778 个输入文件及三个 Agent 仓库的提交与 dirty 状态；构建前后输入一致。Server、Web、运行时和 Electron 资源重新组装，Node 为 22.23.1、Electron 为 42.4.0；Windows 指针辅助程序通过离线锁定 Cargo 构建检查，包内文件与输出一致。正式版本仍为 1.11.9，原 `VERSION`、`BUILD-INFO.json` 和已交付归档保留，没有提交、推送、上传或更新 SSH 客户机。
